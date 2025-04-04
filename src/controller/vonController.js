@@ -722,9 +722,9 @@ if (invalidRecords.length > 0) {
         invalidRecords: invalidRecords
     });
 }
-console.log(formattedData);
+// console.log(formattedData);
 
-// console.log("Formatted Data:", formattedData);
+console.log("Formatted Data:", formattedData);
 
 await transaction.begin(); // Start transaction
 await insertData(formattedData,tableName)  // Insert Function to insert formatted data into table
