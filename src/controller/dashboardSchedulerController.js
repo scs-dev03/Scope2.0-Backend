@@ -599,7 +599,7 @@ function scheduleTask() {
       const query = `use [UAD_BI]
                      SELECT TOP 5  reqid, dashboardcode, brand, brandid, dealer, dealerid, scheduledon
                      FROM SBS_DBS_ScheduledDashboard 
-                     WHERE status = 0 and dateadd(hour,-6,ScheduledOn) < = GETDATE()`
+                     WHERE status = 0 and dateadd(hour,-10,ScheduledOn) < = GETDATE() order by ScheduledOn`
       const result = await pool.request().query(query)
       const tasks = result.recordset
 
