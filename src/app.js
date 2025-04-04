@@ -12,11 +12,8 @@ app.use(cors())
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-<<<<<<< HEAD
- //scheduleTask()
-=======
-//  scheduleTask()
->>>>>>> dc6a7f177bbb7aca02f71380070a746f9206b588
+ scheduleTask()
+
 
 
 app.use('/api', appRoutes); 
