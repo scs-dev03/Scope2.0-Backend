@@ -157,7 +157,11 @@ return false;
 // Checking User is Authorised to Perform Actions or not 
 const checkisUserValid = async(addedby)=>{
   const pool = await getPool1()
+<<<<<<< HEAD
   const query = `use [z_scope] select designation , isBDM from adminmaster_gen where bintid_pk = @addedby`
+=======
+  const query = `use [z_scope] select designation , isBDM from [10.10.152.16].[z_scope].[dbo].adminmaster_gen where bintid_pk = @addedby`
+>>>>>>> dc6a7f177bbb7aca02f71380070a746f9206b588
   const result = await pool.request().input('addedby',sql.Int,addedby).query(query)
   if(result.recordset[0].designation == 5 || result.recordset[0].isBDM == 'Y'){
     return true;
@@ -167,14 +171,22 @@ const checkisUserValid = async(addedby)=>{
 }
 const checkGroupSetting = async(dealerid)=>{
   const pool = await getPool1()
+<<<<<<< HEAD
   let query = `select count(dealerid) from [10.10.152.16].z_scope..locationinfo where dealerid =  @dealerid `
+=======
+  let query = `select count(dealerid) from [10.10.152.16].z_scope.dbo.locationinfo where dealerid =  @dealerid `
+>>>>>>> dc6a7f177bbb7aca02f71380070a746f9206b588
   let result = await pool.request().input('dealerid',sql.Int,dealerid).query(query)
   if(result.recordset.count = 1 ){
     return true
   }
   else{
     query = ` use z_scope 
+<<<<<<< HEAD
                   SELECT  CASE WHEN EXISTS (SELECT 1 FROM [10.10.152.16].z_scope..Dealer_setting_master WHERE dealerid = @dealerid AND locationid = 0) THEN 'YES'
+=======
+                  SELECT  CASE WHEN EXISTS (SELECT 1 FROM [10.10.152.16].z_scope.dbo.Dealer_setting_master WHERE dealerid = @dealerid AND locationid = 0) THEN 'YES'
+>>>>>>> dc6a7f177bbb7aca02f71380070a746f9206b588
                   ELSE 'NO' END AS CID;`
    result = await pool.request().input('dealerid',sql.Int,dealerid).query(query)
   if(result.recordset[0].CID === 'YES'){

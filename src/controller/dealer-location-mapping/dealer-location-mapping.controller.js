@@ -1,7 +1,11 @@
 
+<<<<<<< HEAD
 import {addDealerLocationMappingInService,exportUploadedData,editDealerLocationMappingInService,
     viewDealerLocationMappingInService,deleteDealerLocationMappingInService
 } from '../../services/dealer-location-mapping/dealer-location-mapping.service.js';
+=======
+import {addDealerLocationMappingInService,exportUploadedData,editDealerLocationMappingInService} from '../../services/dealer-location-mapping/dealer-location-mapping.service.js';
+>>>>>>> dc6a7f177bbb7aca02f71380070a746f9206b588
 const addDealerLocationMapping=async (req,res)=>{
 
     try{       
@@ -39,6 +43,7 @@ const editDealerLocationMapping=async(req,res)=>{
     }
 }
 
+<<<<<<< HEAD
 const viewDealerLocationMapping=async (req,res)=>{
     try{       
         const result= await viewDealerLocationMappingInService(req.body);
@@ -63,3 +68,6 @@ const deleteDealerLocationMapping=async(req,res)=>{
 }
 export { addDealerLocationMapping,exportUploadedDataInController,editDealerLocationMapping
     ,viewDealerLocationMapping,deleteDealerLocationMapping}
+=======
+export { addDealerLocationMapping,exportUploadedDataInController,editDealerLocationMapping}
+>>>>>>> dc6a7f177bbb7aca02f71380070a746f9206b588
