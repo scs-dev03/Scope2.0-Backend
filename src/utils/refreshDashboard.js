@@ -43,7 +43,7 @@ const refreshSI = async(dealerid,reqid)=>{
             let query = ` exec [10.10.152.16].[UAD_BI_SI].[dbo].uad_si_report_3 '${dealerid}','${date}'`
       
           const result =  await pool.request().query(query)
-          console.log(`Data Refreshing SI`);
+          console.log(`Data Refreshing SI for reqid: ${reqid}`);
 
       let Check =  isDataRefreshed(result.recordset[0])
 
@@ -74,7 +74,7 @@ const refreshBenchmarking = async(dealerid,reqid)=>{
      const pool = await getPool1()
      let query = `exec [10.10.152.16].[UAD_BI].[dbo].DRD_Adjustment_Dealer @dealerid`
      let result =  await pool.request().input('dealerid',sql.Int,dealerid).query(query)
-      console.log(`Data Refreshing Benchmarking`);
+      console.log(`Data Refreshing Benchmarking for reqid: ${reqid}`);
 
       let Check =  isDataRefreshed(result.recordset[0])
       //Data Refresh Done Successfully
@@ -111,7 +111,7 @@ const refreshCID = async(dealerid,reqid)=>{
      let query = `exec [10.10.152.16].[UAD_BI_CID].[dbo].UAD_Cinv_Compile @dealerid`
    //   const test = `use uad_bi select * from BackupTbl`
      const result =  await pool.request().input('dealerid',sql.Int,dealerid).query(query)
-      console.log(`Data Refreshing CID`);
+      console.log(`Data Refreshing CID for reqid: ${reqid}`);
       let Check =  isDataRefreshed(result.recordset[0])
       //Data Refresh Done Successfully
       if(Check){
@@ -141,7 +141,7 @@ const refreshPPNI = async(brandid,dealerid,reqid)=>{
       const pool = await getPool1()
       // let query = `use UAD_BI_PPNI exec UAD_PPNI_Report_LS @brandid,@dealerid`
       // const result =  await pool.request().input('brandid',sql.TinyInt,brandid).input('dealerid',sql.Int,dealerid).query(query)
-      console.log(`Data Refreshing PPNI`);
+      console.log(`Data Refreshing PPNI for reqid: ${reqid}`);
       // let Check =  isDataRefreshed(result.recordset[0])
       //Data Refresh Done Successfully
       // if(Check){
@@ -166,7 +166,7 @@ const refreshPPNI = async(brandid,dealerid,reqid)=>{
 const refreshSpecialList = async(reqid)=>{
    try {
       const pool = await getPool1()
-      console.log(`Data Refreshing Special List`);
+      console.log(`Data Refreshing Special List for reqid: ${reqid}`);
       //Data is Always Refreshed in Special List 
       let query = `use [UAD_BI] Update SBS_DBS_ScheduledDashboard set status = 3 where reqid = @reqid`
        await pool.request().input('reqid',sql.Int,reqid).query(query)
@@ -178,7 +178,7 @@ const refreshSpecialList = async(reqid)=>{
 const refreshGainerMini = async(reqid)=>{
    try {
       const pool = await getPool1()
-      console.log(`Data Refreshing Gainer Mini`);
+      console.log(`Data Refreshing Gainer Mini for reqid: ${reqid}`);
       //Data is Always Refreshed in Special List 
       let query = `use [UAD_BI] Update SBS_DBS_ScheduledDashboard set status = 3 where reqid = @reqid`
        await pool.request().input('reqid',sql.Int,reqid).query(query)
@@ -193,7 +193,7 @@ const refreshTOPS = async(dealerid,reqid)=>{
      let query = `EXEC [10.10.152.17].[z_scope].[dbo].Tops_vs_scs_norms_dealerwise_test1 @dealerid`
    //   const test = `use uad_bi select * from BackupTbl`
      const result =  await pool.request().input('dealerid',sql.Int,dealerid).query(query)
-      console.log(`Data Refreshing TOPS`)
+      console.log(`Data Refreshing TOPS for reqid: ${reqid}`)
       let Check =  isDataRefreshed(result.recordset[0])
       //Data Refresh Done Successfully
       if(Check){
