@@ -162,5 +162,33 @@ try {
 //     }
 // };
 
+const userInfo = async(req,res)=>{
+try {
+      const pool = await getPool1()
+      const {token , usertype} = req.body
 
-export {getBrands,getDealers,getLocation,getWorkspace,getDashboard,partNature,model,seasonal,partType}
+      
+      if(!token || !usertype){
+        return res.status(400).json({message:`Token and Usertype Both are required`})
+      }
+      if(usertype === 'a'){
+      const query = `select bintid_pk , concat(vcfirstname , ' ', vcLastname)as username , designation from adminmaster_gen where bintId_Pk=dbo.f_Decryption('${token}') `
+      
+      const result = await pool.request().query(query)
+      res.status(200).json({Data:result.recordset})
+      }
+      else{
+        const query = `SELECT distinct li.BrandID, dur.dealerid , dur.locationid , concat(amg.vcfirstname , ' ', amg.vcLastname)as username  FROM AdminMaster_GEN amg
+    join Dealer_User_Relation dur on amg.bintid_pk = dur.userid
+    join locationinfo li on dur.locationid = li.LocationID
+    where bintId_Pk=dbo.f_Decryption('${token}') `
+    const result = await pool.request().query(query)
+    res.status(200).json({Data:result.recordset})
+      }
+} catch (error) {
+    res.status(500).json({Error:error.message})
+}
+
+}
+
+export {getBrands,getDealers,getLocation,getWorkspace,getDashboard,partNature,model,seasonal,partType,userInfo}
