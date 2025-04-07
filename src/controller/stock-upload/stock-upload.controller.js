@@ -103,26 +103,8 @@ const getPartNotInMasterMultiLocation=async(req,res)=>{
 
     try{
 
-<<<<<<< HEAD
         const result=await getPartNotInMasterMultiLocationInService(req.body,res);
         res.status(200).json({data:result});
-=======
-        const zipBuffer=await getPartNotInMasterMultiLocationInService(req.body,res);
-        res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', 'attachment; filename=part_not_in_master.zip');
-
-    // Send the ZIP file as the response
-    res.send(zipBuffer);
-    const zipFilePath = path.join(__dirname, 'part_not_in_master.zip'); // Use the appropriate path
-    fs.unlink(zipFilePath, (err) => {
-      if (err) {
-        console.error('Error deleting the ZIP file:', err);
-      } else {
-        console.log('ZIP file deleted successfully');
-      }
-    });
-        // res.status(200).json({data:result});
->>>>>>> dc6a7f177bbb7aca02f71380070a746f9206b588
     }
     catch(error){
 

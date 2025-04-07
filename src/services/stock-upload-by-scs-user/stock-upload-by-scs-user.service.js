@@ -16,8 +16,9 @@ const singleUploadStockInService = async (req, res) => {
     let dealerId = req.body.dealer_id;
     let date = req.body.date;
     const date1 = new Date(date);
-    const formattedDate = date1.toISOString().split("T")[0]; // Extract the date portion of the ISO string
-    // console.log(typeof formattedDate,formattedDate);
+    const formattedDate = date1.toLocaleDateString('en-CA');
+    // const formattedDate = date1.toISOString().split("T")[0]; // Extract the date portion of the ISO string
+    // console.log(typeof formattedDate,date1,formattedDate);
     //   console.log("date ",date)
     let getMappingQuery = `use [StockUpload] select part_number,stock_qty,loc,stock_type from stock_upload_mapping where brand_id=@brandId and stock_type='current'`;
 
@@ -369,32 +370,35 @@ const singleUploadStockInService = async (req, res) => {
       .query(insertQueryForCurrentStock1);
     let StockCodeCurrent = result1.recordset[0].tcode;
 
-    //  console.log("part not in master ",partNotInMasterArray)
-    const values = partNotInMasterArray.map((item) => {
-      return [
-        parseInt(brandId, 10), // Ensure brandId is an integer
-        item["partnumber"],
-      ];
-    });
-    try {
-      await pool.request().query("use [StockUpload]");
-      const table = new sql.Table("part_not_in_master"); // Updated table name
-      table.create = false;
-
-      table.columns.add("brand_id", sql.Int, { nullable: true });
-      table.columns.add("partnumber", sql.VarChar(100), { nullable: true });
-      // Add rows to the table
-      values.forEach((row) => {
-        table.rows.add(
-          row[0],
-          row[1] // brandid
-        );
+    if(partNotInMasterArray.length!=0){
+      const values = partNotInMasterArray.map((item) => {
+        return [
+          parseInt(brandId, 10), // Ensure brandId is an integer
+          item["partnumber"],
+        ];
       });
-      await pool.request().bulk(table);
-    } catch (error) {
-      console.error("Error during bulk insert: part not in master", error);
-      return { error: error }; // Rethrow the error for further handling if necessary
+      try {
+        await pool.request().query("use [StockUpload]");
+        const table = new sql.Table("part_not_in_master"); // Updated table name
+        table.create = false;
+  
+        table.columns.add("brand_id", sql.Int, { nullable: true });
+        table.columns.add("partnumber", sql.VarChar(100), { nullable: true });
+        // Add rows to the table
+        values.forEach((row) => {
+          table.rows.add(
+            row[0],
+            row[1] // brandid
+          );
+        });
+        await pool.request().bulk(table);
+      } catch (error) {
+        console.error("Error during bulk insert: part not in master", error);
+        return { error: error }; // Rethrow the error for further handling if necessary
+      }
     }
+    //  console.log("part not in master ",partNotInMasterArray)
+  
 
     // console.log(filteredRowData[0])
     const values1 = updatedFilteredRowData.map((item) => {
@@ -561,7 +565,8 @@ const uploadBulkStock = async (req, res) => {
     // const date1= new Date(currentDate);
     let date = req.body.date;
     const date1 = new Date(date);
-    const formattedDate = date1.toISOString().split("T")[0]; // Extract the date portion of the ISO string
+    const formattedDate = date1.toLocaleDateString('en-CA');
+    // const formattedDate = date1.toISOString().split("T")[0]; // Extract the date portion of the ISO string
     // console.log(typeof formattedDate,formattedDate);
     //   console.log("date ",date)
     let getLocationsQuery = `use [z_scope] select locationId from locationInfo where dealerId=@dealerId`;
@@ -648,65 +653,7 @@ const uploadBulkStock = async (req, res) => {
     }
 
     let result567;
-    // rowData = rowDataArray.map((rowData1) => ({
-    //   part_number:
-    //     rowData1[mappedData.part_number] != null
-    //       ? rowData1[mappedData.part_number]
-    //           .toString()
-    //           .replace(/[^a-zA-Z0-9]/g, "")
-    //       : "",
 
-    //   qty:
-    //     rowData1[mappedData.stock_qty] != null
-    //       ? parseFloat(rowData1[mappedData.stock_qty]) || 0
-    //       : 0,
-
-    //   availability:
-    //     rowData1["availability"] != null
-    //       ? rowData1["availability"].toString().trim()
-    //       : "",
-
-    //   status:
-    //     rowData1["status"] != null ? rowData1["status"].toString().trim() : "",
-    //   location: rowData1[mappedData.loc] != null ? rowData1[mappedData.loc] : 0,
-    // }));
-    // // console.log("row data ",rowData)
-
-    // filteredRowData = rowData.filter((row) => {
-    //   // Convert qty to a number safely (handle undefined/null cases)
-    //   const stockQty = parseFloat(row.qty);
-    //   // console.log("parse int ",stockQty)
-    //   // Check if part_number exists and is not empty
-    //   const hasPartNumber = row.part_number !== "";
-    //   const hasLocation = row.loc !== "";
-    //   // Normalize headers
-    //   const availabilityHeader = Object.keys(headers).find(
-    //     (header) => header.toLowerCase() === "availability"
-    //   );
-    //   const statusHeader = Object.keys(headers).find(
-    //     (header) => header.toLowerCase() === "status"
-    //   );
-
-    //   // Get availability and status values
-    //   const availability = row[availabilityHeader]?.toLowerCase().trim();
-    //   const status = row[statusHeader]?.toLowerCase().trim();
-
-    //   // Remove rows where part_number is null/empty and qty > 0
-    //   if (hasPartNumber && stockQty > 0 && hasLocation) {
-    //     return true;
-    //   }
-
-    //   // For brandId 17, 28 remove if availability is "on-hand" and status is not "good"
-    //   if ([17, 28].includes(brandId)) {
-    //     if (availability === "on-hand" && status == "good") {
-    //       return true;
-    //     }
-    //   }
-
-    //   // return true; // Keep the row if it passed all filters
-    // });
-
-    // console.log("filtered data 665 ",filteredRowData)
     rowData = rowDataArray.map((rowData1) => {
       // Find the correct keys dynamically (case insensitive)
       const availabilityKey = Object.keys(rowData1).find(
@@ -725,7 +672,8 @@ const uploadBulkStock = async (req, res) => {
           qty: rowData1[mappedData.stock_qty] != null 
               ? parseFloat(rowData1[mappedData.stock_qty]) || 0 
               : 0, 
-          
+          location: rowData1[mappedData.loc] != null ? rowData1[mappedData.loc] : "",
+
           availability: availabilityKey && rowData1[availabilityKey] != null 
               ? rowData1[availabilityKey].toString().trim() 
               : "", 
@@ -738,12 +686,12 @@ const uploadBulkStock = async (req, res) => {
   
 filteredRowData = rowData.filter((row) => {
   // Convert qty to a number safely (handle undefined/null cases)
- // console.log("row ",row)
+  //console.log("row ",row)
   const stockQty = parseFloat(row.qty) ;
   // console.log("parse int ",stockQty)
   // Check if part_number exists and is not empty
   const hasPartNumber = row.part_number && row.part_number.trim() !== "";
-
+ const hasLocation=row.location && row.location.trim() !==''
   // Normalize headers
   const availabilityHeader = Object.keys(headers).find(
     (header) => {
@@ -768,21 +716,24 @@ filteredRowData = rowData.filter((row) => {
   // }
 
   // For brandId 17, 28 remove if availability is "on-hand" and status is not "good"
-  if ((brandId == 17 || brandId == 28) && availability == "on hand" && status == "good" && hasPartNumber && stockQty > 0) {
+  if ((brandId == 17 || brandId == 28) && availability == "on hand" && status == "good" && hasPartNumber && stockQty > 0 && hasLocation) {
     return true;
 }
 else
-if (brandId == 22 && availability == "on hand" && hasPartNumber && stockQty > 0) {
-   if(row.part_number=='05321KEMP01'){
-    console.log("qty ",stockQty,hasPartNumber)
-   }
+if (brandId == 22 && availability == "on hand" && hasPartNumber && stockQty > 0 && hasLocation) {
+  //  if(row.part_number=='05321KEMP01'){
+  //   console.log("qty ",stockQty,hasPartNumber)
+  //  }
     return true;
 }
 
 if (![17, 22, 28].includes(brandId)) {
-  if (hasPartNumber && stockQty > 0) {
-    return true;
-  }
+  if (hasPartNumber && stockQty > 0 && hasLocation) {
+        return true;
+      }
+  // if (hasPartNumber && stockQty > 0) {
+  //   return true;
+  // }
 }
 
 return false;
@@ -831,10 +782,10 @@ return false;
     // console.log("tcode from stock 1 598", tCodeFromStock1);
     let stockCodes = res45?.recordset;
     StockCodes = stockCodes.map((code) => parseInt(code.tcode, 10));
-    //console.log("stockcodes 606 line", StockCodes);
+  //  console.log("stockcodes 606 line", StockCodes);
     let countPrevRecords = 0;
     let insertedDataResult = [];
-    let quantitySumPrev = 0;
+  
     if (res45?.recordset?.length > 0) {
       let insertedDataQuery = `
       USE [StockUpload]; 
@@ -859,32 +810,6 @@ return false;
       countPrevRecords = insertedDataResult.length;
       //console.log("count prev recorcds ",countPrevRecords)
       // console.log("stock code ",StockCode)
-
-      if (insertedDataResult.length != 0) {
-        // console.log("countRecords inserted ",countPrevRecords)
-        // StockCode = insertedDataResult[0].StockCode;
-        let quanitySumQuery = `
-        USE [StockUpload]; 
-        SELECT SUM(qty) AS QuantSum 
-        FROM currentStock2 
-        WHERE StockCode IN (${StockCodes.map((_, i) => `@code${i}`).join(", ")})
-    `;
-
-        let request = await pool.request();
-        StockCodes.forEach((code, i) => {
-          request.input(`code${i}`, sql.Int, code); // Assuming StockCode is a string
-        });
-
-        result567 = await request.query(quanitySumQuery);
-        // console.log("quantity sum 642", result567.recordset);
-
-        if (result567?.recordset?.length != 0) {
-          quantitySumPrev = result567.recordset[0]?.QuantSum || 0;
-        
-        }
-      }
-
-    
       combinedExistedData = insertedDataResult.flatMap((a1) =>
         tCodeFromStock1
           .filter((a2) => parseInt(a1.stockcode, 10) == parseInt(a2.tcode, 10))
@@ -896,7 +821,7 @@ return false;
           }))
       );
 
-      //console.log("combined existed data 716", combinedExistedData);
+   //  console.log("combined existed data 716", combinedExistedData);
     }
 
     //console.log("filtered row 713 ",filteredRowData)
@@ -923,16 +848,17 @@ return false;
 
       if (!deleteItem) {
         for (const element of dealerLocationMappedData) {
-          // console.log("element ",element,item)
+        //  console.log("element ",item.location,item.location.replace(/[^a-zA-Z0-9-_ ]/g, ''))
           if (
             item.location &&
-            item.location.trim().toLowerCase() ===
+            item.location.replace(/[^a-zA-Z0-9-_ ]/g, '').trim().toLowerCase() ===
               element.inventory_location.trim().toLowerCase()
           ) {
             // Add the partid to the item if a match is found
             item.locationId = element.locationId; // Directly mutate the original item
             updatedFilteredRowData.push(item);
             break; // Exit the loop after finding the match
+            
           } else {
             wrongDealerLocationInFile.push(item.location);
           }
@@ -959,95 +885,141 @@ return false;
 
     // console.log("updated filteredd data 771 ",updatedFilteredRowData)
     // Group and accumulate stockQty for each partNumber + locationId
+
     for (const element of updatedFilteredRowData) {
-      const key = `${element.part_number}-${element.locationId}`; // Unique key for grouping
-      // console.log("element in updatef filtrered row ",element)
+      const key = `${element.part_number}-${element.locationId}`;
+    
       if (partCountMap.has(key)) {
         const existing = partCountMap.get(key);
         partCountMap.set(key, {
           part_number: element.part_number,
-          count: existing.count + 1, // Increment count
-          qty: existing.qty + element.qty, // Sum stockQty
+          qty: existing.qty + element.qty,
           partId: element.partId,
           locationId: element.locationId,
+          count: existing.count + 1,
+          location: element.location || existing.location || '',
+          availability: element.availability || existing.availability || '',
+          status: element.status || existing.status || '',
         });
       } else {
-        partCountMap.set(key, { ...element, count: 1 }); // First entry
+        partCountMap.set(key, {
+          part_number: element.part_number,
+          qty: element.qty,
+          partId: element.partId,
+          locationId: element.locationId,
+          count: 1,
+          location: element.location || '',
+          availability: element.availability || '',
+          status: element.status || '',
+        });
       }
     }
+    
+     updatedFilteredRowData = Array.from(partCountMap.values());
+    
+  //  console.log("filtered 974 ",filteredRowData)
 
-    //  console.log("part count", partCountMap);
-
-    // console.log("updated filtered data ",partCountMap)
-    updatedFilteredRowData = Array.from(
-      partCountMap.values(), // Extract only values from the Map
-      ({ part_number, qty, partId, locationId }) => ({
-        part_number, // Keep only the part number without locationId
-        qty: qty, // Renaming stockQty to qty
-        partId,
-        locationId,
-      })
-    );
-
-    //console.log("updated filtered row 792 ",updatedFilteredRowData)
+    //console.log("updated filtered row 918 ",partCountMap);
+ //console.log("updated filtered data 922 ",updatedFilteredRowData)
+  
     if (insertedDataResult.length != 0) {
-      updatedFilteredRowData.forEach((item) => {
-        // console.log(item)
-        let partID = item.partId;
-        let qty = item.qty;
-
-        for (let i = 0; i < combinedExistedData.length; i++) {
-          const element = combinedExistedData[i];
-          // console.log(element,partID)
-          if (
-            element.partId === partID &&
-            element.locationId == item.locationId
-          ) {
-            // Add the qty to the item.qty
-            item.qty = qty + element.qty;
-            break; // Exit the loop after the first match
-          }
-        }
-      });
-    }
-
-    if (updatedFilteredRowData.length < combinedExistedData.length) {
-      const updatedMap = new Map(
-        updatedFilteredRowData.map((item) => [item.partId, item])
-      );
-
-      //  console.log("combined ",combinedExistedData)
-      // Check for missing records in insertedDataResult
-      const missingRecords = combinedExistedData
-        .filter((item) => !updatedMap.has(item.partId))
-        .map((item) => ({
-          part_number: item.part_number,
-          partId: item.partId,
-          qty: item.qty, // Convert qty to an integer
-          locationId: item.locationId,
-        }));
-
-      //  console.log("updated ",updatedMap)
-      // console.log("Missing Records:", missingRecords);
-
-      updatedFilteredRowData.forEach((item) => {
-        if (updatedMap.has(item.partId)) {
-          const existing = combinedExistedData.find(
-            (el) => el.partId === item.partId
+   //   console.log("updated filtered ",updatedFilteredRowData);
+  //    console.log("combined filtered ",combinedExistedData)
+      if (updatedFilteredRowData.length > combinedExistedData.length) {
+        const missingRecords = [];
+      
+        updatedFilteredRowData.forEach((item) => {
+          let partID = item.partId;
+          let qty = parseFloat(item.qty);
+      
+          const match = combinedExistedData.find(
+            (el) => el.partId == partID && el.locationId == item.locationId
           );
-          // if (existing) {
-          //     item.qty = parseInt(existing.qty, 10);
-          // }
-          item.qty = parseFloat(item.qty);
-        }
-      });
-
-      // Add missing records to updatedFilteredRowData
-      for (let j = 0; j < missingRecords.length; j++) {
-        updatedFilteredRowData.push(missingRecords[j]);
+      
+          if (match) {
+          //  console.log("Matched element:", match);
+            item.qty = qty + parseFloat(match.qty);
+          } else {
+            // Only push missing record if not already in missingRecords
+            const potentialMissing = combinedExistedData.find(
+              (el) => el.locationId == item.locationId && el.partId != partID
+            );
+      
+            if (
+              potentialMissing &&
+              !missingRecords.some(
+                (rec) =>
+                  rec.partId == potentialMissing.partId &&
+                  rec.locationId == potentialMissing.locationId
+              )
+            ) {
+           //   console.log("Missing item:", potentialMissing);
+              missingRecords.push(potentialMissing);
+            }
+          }
+        });
+    //   console.log("missing records ",missingRecords)
+        // Only push missingRecords if they're truly missing
+        updatedFilteredRowData.push(
+          ...missingRecords.filter(
+            (missingItem) =>
+              !updatedFilteredRowData.some(
+                (item) =>
+                  item.partId == missingItem.partId &&
+                  item.locationId == missingItem.locationId
+              )
+          )
+        );
       }
+
+    //  console.log("updated filtered 974 ",updatedFilteredRowData)
+      
+      if (updatedFilteredRowData.length < combinedExistedData.length) {
+        // Create a combined key map like "partId-locationId"
+        const updatedMap = new Map(
+          updatedFilteredRowData.map((item) => [`${item.partId}-${item.locationId}`, item])
+        );
+      
+      //  console.log("combined ", combinedExistedData);
+      
+        // Find missing records in updatedFilteredRowData
+        const missingRecords = combinedExistedData
+          .filter(
+            (item) => !updatedMap.has(`${item.partId}-${item.locationId}`)
+          )
+          .map((item) => ({
+            part_number: item.part_number,
+            partId: parseInt(item.partId, 10),
+            qty: parseFloat(item.qty),
+            locationId: parseInt(item.locationId, 10),
+          }));
+      
+       // console.log("updated map ", updatedMap);
+      
+        updatedFilteredRowData.forEach((item) => {
+          const key = `${item.partId}-${item.locationId}`;
+          if (updatedMap.has(key)) {
+            const existing = combinedExistedData.find(
+              (el) => el.partId == item.partId && el.locationId == item.locationId
+            );
+      
+            if (existing) {
+              item.qty = parseFloat(item.qty) + parseFloat(existing.qty);
+            } 
+          }
+        });
+      
+        // Add missing records
+        updatedFilteredRowData.push(...missingRecords);
+      }
+      
     }
-    //  console.log("updatedFiltered 828 ",updatedFilteredRowData)
+
+  //  console.log("updated filtered row ",updatedFilteredRowData,updatedFilteredRowData.length);
+   // console.log("previous data ",combinedExistedData,combinedExistedData.length)
+  
+   // console.log("filtered 982 ",updatedFilteredRowData)
+   //  console.log("updatedFiltered 828 ",updatedFilteredRowData)
     const uniqueLocationIds = [
       ...new Set(updatedFilteredRowData.map((item) => item.locationId)),
     ];
@@ -1060,16 +1032,56 @@ return false;
     let combinedLogsLocationWise = [];
     let currentStockCode;
     // console.log("unique ids ",uniqueLocationIds)
-
+   
     for (let i = 0; i < uniqueLocationIds.length; i++) {
       let locId = uniqueLocationIds[i];
-      // console.log("updated ",updatedFilteredRowData)
+      let prevCountRecords=0;
+      let quantitySumPrev = 0;
+    //   console.log("unique ids  ",uniqueLocationIds)
       let filteredData = updatedFilteredRowData.filter(
         (item) => item.locationId === locId
       );
 
       //console.log("filtered data ",filteredData,locId,StockCodes);
+      if (insertedDataResult.length != 0) {
+        // console.log("countRecords inserted ",countPrevRecords)
+        // StockCode = insertedDataResult[0].StockCode;
+        let tcodeQuery = `
+        USE [StockUpload]; 
+        SELECT tcode
+        FROM currentStock1
+        WHERE locationId =@locId
+    `;
 
+        let request = await pool.request().input('locId',locId);
+
+        let resultTcode= await request.query(tcodeQuery);
+        // console.log("quantity sum 642", result567.recordset);
+     //  console.log("result tcode ",resultTcode)
+        if(resultTcode?.recordset[0]?.tcode){
+          let resTcode=parseInt(resultTcode?.recordset[0]?.tcode,10);
+        //  console.log("tcode at 1069 ",resTcode);
+
+      let quantitySumQuery=`Select sum(qty) as QuantSum,count(*) as countRecords  from currentstock2 where stockcode=@resTcode`;
+       result567=await pool.request().input('resTcode',resTcode).query(quantitySumQuery)  
+      // console.log("quantity sum query 1072 ",result567?.recordset[0]?.QuantSum ) 
+         
+         // console.log(result567);
+      if (result567?.recordset?.length != 0) {
+          quantitySumPrev = result567?.recordset[0]?.QuantSum || 0;
+          prevCountRecords=result567?.recordset[0]?.countRecords ||0 ;
+          //console.log("prevCount ",prevCountRecords)
+        }
+
+        let deleteQuery=`use [stockupload] Delete from currentstock1 where tcode=@resTcode`;
+
+        let res34=await pool.request().input('resTcode',resTcode).query(deleteQuery);
+
+        let deleteQuery1=`use [stockupload] delete from currentstock2 where stockcode=@resTcode`;
+        await pool.request().input('resTcode',resTcode).query(deleteQuery1)
+        }
+       
+      }
       // console.log("updated filtered row after getting unique location id ",updatedFilteredRowData)
       // console.log("current stock1 ",locId,formattedDate,addedBy)
       let insertQueryForCurrentStock1 = `use [StockUpload] insert into currentStock1(locationID,stockdate,addedby) output inserted.tcode values(@locId,@formattedDate,@addedBy)`;
@@ -1135,18 +1147,19 @@ return false;
         .input("currentStockCode", currentStockCode)
         .input("locId", locId)
         .input("addedBy", addedBy)
-        .input("currentQuantSum", currentQuantSum)
+        .input("currentQuantSum", result678?.recordset[0]?.currentQuantSum)
         .input("brandId", brandId)
         .input("dealerId", dealerId)
-        .input("rowCount", rowCount)
+        .input("rowCount", filteredData?.length)
         .input("quantitySumPrev", quantitySumPrev)
-        .input("countPrevRecords", countPrevRecords)
+        .input("countPrevRecords", prevCountRecords)
         .query(logQuery);
+
       combinedLogsLocationWise.push({
-        currentSumQuantity: currentQuantSum,
-        prevSumQuantity: quantitySumPrev,
-        currentRecords: rowCount,
-        prevRecords: countPrevRecords,
+        currentSumQuantity: result678?.recordset[0]?.currentQuantSum||0,
+        prevSumQuantity: quantitySumPrev ||0,
+        currentRecords: filteredData?.length||0,
+        prevRecords: prevCountRecords ||0,
       });
 
       // console.log("partNotInMaster ", {
@@ -1185,35 +1198,35 @@ return false;
         return error; // Rethrow the error for further handling if necessary
       }
     }
+  
+    // if (result567?.recordset?.length != 0) {
+    //   // console.log("quant sum prev ",quantitySumPrev);
+    //   // console.log("stock codes ",stockCodes)
+    //   if (stockCodes.length != 0) {
+    //     let deleteQuery = `
+    //   USE [StockUpload]; 
+    //   DELETE FROM currentStock2 
+    //   WHERE StockCode IN (${StockCodes.map((_, i) => `@code${i}`).join(", ")})
+    //   `;
+    //     // console.log("stock codes ",stockCodes)
 
-    if (result567?.recordset?.length != 0) {
-      // console.log("quant sum prev ",quantitySumPrev);
-      // console.log("stock codes ",stockCodes)
-      if (stockCodes.length != 0) {
-        let deleteQuery = `
-      USE [StockUpload]; 
-      DELETE FROM currentStock2 
-      WHERE StockCode IN (${StockCodes.map((_, i) => `@code${i}`).join(", ")})
-      `;
-        // console.log("stock codes ",stockCodes)
+    //     let deleteQuery1 = `
+    //   USE [StockUpload]; 
+    //   DELETE FROM currentStock1 
+    //   WHERE tcode IN (${StockCodes.map((_, i) => `@code${i}`).join(", ")})
+    //   `;
+    //     //  console.log("stock codes ",stockCodes)
+    //     let request = await pool.request();
+    //     StockCodes.forEach((code, i) => {
+    //       //console.log(" code ",code)
+    //       request.input(`code${i}`, sql.Int, code); // Assuming StockCode and tcode are strings
+    //     });
 
-        let deleteQuery1 = `
-      USE [StockUpload]; 
-      DELETE FROM currentStock1 
-      WHERE tcode IN (${StockCodes.map((_, i) => `@code${i}`).join(", ")})
-      `;
-        //  console.log("stock codes ",stockCodes)
-        let request = await pool.request();
-        StockCodes.forEach((code, i) => {
-          //console.log(" code ",code)
-          request.input(`code${i}`, sql.Int, code); // Assuming StockCode and tcode are strings
-        });
-
-        // Execute the queries
-        await request.query(deleteQuery);
-        await request.query(deleteQuery1);
-      }
-    }
+    //     // Execute the queries
+    //     await request.query(deleteQuery);
+    //     await request.query(deleteQuery1);
+    //  }
+    
 
     //  console.log("locationIWs e",combinedLogsLocationWise)
     return combinedLogsLocationWise;
@@ -1297,9 +1310,10 @@ const getBulkDataInService = async (req, res) => {
       return []; // Return an empty array if no locationIds are provided
     }
 
-    // console.log("locationIds ",locationIds)
+   // console.log("locationIds ",locationIds)
     for (let i = 0; i < locationIds.length; i++) {
-      let locationId = locationIds[i];
+      let locationId = parseInt(locationIds[i],10);
+    //  console.log("locationId ",locationId)
       let getTcodeQuery = `use [stockupload] Select tcode from currentStock1 where locationId=@locationId`;
       const res = await pool
         .request()
@@ -1307,15 +1321,26 @@ const getBulkDataInService = async (req, res) => {
         .query(getTcodeQuery);
       tcode = res.recordset[0]?.tcode;
 
-      // console.log("tcode in bulk data service ", tcode);
+     //  console.log("tcode in bulk data service ", tcode);
       if (tcode != undefined || tcode != null) {
         try {
-          let getDataQuery = `use [stockupload] select partNumber,qty from currentStock2 where stockCode=@tcode`;
+          let getDataQuery = `use [stockupload] select partNumber,qty as Quantity from currentStock2 where stockCode=@tcode`;
           const res78 = await pool
             .request()
             .input("tcode", tcode)
             .query(getDataQuery);
-          bulkUploadedData.push(...res78.recordset);
+            let locationName='';
+
+            let getLocationQuery=`use [z_scope] select location from locationinfo where locationid=@locationId `;
+            let result1=await pool.request().input('locationId',locationId).query(getLocationQuery)
+            locationName=result1.recordset[0]?.location;
+            const recordsWithLocation = res78.recordset.map(record => ({
+              ...record,
+              Location: locationName,
+            }));
+          
+            bulkUploadedData.push(...recordsWithLocation);
+          // bulkUploadedData.push(...res78.recordset);
           // console.log(bulkUploadedData)
         } catch (error) {
           console.log(
@@ -1323,9 +1348,10 @@ const getBulkDataInService = async (req, res) => {
             error.message
           );
         }
-      } else {
-        break;
-      }
+      } 
+      // else {
+      //   break;
+      // }
     }
 
     // Create an Excel file for the location
@@ -1341,6 +1367,7 @@ const getBulkDataInService = async (req, res) => {
       archive.addBuffer(tempBuffer, `Uploaded Data ${dealerName}.xlsx`);
     }
 
+  //  console.log("bulk data ",bulkUploadedData)
     const zipBuffer = await new Promise((resolve, reject) => {
       const chunks = [];
       archive.outputStream.on("data", (chunk) => chunks.push(chunk));

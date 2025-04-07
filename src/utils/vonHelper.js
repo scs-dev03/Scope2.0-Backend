@@ -1,8 +1,5 @@
 import sql from 'mssql'
-<<<<<<< HEAD
-=======
 import xlsx from 'xlsx'
->>>>>>> dc6a7f177bbb7aca02f71380070a746f9206b588
 import { getPool1 } from '../db/db.js'
 
 const partBrandCheck = async(dealerid,locationid,partid)=>{
@@ -26,12 +23,6 @@ const partBrandCheck = async(dealerid,locationid,partid)=>{
         }
 }
 
-<<<<<<< HEAD
-
-
-
-export {partBrandCheck}
-=======
 const readExcel = async (filePath)=>{
       let data
       //  filePath = req.file.path;
@@ -254,4 +245,3 @@ const insertData = async (formattedData,tableName)=>{
 
 
 export {partBrandCheck,readExcel,insertData}
->>>>>>> dc6a7f177bbb7aca02f71380070a746f9206b588

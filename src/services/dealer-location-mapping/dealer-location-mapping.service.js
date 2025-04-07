@@ -344,7 +344,7 @@ rowData.forEach(item => {
     
 
         // console.log("mapped data",rowData,mappedData1)
-      console.log("normalidex data ",normalizedRowData)
+    //  console.log("normalidex data ",normalizedRowData)
 
         if(normalizedRowData.length!=0){
             operation="create dealer location mapping"

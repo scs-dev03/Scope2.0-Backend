@@ -1,6 +1,7 @@
 import { getPool1 } from "../../db/db.js"
 import * as XLSX from "xlsx";
 import fs from "fs";
+import he from 'he'
 export const getBrands = async () => {
   try {
     const pool = await getPool1();
@@ -172,110 +173,37 @@ const readExcelFileWithSubColumnsOfTwoHeader = async (filePath) => {
   }
 };
 
-const decodeHtmlEntities = (text) => {
-  return text.replace(/&#32;/g, " ").trim(); // Replace `&#32;` with space
-};
+function mergeHeaders(headerRows) {
+  const [row1, row2] = headerRows;
+  const merged = [];
 
-// Function to clean header row (replace null/undefined with empty strings)
-const cleanHeaderRow = (row) => row.map(item => item?.toString().trim() || "");
+  let currentGroup = "";
 
-// Function to read and process Excel file
-// const readExcelFileWithSubColumns = async (filePath) => {
-//   try {
-//     const fileBuffer = fs.readFileSync(filePath);
-//     const workbook = XLSX.read(fileBuffer, { type: "buffer" });
+  for (let i = 0; i < row1.length; i++) {
+    const top = row1[i]?.toString().trim().replace(/\n/g, " ") || "";
+    const sub = row2[i]?.toString().trim().replace(/\n/g, " ") || "";
 
-//     const sheetName = workbook.SheetNames[0];
-//     const sheet = workbook.Sheets[sheetName];
-//     const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    if (top) {
+      currentGroup = top;
+    }
 
-//     // Extract first three header rows
-//     let headerRow1 = data[0] || [];
-//     let headerRow2 = data[1] || [];
-//     let headerRow3 = data[2] || [];
+    // If both are empty, skip this column
+    if (!currentGroup && !sub) {
+      merged.push("");
+      continue;
+    }
 
-//     headerRow1 = cleanHeaderRow(headerRow1);
-//     headerRow2 = cleanHeaderRow(headerRow2);
-//     headerRow3 = cleanHeaderRow(headerRow3);
-
-//     // Merge all three header rows while removing 'undefined'
-//     const mergedHeaders = headerRow1.map((header, index) => {
-//       const header2 = headerRow2[index] || "";
-//       const header3 = headerRow3[index] || "";
-
-//       // Remove 'undefined' and unnecessary spaces
-//       const finalHeader = [header, header2, header3]
-//         .filter(Boolean)  // Remove empty/undefined parts
-//         .join(" ")        // Merge into a single string
-//         .replace(/\s+/g, " ") // Remove extra spaces
-
-//       return decodeHtmlEntities(finalHeader); // Convert HTML entities back to normal text
-//     }).filter(header => header !== ""); // Remove completely empty headers
-
-//     // Remove the first three rows and replace with mergedHeaders
-//     data[0] = mergedHeaders;
-//     data.splice(1, 2); // Remove the second and third header rows
-//     console.log("merge headers ",mergedHeaders)
-//     // Convert data to array of objects
-//     let resultData = data.slice(1).map((row) => {
-//       let obj = {};
-//       row.forEach((cell, index) => {
-//         // if (mergedHeaders[index].toLowerCase() !== "dealer" && mergedHeaders[index].toLowerCase() !== "location") {
-//         //   obj[mergedHeaders[index]] = removeSpecialCharacters(cell);
-//         // } else {
-//           obj[mergedHeaders[index]] = cell;
-//         //}
-//       });
-//       return obj;
-//     });
-
-//     // Delete file after processing
-//     fs.unlink(filePath, (err) => {
-//       if (err) console.error("Error deleting the file:", err);
-//     });
-
-//     return { headers: mergedHeaders, data: resultData };
-//   } catch (error) {
-//     console.error("Error reading the Excel file:", error);
-//   }
-// };
-
-const mergeHeaders = (headerRows) => {
-  let columnCount = Math.max(...headerRows.map(row => row.length));
-  let mergedHeaders = [];
-
-  for (let i = 0; i < columnCount; i++) {
-    let merged = headerRows
-      .map(row => row[i] || "")
-      .filter(Boolean) // Remove empty values
-      .join(" ") // Merge multi-line headers
-      .replace(/&#32;/g, " ") // Convert HTML space entity
-      .replace(/\n/g, " ") // Remove line breaks
-      .trim();
-
-    mergedHeaders.push(merged);
+    if (sub) {
+      merged.push(`${currentGroup} ${sub}`.trim());
+    } else {
+      merged.push(currentGroup.trim());
+    }
   }
 
-  // Ensure specific headers are properly expanded
-  const inventoryHeaders = ["ON-HAND", "SAFETY", "ALL. QTY", "DISUSE", "B/O", "DUE-IN", "ON-ORD"];
-  const demandHeaders = ["AMD3", "AMD6", "AMD12"];
-  const desiredStockHeaders = ["DESIRED STOCK", "PO QTY", "REMAINING PO QTY"];
-  
-  let expandedHeaders = mergedHeaders.map(header => {
-    if (header.includes("INVENTORY QUANTITY")) {
-      return inventoryHeaders.map(sub => `INVENTORY QUANTITY ${sub}`);
-    } else if (header.includes("DEMAND")) {
-      return demandHeaders.map(sub => `DEMAND ${sub}`);
-    } else if (header.includes("DESIRED STOCK LEVEL")) {
-      return desiredStockHeaders.map(sub => `DESIRED STOCK LEVEL ${sub}`);
-    } else if (header.includes("NON MOVING")) {
-      return "NON MOVING D/C RATE %";
-    }
-    return header;
-  });
+  return merged;
+}
 
-  return expandedHeaders.flat();
-};
+
 
 // Function to process Excel file dynamically
 const readExcelFileWithSubColumns = async (filePath) => {
@@ -288,25 +216,46 @@ const readExcelFileWithSubColumns = async (filePath) => {
     const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
     // Extract header rows and merge them
-    let headerRows = data.slice(0, 3).map(row => row.map(item => item?.toString().trim() || ""));
+    // let headerRows = data.slice(0, 3).map(row => row.map(item => item?.toString().trim() || ""));
+    const headerRows = [
+      ["PART NO", "PART NAME", "HSN CODE", "PCC code", "CLASS", "PART TYPE", "PART SOURCE", "SUPPLIER", "STORE", "LOC", "MODEL", "INVENTORY QUANTITY", "", "", "", "", "", "", "DEMAND", "", "", "DESIRED STOCK LEVEL", "", "", "PRICE", "AMT", "MOQ", "NON MOVING", "", "PURCHASE BASIC DISCOUNT", "SALE TAX", "EMG_PDC", "GEN_PDC", "STK EFF", "DESIRED_MOS_QTY", "LAST SALE DATE", "LAST PURCHASE DATE", "REGION", "L x W x H (mm)", "Weight (Kg)", "CBM"],
+      ["", "", "", "", "", "", "", "", "", "", "", "ON-HAND", "SAFETY", "ALL. QTY", "DISUSE", "B/O", "DUE-IN", "ON-ORD", "AMD3", "AMD6", "AMD12", "DESIRED STOCK", "PO QTY", "REMAINING PO QTY", "MAV", "", "", "D/C RATE %", "APPLY DATE", "", "", "", "", "", "", "", "", "", "", "", ""],
+      // Optional 3rd row if needed
+    ];
     let mergedHeaders = mergeHeaders(headerRows);
 
     // Remove header rows from the data
     let bodyData = data.slice(headerRows.length);
 
     // Convert data into JSON
+    // let jsonData = bodyData.map(row => {
+    //   let obj = {};
+    //   row.forEach((cell, index) => {
+    //     obj[mergedHeaders[index]] = cell;
+    //   });
+    //   return decodeAndTrimObjectStrings(obj);;
+    // });
     let jsonData = bodyData.map(row => {
       let obj = {};
-      row.forEach((cell, index) => {
-        obj[mergedHeaders[index]] = cell;
+      mergedHeaders.forEach((header, index) => {
+        obj[header] = row[index] !== undefined ? row[index] : ""; // or null, or "N/A"
       });
-      return obj;
+      return decodeAndTrimObjectStrings(obj);
     });
-    console.log("merge headers ",mergedHeaders)
+   // console.log("merge headers ",jsonData)
     return { headers: mergedHeaders, data: jsonData };
   } catch (error) {
     console.error("Error processing Excel file:", error);
   }
+};
+
+const decodeAndTrimObjectStrings = (obj) => {
+  const cleaned = {};
+  for (const key in obj) {
+    const val = obj[key];
+    cleaned[key.trim()] = typeof val === 'string' ? he.decode(val).trim() : val;
+  }
+  return cleaned;
 };
 
 
@@ -374,7 +323,7 @@ const readExcelFile = async (filePath) => {
         console.log("File deleted successfully:", filePath);
       }
     });
-      // console.log("header ",resultData)
+       //console.log("header ",headers)
     return { headers: headers, data: resultData };
   } catch (error) {
     console.log("error in reading the excel file ", error.message);
