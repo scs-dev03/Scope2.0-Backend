@@ -2,7 +2,7 @@ import {getPool1} from '../db/db.js'
 import sql from 'mssql'
 
 import fs from 'fs'
-import { partBrandCheck, readExcel,insertData } from '../utils/vonHelper.js'
+import { partBrandCheck, readExcel,insertData , findLocationPartidDuplicates, checkPendingFeedbackAndStatus } from '../utils/vonHelper.js'
 import { model } from './MasterApiController.js'
 
 
@@ -498,10 +498,16 @@ const dealerUpload = async (req, res) => {
             }));
     
 // console.log(cleanedData);
+// Get duplicates
 const isArrayEmpty = (arr) => !arr || arr.length === 0;
 if(isArrayEmpty(cleanedData)){
     return res.status(400).json({message:`UserFeedback and ProposedQty cannot be null or undefined`})
 }
+const duplicateEntries = findLocationPartidDuplicates(cleanedData);
+if(!isArrayEmpty(duplicateEntries)){
+    return res.status(400).json({Data:duplicateEntries})
+}
+// console.log('Duplicate combinations:', duplicateEntries);
 
 
 // Extract distinct values from data
@@ -582,8 +588,8 @@ for (const loc of distinctLocations) {
     }
 }
 
-console.log('Locations with IDs:', locationResults);
-console.log(locationResults[0].locationid);
+// console.log('Locations with IDs:', locationResults);
+// console.log(locationResults[0].locationid);
 
 
 const latestPartIDs = [];
@@ -600,17 +606,19 @@ if (queryResult.recordset.length) {
   });
 }
 
+// Inside "Get previousFBIDs" section
 const previousFBIDs = [];
 
+// Query for all locations in locationResults
 const queryPreviousFBID = `
     WITH RankedFeedback AS (
         SELECT 
             FeedbackID, 
             PartID, 
             locationid,
-            ROW_NUMBER() OVER (PARTITION BY PartID ORDER BY FeedbackDate DESC) AS rn
+            ROW_NUMBER() OVER (PARTITION BY PartID, locationid ORDER BY FeedbackDate DESC) AS rn
         FROM ${tableName}
-        WHERE locationid = ${locationResults[0].locationid}
+        WHERE locationid IN (${locationResults.map(l => l.locationid).join(',')})
     )
     SELECT FeedbackID, PartID, locationid
     FROM RankedFeedback
@@ -619,108 +627,128 @@ const queryPreviousFBID = `
 
 try {
     const previousFBResult = await pool.request().query(queryPreviousFBID);
-
     if (previousFBResult.recordset.length) {
         previousFBIDs.push(...previousFBResult.recordset.map(row => ({
             Partid: row.PartID,
+            LocationID: row.locationid, // Include locationid
             PreviousFBID: row.FeedbackID
         })));
     }
 } catch (fetchError) {
     console.error("Error fetching PreviousFBIDs:", fetchError);
+
 }
 // console.log(previousFBIDs);
 
+// Inside "Get maxValue for each part-location pair" section
 let maxValueMapping = [];
+
+// Query for maxvalue for all relevant locations
 const queryMaxValue = `
-    SELECT DISTINCT partid, maxvalue 
+    SELECT partid, locationid, maxvalue 
     FROM ${maxTable} 
-    WHERE locationid = 14 
+    WHERE locationid IN (${locationResults.map(l => l.locationid).join(',')})
     AND stockdate = (
         SELECT MAX(stockdate)  
         FROM ${maxTable}  
-        WHERE locationid = 14
+        WHERE locationid IN (${locationResults.map(l => l.locationid).join(',')})
     )
 `;
-
-// console.log(`Executing Query: ${queryMaxValue}`);
 
 const maxResult = await pool.request().query(queryMaxValue);
 
 if (maxResult.recordset.length) {
     maxValueMapping = maxResult.recordset.map(row => ({
         Partid: row.partid,
-        Location: 14, // Since we're querying for location 14
+        LocationID: row.locationid, // Use actual locationid
         MaxValue: row.maxvalue
     }));
 }
 
 // console.log(maxValueMapping);
 
-
     
-const invalidRecords = cleanedData.filter(item => {
-    const locationMapping = locationResults.find(l => l.location === item.Location);
-    return !locationMapping;  // If location is not found, it's invalid
-});
 
-if (invalidRecords.length > 0) {
-    // console.error("Invalid Locations Found:", invalidRecords.map(r => ({ Dealer: r.Dealer, Location: r.Location })));
-
-    return res.status(400).json({
-        message: "Some locations are invalid for the given dealer",
-        invalidLocations: invalidRecords.map(r => ({ Dealer: r.Dealer, Location: r.Location }))
-    });
-}
  
 // console.log("PreviousFBIDs:", previousFBIDs);
   const UserID = 1; // Static User ID
   const UserFBRemarkID = 1; // Static feedback remark ID
 
+//   console.log("latestPartIDs:", latestPartIDs);
+// console.log("maxValueMapping:", maxValueMapping);
+// console.log("previousFBIDs:", previousFBIDs);
+
     // Transform the data to only include the required fields
-const formattedData = cleanedData.map(item => {
-    const brandMapping = brandResults.find(b => b.brand === item.Brand);
-    const dealerMapping = dealerResults.find(d => d.dealer === item.Dealer);
-    const locationMapping = locationResults.find(l => l.location === item.Location);
-    const latestpartidMapping = latestPartIDs.find(lp => lp.Partid === item.Partid);
-    const partidPreviousFBIDMapping = previousFBIDs.find(pfb => pfb.Partid === item.Partid);
+    const formattedData = cleanedData.map(item => {
+        const brandMapping = brandResults.find(b => b.brand === item.Brand);
+        const dealerMapping = dealerResults.find(d => d.dealer === item.Dealer);
+        const locationMapping = locationResults.find(l => l.location === item.Location);
+        
+        // Convert locationid to NUMBER to match mappings
+        const locationid = locationMapping ? Number(locationMapping.locationid) : null;
+    
+        // 1. LatestPartID Mapping
+        const latestpartidMapping = latestPartIDs.find(lp => 
+            lp.Partid === item.Partid // Ensure `Partid` exists in latestPartIDs
+        );
+    
+        // 2. MaxValue Mapping
+        const maxValueMappingItem = maxValueMapping.find(mv => 
+            mv.Partid === item.Partid && 
+            mv.LocationID === locationid // Match numeric LocationID
+        );
+    
+        // 3. PreviousFBID Mapping
+        const partidPreviousFBIDMapping = previousFBIDs.find(pfb => 
+            pfb.Partid === item.Partid && 
+            pfb.LocationID === locationid
+        );
+    
+        return {
+            brandid: brandMapping?.brandid,
+            dealerid: dealerMapping?.dealerid,
+            locationid: locationid,
+            maxvalue: maxValueMappingItem?.MaxValue ?? null, // Default to null if undefined
+            partid: item.Partid,
+            latestpartid: latestpartidMapping?.LatestPartID ?? null,
+            UserID: UserID,
+            UserFBRemarkID: UserFBRemarkID,
+            CustomRem: item.UserRemark,
+            ProposedQty: item.ProposedQty,
+            PreviousFBID: partidPreviousFBIDMapping?.PreviousFBID ?? null
+        };
+    });
 
-    // Fix for maxValueMapping
-    const maxValueMappingItem = maxValueMapping.find(mv => 
-        mv.Partid && item.Partid && Number(mv.Partid) === Number(item.Partid)
-    );
-
-    // Debugging
-    // console.log(`Checking Partid: ${item.Partid}, Found MaxValue: ${maxValueMappingItem?.MaxValue}`);
-
-    return {
-        brandid: brandMapping ? brandMapping.brandid : null,
-        dealerid: dealerMapping ? dealerMapping.dealerid : null,
-        locationid: locationMapping ? locationMapping.locationid : null,
-        maxvalue: maxValueMappingItem ? maxValueMappingItem.MaxValue : null,
-        partid: item.Partid,
-        latestpartid: latestpartidMapping ? latestpartidMapping.LatestPartID : null,
-        UserID: UserID,
-        UserFBRemarkID: UserFBRemarkID,
-        CustomRem: item.UserRemark,
-        ProposedQty: item.ProposedQty,
-        PreviousFBID: partidPreviousFBIDMapping ? partidPreviousFBIDMapping.PreviousFBID : null
-    };
-});
 
 
-// Find records with null locationid
-// const invalidRecords = formattedData.filter(item => item.locationid === null);
+const check = await checkPendingFeedbackAndStatus(dealerid, tableName, formattedData);
+console.log(check);
+
+
+if (check.length > 0) {
+    return res.status(400).json({ 
+        message: "Some records are in pending status.", 
+        pendingRecords: check 
+    });
+} 
+
+
+
+const invalidRecords = formattedData.filter(item => 
+    !item.locationid || 
+    !item.maxvalue 
+);
 
 if (invalidRecords.length > 0) {
-    // console.error("Error: The following records have null locationid:", invalidRecords);
-
     return res.status(400).json({
-        message: "Some records have missing location IDs",
-        invalidRecords: invalidRecords
+        message: "Some records have missing data",
+        invalidRecords: invalidRecords.map(r => ({
+            Partid: r.partid,
+            Location: r.locationid,
+            MaxValue: r.maxvalue
+        }))
     });
 }
-// console.log(formattedData);
 
 
 
@@ -741,6 +769,5 @@ await insertData(formattedData,tableName)  // Insert Function to insert formatte
       res.status(500).json({ Error: error.message });
     }
 };
-
 
 export {remarkMaster,userView,adminView,userFeedbacklog,viewLog,newRemark,viewRemark,adminFeedbackLog,partFamily,countPending,partFamilySale,adminPendingView,dealerUpload}

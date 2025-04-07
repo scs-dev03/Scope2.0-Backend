@@ -143,11 +143,63 @@ const insertData = async (formattedData, tableName) => {
     console.error('Error during bulk insert:', err);
     await transaction.rollback();
     throw err; // Re-throw for upstream handling
-  } finally {
-    await pool.close();
+  } 
+};
+function findLocationPartidDuplicates(data) {
+  const seen = new Map();
+  const duplicates = [];
+
+  data.forEach(item => {
+    const key = `${item.Location}-${item.Partid}`;
+    
+    if (seen.has(key)) {
+      // Add duplicate entry if not already tracked
+      if (seen.get(key) === 1) { // Only add once per duplicate group
+        duplicates.push({ Location: item.Location, Partid: item.Partid });
+      }
+      seen.set(key, seen.get(key) + 1);
+    } else {
+      seen.set(key, 1);
+    }
+  });
+
+  return duplicates;
+}
+
+const checkPendingFeedbackAndStatus = async (dealerid, tableName, formattedData, res) => {
+  try {
+      // Get database connection
+      const pool = await getPool1();
+
+      // Fetch pending feedback records for the given dealer
+      const query = `SELECT partid, locationid FROM ${tableName} WHERE dealerid = ${dealerid} and status = 'Pending'`;
+      console.log(query);
+
+      const result = await pool.request().query(query);
+      const pendingStatusData = result.recordset;
+
+      // Create a Set for quick lookup
+      const pendingSet = new Set(pendingStatusData.map(item => `${item.partid}-${item.locationid}`));
+
+ // Find the records in formattedData that exist in pendingStatusData
+ const pendingRecords = formattedData.filter(item => 
+  pendingSet.has(`${item.partid}-${item.locationid}`)
+);
+
+return pendingRecords.length > 0 ? pendingRecords : [];
+
+
+      // Proceed with further processing if no pending records
+      // console.log("No pending records found.");
+      // return { message: "Success", pending: false };
+
+  } catch (error) {
+      console.error("Error checking pending feedback:", error);
+      return res.status(500).json({ message: "Internal Server Error", error });
   }
 };
 
 
 
-export {partBrandCheck,readExcel,insertData}
+
+export {partBrandCheck,readExcel,insertData,findLocationPartidDuplicates,checkPendingFeedbackAndStatus}
