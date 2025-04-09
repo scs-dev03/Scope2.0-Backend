@@ -666,7 +666,7 @@ const uploadBulkStock = async (req, res) => {
   
       return {
           part_number: rowData1[mappedData.part_number] != null 
-              ? rowData1[mappedData.part_number].toString().replace(/[^a-zA-Z0-9]/g, "") 
+              ? rowData1[mappedData.part_number].toString().replace(/[^a-zA-Z0-9]/g, "").trim()
               : "", 
           
           qty: rowData1[mappedData.stock_qty] != null 
@@ -972,9 +972,9 @@ return false;
         );
       }
 
-    //  console.log("updated filtered 974 ",updatedFilteredRowData)
+      //console.log("updated filtered 974 ",updatedFilteredRowData)
       
-      if (updatedFilteredRowData.length < combinedExistedData.length) {
+      if (updatedFilteredRowData.length <= combinedExistedData.length) {
         // Create a combined key map like "partId-locationId"
         const updatedMap = new Map(
           updatedFilteredRowData.map((item) => [`${item.partId}-${item.locationId}`, item])

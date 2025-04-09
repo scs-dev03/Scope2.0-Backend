@@ -86,7 +86,12 @@ const addDealerLocationMappingInService=async (req,res)=>{
         }
             // console.log("rowData ",rowData)
 
-          
+            //validation- single inventory location is associated to the single location
+       let rowData1= await validateInventoryLocations(rowData);
+        //  console.log("rowdata 1",rowData1);
+          if(rowData1.data.length!=0){
+            return {multipleInventoryLocationsData:rowData1.data,multipleInventoryLocations:true}
+          }
       let currentDateTime =await getCurrentDateTimeInIST();
       let operation= "create dealer location mapping"
             const values = rowData.map(item => {
@@ -132,9 +137,7 @@ const addDealerLocationMappingInService=async (req,res)=>{
                     row[5],
                     row[6],   // operation
                     row[7],
-                  
-                      
-                   
+                                   
                 );
             });
             await pool.request().bulk(table);
@@ -159,10 +162,11 @@ const addDealerLocationMappingInService=async (req,res)=>{
         return error;
     }
 }
+
 const checkFields=async(arr)=>{
 
    arr= await convertKeysToLowercase(arr);
-//    console.log("arr ",arr)
+  // console.log("arr ",arr)
     return arr.some(item => (item.dealer === null || item.dealer==undefined) || item.location === null|| item.location==undefined || item["inventory location"] ==null || item["inventory location"] ==undefined );
 }
 const convertKeysToLowercase = (arr) => {
@@ -170,12 +174,57 @@ const convertKeysToLowercase = (arr) => {
       const newItem = {};
       for (let key in item) {
         if (item.hasOwnProperty(key)) {
-          newItem[key.toLowerCase()] = item[key];
+          newItem[key.trim().toLowerCase()] = item[key];
         }
       }
       return newItem;
     });
   };
+
+  async function validateInventoryLocations(data) {
+    const inventoryMap = {};
+    const multipleInventoryLocations = [];
+    const seenDuplicates = new Set(); // To avoid duplicate entries
+  
+    for (const entry of data) {
+      const inventoryLoc = entry['inventory location'].trim().toLowerCase();
+      const location = entry.location.trim().toLowerCase();
+      const dealer = entry.dealer;
+  
+      if (inventoryMap[inventoryLoc]) {
+        if (inventoryMap[inventoryLoc] !== location) {
+          const duplicateKey = `${inventoryLoc}::${location}`;
+          
+          if (!seenDuplicates.has(duplicateKey)) {
+            multipleInventoryLocations.push({
+              Dealer: dealer,
+              Location: location,
+              ['Inventory Location']: inventoryLoc
+            });
+            seenDuplicates.add(duplicateKey);
+  
+           // console.log(`❌ Inventory location "${inventoryLoc}" is assigned to multiple locations: "${inventoryMap[inventoryLoc]}" and "${location}".`);
+          }
+        }
+      } else {
+        inventoryMap[inventoryLoc] = location;
+      }
+    }
+  
+    if (multipleInventoryLocations.length > 0) {
+      return {
+        status: false,
+        message: "Duplicate inventory locations found.",
+        data: multipleInventoryLocations
+      };
+    }
+  
+    return {
+      status: true,
+      message: "✅ Validation passed. Each inventory location is unique to a location.",
+      data: []
+    };
+  }
 
 
 const editDealerLocationMappingInService=async(req,res)=>{
@@ -200,18 +249,18 @@ const editDealerLocationMappingInService=async(req,res)=>{
         rowData=fileData.data;
        
         const  lowerCaseHeaders=headers.map((header)=> header.trim().toLowerCase());
-
+        // console.log("lowercase headers ",lowerCaseHeaders)
         if(!(lowerCaseHeaders.includes('dealer') && lowerCaseHeaders.includes('location') && lowerCaseHeaders.includes('inventory location'))){
             isDealerAndLocationExist=false
             // console.log("is dealer location exist in file ",isDealerAndLocationExist)
             return {isDealerAndLocationPresent:isDealerAndLocationExist};
         }
 
-        //  console.log("headers ",headers,rowData)
+         // console.log("headers ",headers,rowData)
         
          let isDealerAndLocationNull=await checkFields(rowData);
         //   console.log("is dealer location null in file ",isDealerAndLocationNull)
-
+      //  console.log("row data ",rowData)
          if(isDealerAndLocationNull){
             return {isDealerAndLocationNull:isDealerAndLocationNull}
          }
@@ -224,8 +273,7 @@ const editDealerLocationMappingInService=async(req,res)=>{
 
         // console.log("row data ",rowData)
         // Create a Map for fast lookup
-// Function to clean and normalize text
-// Function to normalize text safely (convert to string, trim, remove extra spaces)
+
 function normalizeText(value) {
     return String(value || "") // Ensure it's a string
         .trim() // Remove leading/trailing spaces // Replace multiple spaces with a single space
@@ -245,7 +293,7 @@ dealerAndLocationResult.forEach(obj => {
     dealerLocationMap.set(key, obj); // Store full object for retrieval
 });
 
-// console.log("row data ",dealerAndLocationResult)
+//console.log("row data ",rowData)
 rowData.forEach((row, index) => {
     // Normalize row keys and values
     const normalizedItem = Object.keys(row).reduce((acc, key) => {
@@ -297,6 +345,12 @@ rowData.forEach(item => {
             return {dealerLocationNotInMasterPresent:true,dealerLocationNotInMaster:dealerLocationNotInMaster}
         }
 
+        let rowData1= await validateInventoryLocations(rowData);
+        //  console.log("rowdata 1",rowData1);
+          if(rowData1.data.length!=0){
+            return {multipleInventoryLocationsData:rowData1.data,multipleInventoryLocations:true}
+          }
+
         await pool.request().query('use [StockUpload]') 
         let operation="update dealer location mapping";
          let normalizedRowData=[];
@@ -324,12 +378,18 @@ rowData.forEach(item => {
                
                 mappedData1 = mappedData1.map((element) => {
                     if (element.dealerId === parseInt(item.dealerId) && element.locationId === parseInt(item.locationId)) {
+                       // console.log("element",element,item)
                         return {
-                            ...element,
+                            id:element.id,
+                            dealerId:parseInt(item.dealerId),
+                            locationId:parseInt(item.locationId),
+                            dealer:item.dealer,
+                            location:item.location,
+                            ["inventory location"]:item["inventory location"],
                             isTraversed: true
                         };
                     }
-                    return element;
+                //    return element;
                 });
             }
             //  console.log("updated mapped dta",mappedData1)
@@ -405,11 +465,12 @@ rowData.forEach(item => {
         
             // console.log(updatedMappedData)
             mappedData1.map(async (item)=>{
-                // console.log(item)
-                if(item.isTraversed){
+              //  console.log(item)
+                if(item?.isTraversed){
                     operation="update dealer location mapping"
-                    let updateQuery=`use [stockUpload]  Update dealer_location_mapping set added_on=Getdate(),operation=@operation where id=@id`;
+                    let updateQuery=`use [stockUpload]  Update dealer_location_mapping set added_on=Getdate(),operation=@operation,inventory_location=@inventoryLocation where id=@id`;
                     await pool.request().input('id',item.id)
+                    .input('inventoryLocation',item["inventory location"])
                     .input('operation',operation).query(updateQuery);
                    // console.log("updatd succesfully")
                 }

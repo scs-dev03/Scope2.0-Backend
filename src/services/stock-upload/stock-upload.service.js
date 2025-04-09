@@ -593,6 +593,7 @@ const getUploadedDataSingleLocationInService = async (req, res) => {
 
 const stockUploadMultiLocation = async (req, res) => {
   // console.log("req ",req.body.location_id,req.files);
+  const errorLogs=[];
   try {
     let location=req.body.location_id
     let locations = req.body.location_id;
@@ -625,6 +626,12 @@ const stockUploadMultiLocation = async (req, res) => {
 
     if (mappingResult.recordset.length == 0) {
       return { mappingNotPresent: true };
+    // errorLogs.push({
+    //   locationId:locationId,
+    //   status:true,
+    //   log:mappingNotPresent
+    //  })
+       
     }
     
     // console.log("mapped data in stock upload multi location ",mappedData);
@@ -681,7 +688,14 @@ const stockUploadMultiLocation = async (req, res) => {
           const hasRequiredFields = requiredFields.every(field => normalizedHeaders.includes(field));
        // console.log("has required fields ",requiredFields)
           if (!hasRequiredFields) {
-              return { headerNotPresent: true };
+            //  return { headerNotPresent: true };
+            errorLogs.push({
+              locationId:locationId,
+              status:true,
+              log:'headerNotPresent'
+             })
+             continue;
+            
           }
       }
       if ([22].includes(brandId)) {
@@ -689,14 +703,26 @@ const stockUploadMultiLocation = async (req, res) => {
         const hasRequiredFields = requiredFields.every(field => normalizedHeaders.includes(field));
         
         if (!hasRequiredFields) {
-            return { headerNotPresent: true };
+           // return { headerNotPresent: true };
+           errorLogs.push({
+            locationId:locationId,
+            status:true,
+            log:'headerNotPresent'
+           })
+           continue;
         }
       }
       
       
       // Return false if general validation fails
       if (!isValid) {
-          return { headerNotPresent: true };
+        //  return { headerNotPresent: true };
+        errorLogs.push({
+          locationId:locationId,
+          status:true,
+          log:'headerNotPresent'
+         })
+        continue;
       }
       
     //   rowData = rowDataArray.map((rowData1) => ({
@@ -971,39 +997,48 @@ const combinedData = updatedFilteredRowData1.map(item => {
         .input("addedBy", addedBy)
         .query(insertQueryForCurrentStock1);
       let tCode = result1.recordset[0].tcode;
-
-      const values1 = updatedFilteredRowData2.map((item) => {
-        return [
-          parseInt(tCode, 10),
-          item["partNumber"],
-          parseFloat(item["qty"]),
-          parseInt(item["partId"],10),
-        ];
-      });
-
-      try {
-        await pool.request().query('use stockupload')
-        const table1 = new sql.Table("currentStock2"); // Updated table name
-        table1.create = false;
-
-        table1.columns.add("StockCode", sql.BigInt, { nullable: true });
-        table1.columns.add("PartNumber", sql.VarChar(35), { nullable: true });
-        table1.columns.add("Qty", sql.Decimal(18, 2), { nullable: true });
-        table1.columns.add("PartID", sql.Int, { nullable: true });
-        // Add rows to the table
-        values1.forEach((row) => {
-          table1.rows.add(
-            row[0],
-            row[1], // brandid
-            row[2],
-            row[3]
-          );
+      if(updatedFilteredRowData2.length>0){
+        const values1 = updatedFilteredRowData2.map((item) => {
+          return [
+            parseInt(tCode, 10),
+            item["partNumber"],
+            parseFloat(item["qty"]),
+            parseInt(item["partId"],10),
+          ];
         });
-        await pool.request().bulk(table1);
-      } catch (error) {
-        console.error("Error during bulk insert:", error);
-        return {error:error}; // Rethrow the error for further handling if necessary
-      }
+        try {
+          await pool.request().query('use stockupload')
+          const table1 = new sql.Table("currentStock2"); // Updated table name
+          table1.create = false;
+  
+          table1.columns.add("StockCode", sql.BigInt, { nullable: true });
+          table1.columns.add("PartNumber", sql.VarChar(35), { nullable: true });
+          table1.columns.add("Qty", sql.Decimal(18, 2), { nullable: true });
+          table1.columns.add("PartID", sql.Int, { nullable: true });
+          // Add rows to the table
+          values1.forEach((row) => {
+            table1.rows.add(
+              row[0],
+              row[1], // brandid
+              row[2],
+              row[3]
+            );
+          });
+          await pool.request().bulk(table1);
+          
+        }
+        catch (error) {
+          console.error("Error during bulk insert:", error);
+        //  return {error:error}; // Rethrow the error for further handling if necessary
+        errorLogs.push({
+          locationId:locationId,
+          status:true,
+          log:error
+         })
+        continue;
+        }
+
+     
       let currentCountQuery = `use [StockUpload] select sum(qty) as currentQuantSum from currentStock2 where stockCode=@tCode`;
       let result678 = await pool
         .request()
@@ -1043,6 +1078,8 @@ prevStockUploadCount,prevQuantitySum) values(@locationId,@tCode,@addedBy,@brandI
         //   filteredRowData=insertedDataResult;
       }
     }
+    
+  }
 
     // console.log("part not in master in multi stock upload ",partNotInMasterArray)
     if(partNotInMasterArray.length!=0){
@@ -1068,15 +1105,28 @@ prevStockUploadCount,prevQuantitySum) values(@locationId,@tCode,@addedBy,@brandI
         });
         await pool.request().bulk(table);
       } catch (error) {
-        console.error("Error during bulk insert: part not in master", error);
-        return {error:error}; // Rethrow the error for further handling if necessary
+       // console.error("Error during bulk insert: part not in master", error);
+       // return {error:error}; // Rethrow the error for further handling if necessary
+       errorLogs.push({
+        locationId:locationId,
+        status:true,
+        log:error
+       })
+       
       }
     }
    
   } catch (error) {
     console.log("error ", error.message);
-    return {error:error};
+   // return {error:error};
+   errorLogs.push({
+    locationId:locationId,
+    status:true,
+    log:error
+   })
   }
+
+  return errorLogs;
 };
 
 const getAllRecordsMultiLocation=async (req,res)=>{
