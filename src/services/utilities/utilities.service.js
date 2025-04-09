@@ -23,7 +23,7 @@ export const uploadFile = async (req) => {
     let data;
     if (brandId == 33 || brandId == 11) {
       //  console.log(brandId);
-      data = await readExcelFileWithSubColumns(filePath);
+      data = await readExcelFileWithSubColumnsForBulk(filePath);
       headers = data.headers;
     } else {
       data = await readExcelFile(filePath);
@@ -259,7 +259,48 @@ const decodeAndTrimObjectStrings = (obj) => {
 };
 
 
+const readExcelFileWithSubColumnsForBulk = async (filePath) => {
+  try {
+    const fileBuffer = fs.readFileSync(filePath);
+    const workbook = XLSX.read(fileBuffer, { type: "buffer" });
 
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    // Extract header rows and merge them
+    // let headerRows = data.slice(0, 3).map(row => row.map(item => item?.toString().trim() || ""));
+    const headerRows = [
+      ["PART NO", "PART NAME", "HSN CODE", "PCC code", "CLASS", "PART TYPE", "PART SOURCE", "SUPPLIER", "STORE", "LOC", "MODEL", "INVENTORY QUANTITY", "", "", "", "", "", "", "DEMAND", "", "", "DESIRED STOCK LEVEL", "", "", "PRICE", "AMT", "MOQ", "NON MOVING", "", "PURCHASE BASIC DISCOUNT", "SALE TAX", "EMG_PDC", "GEN_PDC", "STK EFF", "DESIRED_MOS_QTY", "LAST SALE DATE", "LAST PURCHASE DATE", "REGION", "L x W x H (mm)", "Weight (Kg)", "CBM","Location"],
+      ["", "", "", "", "", "", "", "", "", "", "", "ON-HAND", "SAFETY", "ALL. QTY", "DISUSE", "B/O", "DUE-IN", "ON-ORD", "AMD3", "AMD6", "AMD12", "DESIRED STOCK", "PO QTY", "REMAINING PO QTY", "MAV", "", "", "D/C RATE %", "APPLY DATE", "", "", "", "", "", "", "", "", "", "", "", ""],
+      // Optional 3rd row if needed
+    ];
+    let mergedHeaders = mergeHeaders(headerRows);
+
+    // Remove header rows from the data
+    let bodyData = data.slice(headerRows.length);
+
+    // Convert data into JSON
+    // let jsonData = bodyData.map(row => {
+    //   let obj = {};
+    //   row.forEach((cell, index) => {
+    //     obj[mergedHeaders[index]] = cell;
+    //   });
+    //   return decodeAndTrimObjectStrings(obj);;
+    // });
+    let jsonData = bodyData.map(row => {
+      let obj = {};
+      mergedHeaders.forEach((header, index) => {
+        obj[header] = row[index] !== undefined ? row[index] : ""; // or null, or "N/A"
+      });
+      return decodeAndTrimObjectStrings(obj);
+    });
+   // console.log("merge headers ",jsonData)
+    return { headers: mergedHeaders, data: jsonData };
+  } catch (error) {
+    console.error("Error processing Excel file:", error);
+  }
+};
 
 
 
@@ -309,7 +350,12 @@ const readExcelFile = async (filePath) => {
         // } else {
         //   obj[headers[index]] = cell; // Leave 'dealer' and 'location' as they are
         // }
-        obj[headers[index]]=cell;
+        if ( headers[index].toLowerCase() == 'inventory location') {
+          obj[headers[index]] = removeSpecialCharacters(cell);
+        } 
+        else{
+          obj[headers[index]]=cell;
+        }
 
       });
       return obj;
@@ -357,19 +403,19 @@ return result.recordset
   
 }
 
-// const removeSpecialCharacters = (str) => {
-//   // This regular expression removes all non-alphanumeric characters (except spaces)
-//   str=str+'';
-//   return str.replace(/[^a-zA-Z0-9 ]/g, '');
+const removeSpecialCharacters = (str) => {
+  // This regular expression removes all non-alphanumeric characters (except spaces)
+  str=str+'';
+  return str.replace(/[^a-zA-Z0-9-_ ]/g, '')
 
-// //   if (header == "location" || header=='dealer') {
-// //     // console.log(convertedStr)
-// //     return convertedStr.trim();  // Return the string as is for 'dealer location'
-// // }
-// // else{
-// //       convertedStr= convertedStr.replace(/[^a-zA-Z0-9\s]/g, "")
-// // }
-// };
+//   if (header == "location" || header=='dealer') {
+//     // console.log(convertedStr)
+//     return convertedStr.trim();  // Return the string as is for 'dealer location'
+// }
+// else{
+//       convertedStr= convertedStr.replace(/[^a-zA-Z0-9\s]/g, "")
+// }
+};
 export const getLocationsInService= async function (req) {
   try {
     const pool = await getPool1();
@@ -393,4 +439,4 @@ export const getLocationsInService= async function (req) {
     return {error:error};
   }
 }
-export { readExcelFile, readExcelFileWithSubColumns };
+export { readExcelFile, readExcelFileWithSubColumns,readExcelFileWithSubColumnsForBulk };

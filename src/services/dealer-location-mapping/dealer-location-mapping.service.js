@@ -41,7 +41,8 @@ const addDealerLocationMappingInService=async (req,res)=>{
          let dealerAndLocationResult=res.recordset;
         //  console.log("dealer location result",dealerAndLocationResult)
         //  let dealerLocationNotInMaster=[];
-
+         rowData = Array.from(new Set(rowData.map(item => JSON.stringify(item))))
+        .map(item => JSON.parse(item));
          rowData.forEach((row,index)=>{
 
             const normalizedItem=Object.keys(row).reduce((acc,key)=>{
@@ -55,7 +56,7 @@ const addDealerLocationMappingInService=async (req,res)=>{
             // console.log(normalizedItem)
             // console.log("dealer location ",dealerAndLocationResult)
            
-            const exists = dealerAndLocationResult.some(obj2 => obj2.dealer.trim() === normalizedItem.dealer.trim() && normalizedItem.location.trim() === obj2.location.trim());
+            const exists = dealerAndLocationResult.some(obj2 => obj2.dealer.trim().toLowerCase() === normalizedItem.dealer.trim().toLowerCase() && normalizedItem.location.trim().toLowerCase() === obj2.location.trim().toLowerCase());
     
             // console.log("exists ",exists)
     // If it does not exist, push the object into array2
@@ -64,8 +65,8 @@ const addDealerLocationMappingInService=async (req,res)=>{
             }else{
                 const matchingItem = dealerAndLocationResult.find(obj2 => {
 
-                    return  obj2.dealer.trim() === normalizedItem.dealer &&
-                      normalizedItem.location.trim() === obj2.location
+                    return  obj2.dealer.trim().toLowerCase() == normalizedItem.dealer.toLowerCase() &&
+                      normalizedItem.location.trim().toLowerCase() == obj2.location.toLowerCase()
                     
                 });
             //   console.log("matching item ",matchingItem)
@@ -187,7 +188,7 @@ const convertKeysToLowercase = (arr) => {
     const seenDuplicates = new Set(); // To avoid duplicate entries
   
     for (const entry of data) {
-      const inventoryLoc = entry['inventory location'].trim().toLowerCase();
+      const inventoryLoc = entry['inventory location'].replace(/[^a-zA-Z0-9-_ ]/g, '').trim().toLowerCase();
       const location = entry.location.trim().toLowerCase();
       const dealer = entry.dealer;
   
@@ -232,7 +233,7 @@ const editDealerLocationMappingInService=async(req,res)=>{
     try{
         let brandId=req.body.brand_id;
         const pool=await getPool1();
-        let getMappingQuery=`use [StockUpload]  Select dealerId,locationId,inventory_location as 'inventory location',id from dealer_location_mapping where brandId=@brandId `;
+        let getMappingQuery=`use [StockUpload]  Select dealerId,locationId,inventory_location as 'inventory location',location,id from dealer_location_mapping where brandId=@brandId `;
         const res1=await pool.request().input('brandId',brandId).query(getMappingQuery);
         let mappedData=res1.recordset;
         let fileData;
@@ -273,7 +274,9 @@ const editDealerLocationMappingInService=async(req,res)=>{
 
         // console.log("row data ",rowData)
         // Create a Map for fast lookup
-
+        rowData = Array.from(new Set(rowData.map(item => JSON.stringify(item))))
+        .map(item => JSON.parse(item));
+       // console.log("row data after removing duplicate",rowData)
 function normalizeText(value) {
     return String(value || "") // Ensure it's a string
         .trim() // Remove leading/trailing spaces // Replace multiple spaces with a single space
@@ -322,8 +325,8 @@ rowData.forEach((row, index) => {
         // ✅ Only update `isMatch` if it's still false
         if (!normalizedItem.isMatch) {
             normalizedItem.isMatch = true;
-            normalizedItem.dealerId = matchingItem.dealerId;
-            normalizedItem.locationId = matchingItem.locationId;
+            normalizedItem.dealerId = parseInt(matchingItem.dealerId,10);
+            normalizedItem.locationId = parseInt(matchingItem.locationId,10);
         }
 
         // console.log("✅ Match Found:", { dealerKey, locationKey, matchingItem });
@@ -332,6 +335,7 @@ rowData.forEach((row, index) => {
     }
 });
 
+//console.log("rowDta",rowData)
 // ✅ After traversal, insert only unmatched rows into dealerLocationNotInMaster
 rowData.forEach(item => {
     if (!item.isMatch) {
@@ -345,6 +349,7 @@ rowData.forEach(item => {
             return {dealerLocationNotInMasterPresent:true,dealerLocationNotInMaster:dealerLocationNotInMaster}
         }
 
+       // console.log("row data ",rowData)
         let rowData1= await validateInventoryLocations(rowData);
         //  console.log("rowdata 1",rowData1);
           if(rowData1.data.length!=0){
@@ -359,52 +364,166 @@ rowData.forEach(item => {
             isTraversed:false
         }))
         let mappedData1 = [...updatedMappedData];
-        // console.log("updated mapped data ",mappedData1)
-        rowData.forEach((item,index)=>{
-            //   console.log(item)
-            const isExist=mappedData1.some((element)=>element.dealerId==parseInt(item.dealerId) && element.locationId==parseInt(item.locationId));
+     //    console.log("updated mapped data ",mappedData1)
+        // rowData.forEach((item,index)=>{
+        //      //  console.log(item)
 
-            if(!isExist){
-                normalizedRowData.push({
-                    dealerId:parseInt(item.dealerId),
-                    locationId:parseInt(item.locationId),
-                    dealer:item.dealer,
-                    location:item.location,
-                    ["inventory location"]:item["inventory location"]
-                })  
+        //     const isExist=mappedData1.some((element)=>{
+        //        // console.log("element ",element)
+        //         element.dealerId==parseInt(item.dealerId) && element.locationId==parseInt(item.locationId)});
 
-            }
-            else{
-               
-                mappedData1 = mappedData1.map((element) => {
-                    if (element.dealerId === parseInt(item.dealerId) && element.locationId === parseInt(item.locationId)) {
-                       // console.log("element",element,item)
-                        return {
-                            id:element.id,
-                            dealerId:parseInt(item.dealerId),
-                            locationId:parseInt(item.locationId),
-                            dealer:item.dealer,
-                            location:item.location,
-                            ["inventory location"]:item["inventory location"],
-                            isTraversed: true
-                        };
-                    }
-                //    return element;
-                });
-            }
-            //  console.log("updated mapped dta",mappedData1)
-        })
-
-        // mappedData1.forEach(async (item)=>{
-        //     if(item.isTraversed==false){
-        //         await deleteQuery(item)
+        //   //  console.log("isExist ",isExist,item)
+        //     if(!isExist){
+        //         normalizedRowData.push({
+        //             dealerId:parseInt(item?.dealerId),
+        //             locationId:parseInt(item?.locationId),
+        //             dealer:item?.dealer,
+        //             location:item?.location,
+        //             ["inventory location"]:item["inventory location"]
+        //         })  
+        //       //  console.log("normalidex data ",normalizedRowData)
         //     }
+        //     else{
+               
+        //         mappedData1 = mappedData1.map((element) => {
+        //             if (element.dealerId == parseInt(item.dealerId,10) && element.locationId == parseInt(item.locationId,10)) {
+        //                // console.log("element",element,item)
+        //                 return {
+        //                     id:element.id,
+        //                     dealerId:parseInt(item?.dealerId),
+        //                     locationId:parseInt(item?.locationId),
+        //                     dealer:item?.dealer,
+        //                     location:item?.location,
+        //                     ["inventory location"]:item["inventory location"],
+        //                     isTraversed: true
+        //                 };
+        //             }
+        //         //    return element;
+        //         });
+        //     }
+            
         // })
-        
-    
+        const inventoryLocationMismatch = [];
+        // console.log("row data ",mappedData1)
+        rowData.forEach((item) => {
+            const dealerId = parseInt(item.dealerId, 10);
+            const locationId = parseInt(item.locationId, 10);
+        //   console.log("item ",item)
+            const matchedEntry = mappedData1.find(
+                (element) =>{
+                  //  console.log("element in mapped data 1",element)
+                  return  element.dealerId == dealerId
+                }
+                   
+            );
+         //  console.log("matched ",matchedEntry)
+            if (matchedEntry) {
+                const rowInventory = (item["inventory location"]);
+                const dbInventory = (matchedEntry["inventory location"]);
+               //   console.log("row inventory ",rowInventory,dbInventory)
+                if (rowInventory != dbInventory) {
+                  
+                    let rowLocation = normalizeText(item["location"]);
+                    let dbLocation = normalizeText(matchedEntry["location"]);
+                  //  console.log("row loc ",rowLocation,dbLocation)
+                        if(rowLocation== dbLocation){
 
+    //    console.log("mapped data ",mappedData1)
+                   const isExist= mappedData1.some((item1)=>item1['inventory location']==rowLocation)
+                  
+                   if(isExist){
+                    const alreadyExists = inventoryLocationMismatch.some((entry) =>
+                        entry.Dealer == mismatch.dealer &&
+                        entry.Location == mismatch.location &&
+                        entry["inventory location"] == mismatch["inventory location"] 
+                        // entry.dbInventory == mismatch.dbInventory
+                    );
+        
+                    if (!alreadyExists) {
+                        inventoryLocationMismatch.push(mismatch);
+                    }
+                   }else{
+
+                    mappedData1 = mappedData1.map((element) => {
+                        if (
+                            element.dealerId === parseInt(item.dealerId, 10) 
+                        ) {
+                            return {
+                                ...element,
+                                dealerId: parseInt(item?.dealerId, 10),
+                                locationId: parseInt(item?.locationId, 10),
+                                dealer: item?.dealer,
+                                location: rowLocation,
+                                ["inventory location"]: item["inventory location"],
+                                isTraversed: true
+                            };
+                        }
+                        return element;
+                    });
+                   }
+                  
+                                    //    console.log("mapped data 1",mappedData1)
+                        }
+                        else{
+                          //  console.log("normalized data executed")
+                            normalizedRowData.push({
+                                            dealerId:parseInt(item?.dealerId),
+                                            locationId:parseInt(item?.locationId),
+                                            dealer:item?.dealer,
+                                            location:item?.location,
+                                            ["inventory location"]:item["inventory location"]
+                                        })  
+                        }
+                   
+                }
+                else{
+              //  if(rowInventory == dbInventory){
+                    let rowLocation = normalizeText(item["location"]);
+                let dbLocation = normalizeText(matchedEntry["location"]);
+              //  console.log("rpw loc ",rowLocation,dbLocation)
+                    if(rowLocation!= dbLocation){
+                    //    console.log("item for mismatch ",item)
+                                   const mismatch = {
+                        dealer: item.dealer,
+                        location: item.location,
+                        "inventory location": item["inventory location"],
+                        // dbInventory,
+                        // dealerId,
+                        // locationId,
+                    };
+                        const alreadyExists = inventoryLocationMismatch.some((entry) =>
+                            entry.Dealer == mismatch.dealer &&
+                            entry.Location == mismatch.location &&
+                            entry["inventory location"] == mismatch["inventory location"] 
+                            // entry.dbInventory == mismatch.dbInventory
+                        );
+            
+                        if (!alreadyExists) {
+                            inventoryLocationMismatch.push(mismatch);
+                        }
+                    }
+                }
+            }
+            // else{
+            //     normalizedRowData.push({
+            //         dealerId:parseInt(item?.dealerId),
+            //         locationId:parseInt(item?.locationId),
+            //         dealer:item?.dealer,
+            //         location:item?.location,
+            //         ["inventory location"]:item["inventory location"]
+            //     })  
+            // }
+        });
+      //  console.log("normalize data ",normalizedRowData)
+        
+        
+      //  console.log("mismatch ",inventoryLocationMismatch)
+        if(inventoryLocationMismatch.length!=0){
+            return {multipleInventoryLocationsData:inventoryLocationMismatch,multipleInventoryLocations:true}
+        }
+    
         // console.log("mapped data",rowData,mappedData1)
-    //  console.log("normalidex data ",normalizedRowData)
+     // console.log("normalidex data ",normalizedRowData)
 
         if(normalizedRowData.length!=0){
             operation="create dealer location mapping"
@@ -463,20 +582,24 @@ rowData.forEach(item => {
            
         }
         
-            // console.log(updatedMappedData)
+           //  console.log(mappedData1)
             mappedData1.map(async (item)=>{
               //  console.log(item)
+              if(item!==undefined){
                 if(item?.isTraversed){
                     operation="update dealer location mapping"
-                    let updateQuery=`use [stockUpload]  Update dealer_location_mapping set added_on=Getdate(),operation=@operation,inventory_location=@inventoryLocation where id=@id`;
+                    let updateQuery=`use [stockUpload]  Update dealer_location_mapping set added_on=Getdate(),operation=@operation,inventory_location=@inventoryLocation,location=@location,locationId=@locationId,dealer=@dealer,dealerId=@dealerId where id=@id`;
                     await pool.request().input('id',item.id)
                     .input('inventoryLocation',item["inventory location"])
-                    .input('operation',operation).query(updateQuery);
+                    .input('dealer',item.dealer)
+                    .input('operation',operation)
+                    .input('location',item.location)
+                    .input('locationId',item.locationId).input('dealerId',item.dealerId).query(updateQuery);
                    // console.log("updatd succesfully")
                 }
+              }
+               
             })
-        
-      
             rowCount=rowData.length;
 
             let logQuery=`use [stockUpload] Insert into Stock_Upload_Logs(brand_id,added_by,operation_type,dealerLocationMappingRowCount) 

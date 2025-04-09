@@ -2,6 +2,7 @@ import { getPool1 } from "../../db/db.js";
 import {
   readExcelFile,
   readExcelFileWithSubColumns,
+  readExcelFileWithSubColumnsForBulk
 } from "../utilities/utilities.service.js";
 import sql from "mssql";
 import yazl from "yazl";
@@ -607,7 +608,7 @@ const uploadBulkStock = async (req, res) => {
     let filteredRowData;
     let combinedExistedData = [];
     if (brandId == 11 || brandId == 33) {
-      fileData = await readExcelFileWithSubColumns(req.file.path);
+      fileData = await readExcelFileWithSubColumnsForBulk(req.file.path);
       // rowData=fileData.data.splice(2);
       rowDataArray = fileData.data.splice(1);
     } else {
