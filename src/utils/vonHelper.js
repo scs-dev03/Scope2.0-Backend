@@ -145,12 +145,87 @@ const insertData = async (formattedData, tableName) => {
     throw err; // Re-throw for upstream handling
   } 
 };
+const insertAdminFeedback = async (formattedData, brandId) => {
+  const pool = await getPool1();
+  const transaction = pool.transaction();
+  
+  try {
+    await transaction.begin();
+        // ✅ Explicitly specify database and schema
+        const databaseName = "UAD_VON";
+        const schemaName = "dbo"; // Replace with your schema if different
+        const fullTableName = `${databaseName}.${schemaName}.UAD_VON_AdminFeedback_9`;
+     
+    console.log(fullTableName);
+    
+    const table = new sql.Table(fullTableName);
+    table.create = false;
+
+    // Define columns to match your schema
+    table.columns.add('Brandid', sql.TinyInt, { nullable: false });
+    table.columns.add('Dealerid', sql.Int, { nullable: false });
+    table.columns.add('Locationid', sql.Int, { nullable: false });
+    table.columns.add('FeedbackID', sql.BigInt, { nullable: false });
+    table.columns.add('AdminID', sql.Int, { nullable: false });
+    table.columns.add('AdminRemark', sql.NVarChar(sql.MAX), { nullable: true });
+    table.columns.add('ApprovedQty', sql.Decimal(18, 2), { nullable: true });
+    // table.columns.add('AdminFBDate', sql.DateTime, { nullable: true });
+    table.columns.add('PreviousAdminFBID', sql.BigInt, { nullable: true });
+    table.columns.add('CustomRem', sql.NVarChar(255), { nullable: true });
+
+    // Process each feedback item
+    formattedData.forEach(item => {
+      const convertedRow = {
+        Brandid: parseInt(item.brandid, 10),
+        Dealerid: parseInt(item.dealerid, 10),
+        Locationid: parseInt(item.locationid, 10),
+        FeedbackID: BigInt(item.feedbackid),
+        AdminID: parseInt(item.AdminID, 10),
+        AdminRemark: item.AdminRemark ? String(item.AdminRemark) : null,
+        ApprovedQty: item.ApprovedQty ? parseFloat(item.ApprovedQty) : null,
+        // AdminFBDate: new Date(),  // Current timestamp
+        PreviousAdminFBID: item.PreviousAdminFBID ? BigInt(item.PreviousAdminFBID) : null,
+        CustomRem: item.CustomRem ? String(item.CustomRem) : null
+      };
+
+      // Validate required fields
+      if (isNaN(convertedRow.Brandid) || convertedRow.Brandid < 0 || convertedRow.Brandid > 255) {
+        throw new Error(`Invalid Brandid: ${item.brandid}`);
+      }
+
+      table.rows.add(
+        convertedRow.Brandid,
+        convertedRow.Dealerid,
+        convertedRow.Locationid,
+        convertedRow.FeedbackID,
+        convertedRow.AdminID,
+        convertedRow.AdminRemark,
+        convertedRow.ApprovedQty,
+        // convertedRow.AdminFBDate,
+        convertedRow.PreviousAdminFBID,
+        convertedRow.CustomRem
+      );
+    });
+
+    const request = new sql.Request(transaction);
+    await request.bulk(table);
+    await transaction.commit();
+    console.log('Admin feedback inserted successfully');
+    return { success: true, insertedCount: formattedData.length };
+
+  } catch (err) {
+    console.error('Error during admin feedback insert:', err);
+    await transaction.rollback();
+    throw err;
+  }
+};
 function findLocationPartidDuplicates(data) {
   const seen = new Map();
   const duplicates = [];
 
   data.forEach(item => {
     const key = `${item.Location}-${item.Partid}`;
+    console.log(key);
     
     if (seen.has(key)) {
       // Add duplicate entry if not already tracked
@@ -162,7 +237,29 @@ function findLocationPartidDuplicates(data) {
       seen.set(key, 1);
     }
   });
+  console.log(duplicates);
+  
+  return duplicates;
+}
+function findLocationPartidDuplicatesAdmin(data) {
+  const seen = new Map();
+  const duplicates = [];
 
+  data.forEach(item => {
+    const key = `${item.location}-${item.feedbackid}`;
+    
+    if (seen.has(key)) {
+      // Add duplicate entry if not already tracked
+      if (seen.get(key) === 1) { // Only add once per duplicate group
+        duplicates.push({ Location: item.location, feedbackid: item.feedbackid });
+      }
+      seen.set(key, seen.get(key) + 1);
+    } else {
+      seen.set(key, 1);
+    }
+  });
+  // console.log(duplicates);
+  
   return duplicates;
 }
 
@@ -173,7 +270,7 @@ const checkPendingFeedbackAndStatus = async (dealerid, tableName, formattedData,
 
       // Fetch pending feedback records for the given dealer
       const query = `SELECT partid, locationid FROM ${tableName} WHERE dealerid = ${dealerid} and status = 'Pending'`;
-      console.log(query);
+      // console.log(query);
 
       const result = await pool.request().query(query);
       const pendingStatusData = result.recordset;
@@ -199,7 +296,44 @@ return pendingRecords.length > 0 ? pendingRecords : [];
   }
 };
 
+const checkReviewedFeedbackByBrand = async (brandid, formattedData) => {
+  try {
+    // Get database connection
+    const pool = await getPool1();
+
+    // SQL query with parameterized Brandid
+    const query = `
+      SELECT af.feedbackid, af.locationid, af.dealerid
+      FROM UAD_VON..UAD_VON_AdminFeedback_${brandid} af
+      JOIN UAD_VON..UAD_VON_SPMFeedback_${brandid} sf ON sf.FeedbackID = af.FeedbackID
+      WHERE sf.Brandid = ${brandid} AND sf.status = 'Reviewed'
+    `;
+
+    const result = await pool
+      .request()
+      .input('brandid', brandid) // Parameterized query
+      .query(query);
+
+    const reviewedStatusData = result.recordset;
+
+    // Create a Set for quick lookup
+    const reviewedSet = new Set(reviewedStatusData.map(item => 
+      `${item.feedbackid}-${item.locationid}-${item.dealerid}`
+    ));
+
+    // Find the records in formattedData that exist in reviewedStatusData
+    const reviewedRecords = formattedData.filter(item => 
+      reviewedSet.has(`${item.feedbackid}-${item.locationid}-${item.dealerid}`)
+    );
+
+    return reviewedRecords.length > 0 ? reviewedRecords : [];
+
+  } catch (error) {
+    console.error("Error checking reviewed feedback by brand:", error);
+    // return res.status(500).json({ message: "Internal Server Error", error });
+  }
+};
 
 
 
-export {partBrandCheck,readExcel,insertData,findLocationPartidDuplicates,checkPendingFeedbackAndStatus}
+export {partBrandCheck,readExcel,insertData,insertAdminFeedback,findLocationPartidDuplicates,checkPendingFeedbackAndStatus,findLocationPartidDuplicatesAdmin,checkReviewedFeedbackByBrand}

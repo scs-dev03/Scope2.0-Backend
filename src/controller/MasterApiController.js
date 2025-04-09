@@ -172,16 +172,16 @@ try {
         return res.status(400).json({message:`Token and Usertype Both are required`})
       }
       if(usertype === 'a'){
-      const query = `select bintid_pk , concat(vcfirstname , ' ', vcLastname)as username , designation from adminmaster_gen where bintId_Pk=dbo.f_Decryption('${token}') `
+      const query = `select bintid_pk , concat(vcfirstname , ' ', vcLastname)as username , designation from z_scope..adminmaster_gen where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `
       
       const result = await pool.request().query(query)
       res.status(200).json({Data:result.recordset})
       }
       else{
-        const query = `SELECT distinct li.BrandID, dur.dealerid , dur.locationid , concat(amg.vcfirstname , ' ', amg.vcLastname)as username  FROM AdminMaster_GEN amg
-    join Dealer_User_Relation dur on amg.bintid_pk = dur.userid
-    join locationinfo li on dur.locationid = li.LocationID
-    where bintId_Pk=dbo.f_Decryption('${token}') `
+        const query = `SELECT distinct li.BrandID, dur.dealerid , dur.locationid , concat(amg.vcfirstname , ' ', amg.vcLastname)as username  FROM z_scope..AdminMaster_GEN amg
+    join z_scope..Dealer_User_Relation dur on amg.bintid_pk = dur.userid
+    join z_scope..locationinfo li on dur.locationid = li.LocationID
+    where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `
     const result = await pool.request().query(query)
     res.status(200).json({Data:result.recordset})
       }

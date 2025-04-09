@@ -2,7 +2,7 @@ import {getPool1} from '../db/db.js'
 import sql from 'mssql'
 
 import fs from 'fs'
-import { partBrandCheck, readExcel,insertData , findLocationPartidDuplicates, checkPendingFeedbackAndStatus } from '../utils/vonHelper.js'
+import { partBrandCheck, readExcel,insertData , findLocationPartidDuplicates, checkPendingFeedbackAndStatus, findLocationPartidDuplicatesAdmin, insertAdminFeedback, checkReviewedFeedbackByBrand } from '../utils/vonHelper.js'
 import { model } from './MasterApiController.js'
 
 
@@ -325,10 +325,10 @@ const adminFeedbackLog = async (req,res)=>{
         
         try {
             const previousAdminFBQuery = `
-            SELECT TOP 1 AdminFBID
-            FROM ${dynamicTable}
-            WHERE Feedbackid = @feedbackid 
-            ORDER BY AdminFBDate DESC
+                SELECT S.FeedbackID, A1.AdminFBID AS PreviousAdminFBID
+             FROM ${dynamicTable} A1
+             JOIN ${userdynamicTable} S ON A1.FeedbackID = S.PreviousFBID
+             WHERE S.FeedbackID =  ${feedbackid};
            `;
         //    console.log(previousAdminFBQuery);
            
@@ -722,7 +722,7 @@ if (maxResult.recordset.length) {
 
 
 const check = await checkPendingFeedbackAndStatus(dealerid, tableName, formattedData);
-console.log(check);
+// console.log(check);
 
 
 if (check.length > 0) {
@@ -770,4 +770,175 @@ await insertData(formattedData,tableName)  // Insert Function to insert formatte
     }
 };
 
-export {remarkMaster,userView,adminView,userFeedbacklog,viewLog,newRemark,viewRemark,adminFeedbackLog,partFamily,countPending,partFamilySale,adminPendingView,dealerUpload}
+const adminUpload = async (req,res)=>{
+    const pool = await getPool1()
+    // const {file} = req.body
+    if (!req.file || req.file.length === 0) {
+        return res.status(400).json({ message: "No files received" });
+      }
+    // console.log(req.file.path);
+    
+      let data = await readExcel(req.file.path);
+    //   console.log(`data` , data[0]);
+    
+    fs.unlinkSync(req.file.path); // Delete uploaded file after processing
+    
+    const cleanedData =  data
+    .filter(item => item.LatestAdminRemark !== null && item.ApprovedQty !== null && item.ApprovedQty !== null && item.ApprovedQty !== undefined)
+    .map(({ brand, dealer, location, feedbackid, LatestAdminRemark, ApprovedQty }) => ({
+        brand,
+        dealer,
+        location,
+        feedbackid,
+        LatestAdminRemark,
+        ApprovedQty
+    }));
+    // console.log(cleanedData);
+    
+    const isArrayEmpty = (arr) => !arr || arr.length === 0;
+if(isArrayEmpty(cleanedData)){
+    return res.status(400).json({message:`No data found to upload`})
+}
+const duplicateEntries = findLocationPartidDuplicatesAdmin(cleanedData);
+if(!isArrayEmpty(duplicateEntries)){
+    console.log(duplicateEntries);
+    
+    return res.status(400).json({Data:duplicateEntries})
+}
+// Extract distinct values from data
+const distinctLocations = [...new Set(cleanedData.map(item => item.location))];
+const distinctBrands    = [...new Set(cleanedData.map(item => item.brand))];
+const distinctDealers   = [...new Set(cleanedData.map(item => item.dealer))];
+const distinctFeedbackids   = [...new Set(cleanedData.map(item => item.feedbackid))];
+
+// console.log(distinctFeedbackids);
+
+
+const brand = data[0].brand;
+const queryIds = `SELECT top 1 brandid
+FROM locationinfo 
+WHERE brand LIKE '${brand}'`;
+
+const resultIds = await pool.request().query(queryIds);
+// console.log(resultIds.recordset);
+const brandResults = [];
+for (const b of distinctBrands) {
+    const queryBrand = `SELECT brandid FROM locationinfo WHERE brand LIKE '${b}'`;
+    const brandResult = await pool.request().query(queryBrand);
+    if (brandResult.recordset.length) {
+        brandResults.push({
+            brand: b,
+            brandid: brandResult.recordset[0].brandid
+        });
+    }
+}
+const AdmintableName = `UAD_VON..UAD_VON_AdminFeedback_${brandResults[0].brandid}`
+const tableName = `UAD_VON..UAD_VON_SPMFeedback_${brandResults[0].brandid}`
+// console.log(AdmintableName);
+
+const dealerResults = [];
+for (const d of distinctDealers) {
+    const queryDealer = `SELECT dealerid FROM locationinfo WHERE dealer LIKE '${d}'`;
+    const dealerResult = await pool.request().query(queryDealer);
+    if (dealerResult.recordset.length) {
+        dealerResults.push({
+            dealer: d,
+            dealerid: dealerResult.recordset[0].dealerid
+        });
+    }
+}
+console.log('Dealers with IDs:', dealerResults);
+const maxTable = `z_scope..stockable_nonstockable_td001_${dealerResults[0].dealerid}`
+// console.log(maxTable);
+
+
+// Get location IDs for each distinct location
+const locationResults = [];
+
+for (const loc of distinctLocations) {
+  const queryLocation = `
+    SELECT locationid 
+    FROM locationinfo 
+    WHERE brandid = ${resultIds.recordset[0].brandid} 
+      AND dealerid = '${dealerResults[0].dealerid}'
+      AND location LIKE '${loc}'
+  `;
+  const locResult = await pool.request().query(queryLocation);
+  if (locResult.recordset.length) {
+      locationResults.push({
+          location: loc,
+          locationid: locResult.recordset[0].locationid
+        });
+    }
+}
+
+// console.log('Locations with IDs:', locationResults);
+
+
+const previousFBIDs = [];
+const queryPreviousAdminFBID = `
+    SELECT S.FeedbackID, A1.AdminFBID AS PreviousAdminFBID
+    FROM ${AdmintableName} A1
+    JOIN ${tableName} S ON A1.FeedbackID = S.PreviousFBID
+    WHERE S.FeedbackID IN (${distinctFeedbackids.join(",")}); 
+`;
+// console.log(queryPreviousAdminFBID);
+
+try {
+    const previousFBResult = await pool.request().query(queryPreviousAdminFBID);
+    // console.log(previousFBResult);
+    
+    previousFBIDs.push(...previousFBResult.recordset.map(row => ({
+        FeedbackID: row.FeedbackID,
+        PreviousAdminFBID: row.PreviousAdminFBID
+    })));
+
+
+} catch (fetchError) {
+    console.error("Error fetching PreviousAdminFBIDs:", fetchError);
+}
+
+console.log(previousFBIDs);
+
+
+const AdminID = 1; // Static User ID
+const AdminRemark = 1; // Static feedback remark ID
+
+const formattedData = cleanedData.map(item => {
+    const brandMapping = brandResults.find(b => b.brand === item.brand);
+    const dealerMapping = dealerResults.find(d => d.dealer === item.dealer);
+    const locationMapping = locationResults.find(l => l.location === item.location);
+    
+    // Convert locationid to NUMBER to match mappings
+    const locationid = locationMapping ? Number(locationMapping.locationid) : null;
+    const previousMapping = previousFBIDs.find(prev => prev.FeedbackID === item.feedbackid);
+
+
+    return {
+        brandid: brandMapping?.brandid,
+        dealerid: dealerMapping?.dealerid,
+        locationid: locationid,
+        feedbackid: item.feedbackid,
+        AdminID: AdminID,
+        AdminRemark: AdminRemark,
+        ApprovedQty: item.ApprovedQty,
+        CustomRem: item.LatestAdminRemark,
+        PreviousAdminFBID: previousMapping ? previousMapping.PreviousAdminFBID : null // Assign found value or null
+    
+    };
+});
+const check = await checkReviewedFeedbackByBrand(brandResults[0].brandid, formattedData);
+if (check.length > 0) {
+    return res.status(400).json({ 
+        message: "Some records are already reviewed.", 
+        pendingRecords: check 
+    });
+} 
+await insertAdminFeedback(formattedData,brandResults[0].brandid)  // Insert Function to insert formatted data into table
+res.status(200).json({ message: "Data inserted successfully", data: formattedData });
+
+}
+    
+
+
+export {remarkMaster,userView,adminView,userFeedbacklog,viewLog,newRemark,viewRemark,adminFeedbackLog,partFamily,countPending,partFamilySale,adminPendingView,dealerUpload,adminUpload}
