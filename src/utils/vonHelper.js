@@ -22,7 +22,18 @@ const partBrandCheck = async(dealerid,locationid,partid)=>{
           res.status(500).json({Error:error.message})
         }
 }
-
+const statusCheck = async(locationid,partid,table)=>{
+  const pool = await getPool1()
+  console.log(locationid,partid,table);
+  const query =  `select top 1 status from ${table} where locationid = ${locationid} and partid = ${partid} order by feedbackid desc`
+  const result = await pool.request().query(query)
+  const status = result.recordset[0].status
+  console.log(status)
+  if(status == 'Pending'){
+    return false
+  }
+  return true
+}
 const readExcel = async (filePath)=>{
       let data
       //  filePath = req.file.path;
@@ -336,4 +347,4 @@ const checkReviewedFeedbackByBrand = async (brandid, formattedData) => {
 
 
 
-export {partBrandCheck,readExcel,insertData,insertAdminFeedback,findLocationPartidDuplicates,checkPendingFeedbackAndStatus,findLocationPartidDuplicatesAdmin,checkReviewedFeedbackByBrand}
+export {partBrandCheck,readExcel,insertData,insertAdminFeedback,findLocationPartidDuplicates,checkPendingFeedbackAndStatus,findLocationPartidDuplicatesAdmin,checkReviewedFeedbackByBrand,statusCheck}
