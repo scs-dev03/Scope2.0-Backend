@@ -486,7 +486,7 @@ const dealerUpload = async (req, res) => {
     // console.log(req.file.path);
     
       let data = await readExcel(req.file.path);
-    //   console.log(`data` , data[0]);
+      console.log(`data` , data[0]);
       
       fs.unlinkSync(req.file.path); // Delete uploaded file after processing
    
@@ -755,6 +755,7 @@ if (invalidRecords.length > 0) {
     });
 }
 
+// console.log(formattedData);
 
 
 // await transaction.begin(); // Start transaction
@@ -806,7 +807,7 @@ if(isArrayEmpty(cleanedData)){
 }
 const duplicateEntries = findLocationPartidDuplicatesAdmin(cleanedData);
 if(!isArrayEmpty(duplicateEntries)){
-    console.log(duplicateEntries);
+    // console.log(duplicateEntries);
     
     return res.status(400).json({Data:duplicateEntries})
 }
@@ -852,7 +853,7 @@ for (const d of distinctDealers) {
         });
     }
 }
-console.log('Dealers with IDs:', dealerResults);
+// console.log('Dealers with IDs:', dealerResults);
 const maxTable = `z_scope..stockable_nonstockable_td001_${dealerResults[0].dealerid}`
 // console.log(maxTable);
 
@@ -903,7 +904,7 @@ try {
     console.error("Error fetching PreviousAdminFBIDs:", fetchError);
 }
 
-console.log(previousFBIDs);
+// console.log(previousFBIDs);
 
 
 const AdminID = 1; // Static User ID

@@ -28,7 +28,6 @@ const statusCheck = async(locationid,partid,table)=>{
   const query =  `select top 1 status from ${table} where locationid = ${locationid} and partid = ${partid} order by feedbackid desc`
   const result = await pool.request().query(query)
   const status = result.recordset[0].status
-  console.log(status)
   if(status == 'Pending'){
     return false
   }
