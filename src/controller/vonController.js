@@ -2,7 +2,7 @@ import {getPool1} from '../db/db.js'
 import sql from 'mssql'
 
 import fs from 'fs'
-import { partBrandCheck, readExcel,insertData , findLocationPartidDuplicates, checkPendingFeedbackAndStatus, findLocationPartidDuplicatesAdmin, insertAdminFeedback, checkReviewedFeedbackByBrand } from '../utils/vonHelper.js'
+import { partBrandCheck, readExcel,insertData , findLocationPartidDuplicates, checkPendingFeedbackAndStatus, findLocationPartidDuplicatesAdmin, insertAdminFeedback, checkReviewedFeedbackByBrand , statusCheck } from '../utils/vonHelper.js'
 import { model } from './MasterApiController.js'
 
 
@@ -129,8 +129,11 @@ const userFeedbacklog = async (req,res)=>{
    }
 
     const dynamicTable = `[UAD_VON]..UAD_VON_SPMFeedback_${brandid}`
-    // console.log(dynamicTable);
-    
+    console.log(dynamicTable);
+    const previousStatusCheck = await statusCheck(locationid , partid , dynamicTable)
+    if(!previousStatusCheck){
+       return  res.status(200).json({message:`Previous feedback has pending state`})
+    }
     let LatestPartID =null;
     try{
         const LatestPartQuery = `select (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END) AS LatestPartNumber 
@@ -453,6 +456,8 @@ try {
             return res.status(400).json({message:`Brandid is required`})
         }
         const query = `use [UAD_VON] EXEC sp_GetAdminView @brandid = @brandid, @dealerid = @dealerid, @locationid = @locationid,@Status = @status,@seasonalid = @seasonalid, @natureid = @natureid, @modelid = @modelid;`
+        // console.log(query);
+        
         const result = await pool.request()
         .input('brandid',sql.Int,brandid)
         .input('dealerid',sql.Int,dealerid)
@@ -481,7 +486,7 @@ const dealerUpload = async (req, res) => {
     // console.log(req.file.path);
     
       let data = await readExcel(req.file.path);
-    //   console.log(`data` , data[0]);
+      console.log(`data` , data[0]);
       
       fs.unlinkSync(req.file.path); // Delete uploaded file after processing
    
@@ -750,6 +755,7 @@ if (invalidRecords.length > 0) {
     });
 }
 
+// console.log(formattedData);
 
 
 // await transaction.begin(); // Start transaction
@@ -801,7 +807,7 @@ if(isArrayEmpty(cleanedData)){
 }
 const duplicateEntries = findLocationPartidDuplicatesAdmin(cleanedData);
 if(!isArrayEmpty(duplicateEntries)){
-    console.log(duplicateEntries);
+    // console.log(duplicateEntries);
     
     return res.status(400).json({Data:duplicateEntries})
 }
@@ -847,7 +853,7 @@ for (const d of distinctDealers) {
         });
     }
 }
-console.log('Dealers with IDs:', dealerResults);
+// console.log('Dealers with IDs:', dealerResults);
 const maxTable = `z_scope..stockable_nonstockable_td001_${dealerResults[0].dealerid}`
 // console.log(maxTable);
 
@@ -898,7 +904,7 @@ try {
     console.error("Error fetching PreviousAdminFBIDs:", fetchError);
 }
 
-console.log(previousFBIDs);
+// console.log(previousFBIDs);
 
 
 const AdminID = 1; // Static User ID
