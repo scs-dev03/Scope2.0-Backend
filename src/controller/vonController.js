@@ -129,7 +129,7 @@ const userFeedbacklog = async (req,res)=>{
    }
 
     const dynamicTable = `[UAD_VON]..UAD_VON_SPMFeedback_${brandid}`
-    console.log(dynamicTable);
+    // console.log(dynamicTable);
     const previousStatusCheck = await statusCheck(locationid , partid , dynamicTable)
     if(!previousStatusCheck){
        return  res.status(200).json({message:`Previous feedback has pending state`})
@@ -142,7 +142,7 @@ const userFeedbacklog = async (req,res)=>{
                                 where pm.partid = ${partid}`
             const result = await pool.request().query(LatestPartQuery)
             LatestPartID = result.recordset.length > 0 ? result.recordset[0].LatestPartNumber : null;
-            // console.log(LatestPartID);  
+            console.log(LatestPartID);  
             
     }catch(error){
         return res.status(500).json({Error:error.message,Error:`Error in Finding LatestPartID`})
@@ -181,7 +181,7 @@ const userFeedbacklog = async (req,res)=>{
      request.input('customrem',sql.VarChar,customrem)                      
      request.input('proposedqty',sql.Int,proposedqty)            
      request.input('previousfbid',sql.Int,previousFBID)     
-     
+
      await request.query(query)
      res.status(200).json({message:`Success`})
  } catch (error) {
