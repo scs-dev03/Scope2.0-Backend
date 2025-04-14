@@ -5,33 +5,54 @@ import { getPool1 } from '../db/db.js'
 const partBrandCheck = async(dealerid,locationid,partid)=>{
     try {
         const pool = await getPool1()
-        const partCheck = `use [z_scope]  SELECT CASE 
-                          WHEN EXISTS (SELECT 1 FROM locationinfo WHERE brandid = (SELECT brandid FROM Part_Master WHERE partid = ${partid})
-                          AND dealerid = ${dealerid} 
-                          AND locationid = ${locationid}
-                          ) THEN 'YES' ELSE 'NO' END AS PartCheck;`
+        // const partCheck = `use [z_scope]  SELECT CASE 
+        //                   WHEN EXISTS (SELECT 1 FROM locationinfo WHERE brandid = (SELECT brandid FROM Part_Master WHERE partid = ${partid})
+        //                   AND dealerid = ${dealerid} 
+        //                   AND locationid = ${locationid}
+        //                   ) THEN 'YES' ELSE 'NO' END AS PartCheck;`
+        const partCheck = `use z_scope
+       SELECT 
+  CASE 
+    WHEN EXISTS (
+      SELECT 1 
+      FROM Stockable_Nonstockable_TD001_${dealerid} 
+      WHERE locationid = ${locationid} 
+        AND partid = ${partid} 
+        AND stockdate = (SELECT MAX(stockdate) FROM Stockable_Nonstockable_TD001_${dealerid})
+    ) 
+    THEN 'YES' 
+    ELSE 'NO' 
+  END AS Result
+`
 
         const result = await pool.request().query(partCheck)                        
-        if(result.recordset[0].PartCheck === 'NO' ){
-             return false
+        if(result.recordset[0].Result === 'YES' ){
+             return true
         }
         else{
-            return true
+            return false
         }
         } catch (error) {
-          res.status(500).json({Error:error.message})
+          console.log(error.message);
+          
         }
 }
 const statusCheck = async(locationid,partid,table)=>{
   const pool = await getPool1()
-  console.log(locationid,partid,table);
+  // console.log(locationid,partid,table);
   const query =  `select top 1 status from ${table} where locationid = ${locationid} and partid = ${partid} order by feedbackid desc`
   const result = await pool.request().query(query)
   const status = result.recordset[0].status
-  if(status == 'Pending'){
+  // console.log(result.recordset[0]);
+  // console.log(`status`,status);
+
+if(status == undefined){
+  return true
+}
+  if(status === 'Pending'){
     return false
   }
-  return true
+return true
 }
 const readExcel = async (filePath)=>{
       let data
