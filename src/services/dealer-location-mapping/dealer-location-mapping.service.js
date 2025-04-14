@@ -17,8 +17,12 @@ const addDealerLocationMappingInService=async (req,res)=>{
         headers=fileData.headers;
         rowData=fileData.data;
         rowCount=rowData.length;
+        let isDealerAndLocationNull;
         // console.log("brand Id ",brandId,rowCount,headers);
-
+        if(headers?.length==0 || headers==undefined){
+            isDealerAndLocationNull=true;
+             return {isDealerAndLocationNull:isDealerAndLocationNull}
+           }
      
         const  lowerCaseHeaders=headers.map((header)=> header.trim().toLowerCase());
         // console.log("lowe case ",!(lowerCaseHeaders.includes('dealer') && lowerCaseHeaders.includes('location') && lowerCaseHeaders.includes('inventory location')))
@@ -29,7 +33,7 @@ const addDealerLocationMappingInService=async (req,res)=>{
         }
 
         // console.log("pahuch gya yha tak")
-         let isDealerAndLocationNull=await checkFields(rowData);
+         isDealerAndLocationNull=await checkFields(rowData);
         //   console.log("is dealer location null in file ",isDealerAndLocationNull)
 
          if(isDealerAndLocationNull){
@@ -167,7 +171,7 @@ const addDealerLocationMappingInService=async (req,res)=>{
 const checkFields=async(arr)=>{
 
    arr= await convertKeysToLowercase(arr);
-   console.log("arr ",arr)
+  // console.log("arr ",arr)
    if(arr.length==0){
     return true;
    }
@@ -625,6 +629,7 @@ const editDealerLocationMappingInService=async(req,res)=>{
         let rowData;
         let rowCount;
         let headers;
+        let isDealerAndLocationNull;
         let userId=parseInt(req.body.added_by,10);
         let filePath=req.file.path;
        let  isDealerAndLocationExist=true;        
@@ -633,8 +638,12 @@ const editDealerLocationMappingInService=async(req,res)=>{
         const dealerLocationNotInMaster = [];
         headers=fileData.headers;
         rowData=fileData.data;
-       
-        const  lowerCaseHeaders=headers.map((header)=> header.trim().toLowerCase());
+        console.log("headers ",headers)
+       if(headers?.length==0 || headers==undefined){
+        isDealerAndLocationNull=true;
+         return {isDealerAndLocationNull:isDealerAndLocationNull}
+       }
+        const  lowerCaseHeaders=headers?.map((header)=> header.trim().toLowerCase());
         // console.log("lowercase headers ",lowerCaseHeaders)
         if(!(lowerCaseHeaders.includes('dealer') && lowerCaseHeaders.includes('location') && lowerCaseHeaders.includes('inventory location'))){
             isDealerAndLocationExist=false
@@ -644,8 +653,8 @@ const editDealerLocationMappingInService=async(req,res)=>{
 
          // console.log("headers ",headers,rowData)
         
-         let isDealerAndLocationNull=await checkFields(rowData);
-        //   console.log("is dealer location null in file ",isDealerAndLocationNull)
+         isDealerAndLocationNull=await checkFields(rowData);
+           console.log("is dealer location null in file ",isDealerAndLocationNull)
       //  console.log("row data ",rowData)
          if(isDealerAndLocationNull){
             return {isDealerAndLocationNull:isDealerAndLocationNull}
