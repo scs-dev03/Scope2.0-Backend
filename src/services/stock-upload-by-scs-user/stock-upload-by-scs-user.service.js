@@ -1494,7 +1494,7 @@ const uploadBulkStock = async (req, res) => {
     // const date1= new Date(currentDate);
     let date = req.body.date;
     const date1 = new Date(date);
-    const formattedDate = date1.toLocaleDateString('en-CA');
+    let formattedDate = date1.toLocaleDateString('en-CA');
     // const formattedDate = date1.toISOString().split("T")[0]; // Extract the date portion of the ISO string
     // console.log(typeof formattedDate,formattedDate);
     //   console.log("date ",date)
@@ -1567,8 +1567,8 @@ const uploadBulkStock = async (req, res) => {
     }
 
     if ([22].includes(brandId)) {
-      const requiredFields = ["availability"];
-      const hasRequiredFields = requiredFields.every((field) =>
+      let requiredFields = ["availability"];
+      let hasRequiredFields = requiredFields.every((field) =>
         normalizedHeaders.includes(field)
       );
 
@@ -1614,9 +1614,9 @@ const uploadBulkStock = async (req, res) => {
   // });
 
     // 5. Format data
-    const normalizedData = rowDataArray.map(row => {
-      const getVal = (key) => {
-        const match = Object.keys(row).find(k => k.toLowerCase() == key.toLowerCase());
+    let normalizedData = rowDataArray.map(row => {
+      let getVal = (key) => {
+        let match = Object.keys(row).find(k => k.toLowerCase() == key.toLowerCase());
         return match ? row[match]?.toString().trim() : "";
       };
   
@@ -1630,11 +1630,11 @@ const uploadBulkStock = async (req, res) => {
     });
   
     filteredRowData = normalizedData.filter((row) => {
-      const stockQty = parseFloat(row.qty);
-      const hasPartNumber = row.part_number && row.part_number.trim() !== "";
-      const availability = row["availability"]?.toLowerCase();
-      const status = row["status"]?.toLowerCase();
-       const hasLocation=row.location && row.location.trim() !==''
+      let stockQty = parseFloat(row.qty);
+      let hasPartNumber = row.part_number && row.part_number.trim() !== "";
+      let availability = row["availability"]?.toLowerCase();
+      let status = row["status"]?.toLowerCase();
+       let hasLocation=row.location && row.location.trim() !==''
     
       if ((brandId == 17 || brandId == 28)) {
         return hasPartNumber && stockQty > 0 && availability == "on hand" && status == "good" && hasLocation;
@@ -1715,8 +1715,8 @@ const [partMasterRecords, partNotInMasterResult] = await Promise.all([
   partNotInMasterRequest,
 ]);
 
-const partMasterResult = partMasterRecords.recordset;
-const partNotInMasterArray = partNotInMasterResult?.recordset || [];
+let partMasterResult = partMasterRecords.recordset;
+let partNotInMasterArray = partNotInMasterResult?.recordset || [];
 
 const deletePartMasterQuery = `
   USE [StockUpload]; 
@@ -1744,9 +1744,9 @@ const stockRequest = (() => {
 })();
 
 // Run them in parallel
-const [deleteResult, res45] = await Promise.all([deleteRequest, stockRequest]);
+let [deleteResult, res45] = await Promise.all([deleteRequest, stockRequest]);
 
-const tCodeFromStock1 = res45?.recordset || [];
+let tCodeFromStock1 = res45?.recordset || [];
 let stockCodes = tCodeFromStock1;
 
     let updatedFilteredRowData = [];
@@ -1849,25 +1849,25 @@ let stockCodes = tCodeFromStock1;
     // }
 
     // Create lookup maps for faster access
-const partMasterMap = new Map(
+let partMasterMap = new Map(
   partMasterResult.map(el => [el.partnumber1.trim().toLowerCase(), el.partID])
 );
 
-const dealerLocationMap = new Map(
+let dealerLocationMap = new Map(
   dealerLocationMappedData.map(el => [el.inventory_location.trim().toLowerCase(), el.locationId])
 );
 
-const seenPartNumbers = new Set(); // For tracking duplicates in partNotInMasterArray
+let seenPartNumbers = new Set(); // For tracking duplicates in partNotInMasterArray
 
-for (const item of filteredRowData) {
-  const normalizedPartNumber = item.part_number.trim().toLowerCase();
-  const partId = partMasterMap.get(normalizedPartNumber);
+for (let item of filteredRowData) {
+  let normalizedPartNumber = item.part_number.trim().toLowerCase();
+  let partId = partMasterMap.get(normalizedPartNumber);
 
   if (partId) {
     item.partId = partId;
 
-    const normalizedLocation = item.location?.replace(/[^a-zA-Z0-9-_ ]/g, '').trim().toLowerCase();
-    const locationId = dealerLocationMap.get(normalizedLocation);
+    let normalizedLocation = item.location?.replace(/[^a-zA-Z0-9-_ ]/g, '').trim().toLowerCase();
+    let locationId = dealerLocationMap.get(normalizedLocation);
 
     if (locationId) {
       item.locationId = locationId;
@@ -1880,18 +1880,19 @@ for (const item of filteredRowData) {
     // Only push to partNotInMasterArray if not already added
     if (!seenPartNumbers.has(item.part_number)) {
       seenPartNumbers.add(item.part_number);
-      partNotInMasterArray.push({ partnumber: item.part_number });
+     // partNotInMasterArray.push({ partnumber: item.part_number });
     }
   }
 }
-    
+partNotInMasterArray = Array.from(seenPartNumbers).map(partnumber => ({ partnumber }));
+   // console.log("part not in master ",partNotInMasterArray)
     //  updatedFilteredRowData = Array.from(partCountMap.values());
 
-    const partCountMap = new Map();
+    let partCountMap = new Map();
 
-for (const item of updatedFilteredRowData) {
-  const key = `${item.part_number}-${item.locationId}`;
-  const existing = partCountMap.get(key);
+for (let item of updatedFilteredRowData) {
+  let key = `${item.part_number}-${item.locationId}`;
+  let existing = partCountMap.get(key);
 
   if (existing) {
     existing.qty += item.qty;
@@ -1927,13 +1928,13 @@ updatedFilteredRowData = Array.from(partCountMap.values());
    //   console.log("updated filtered ",updatedFilteredRowData);
   //    console.log("combined filtered ",combinedExistedData)
       if (updatedFilteredRowData.length > combinedExistedData.length) {
-        const missingRecords = [];
+        let missingRecords = [];
       
         updatedFilteredRowData.forEach((item) => {
           let partID = item.partId;
           let qty = parseFloat(item.qty);
       
-          const match = combinedExistedData.find(
+          let match = combinedExistedData.find(
             (el) => el.partId == partID && el.locationId == item.locationId
           );
       
@@ -1977,14 +1978,14 @@ updatedFilteredRowData = Array.from(partCountMap.values());
       
       if (updatedFilteredRowData.length <= combinedExistedData.length) {
         // Create a combined key map like "partId-locationId"
-        const updatedMap = new Map(
+        let updatedMap = new Map(
           updatedFilteredRowData.map((item) => [`${item.partId}-${item.locationId}`, item])
         );
       
       //  console.log("combined ", combinedExistedData);
       
         // Find missing records in updatedFilteredRowData
-        const missingRecords = combinedExistedData
+        let missingRecords = combinedExistedData
           .filter(
             (item) => !updatedMap.has(`${item.partId}-${item.locationId}`)
           )
@@ -1998,9 +1999,9 @@ updatedFilteredRowData = Array.from(partCountMap.values());
        // console.log("updated map ", updatedMap);
       
         updatedFilteredRowData.forEach((item) => {
-          const key = `${item.partId}-${item.locationId}`;
+          let key = `${item.partId}-${item.locationId}`;
           if (updatedMap.has(key)) {
-            const existing = combinedExistedData.find(
+            let existing = combinedExistedData.find(
               (el) => el.partId == item.partId && el.locationId == item.locationId
             );
       
@@ -2016,7 +2017,7 @@ updatedFilteredRowData = Array.from(partCountMap.values());
       
     }
 
-  //  console.log("updated filtered row ",updatedFilteredRowData,updatedFilteredRowData.length);
+ //   console.log("updated filtered row ",updatedFilteredRowData,updatedFilteredRowData.length);
    // console.log("previous data ",combinedExistedData,combinedExistedData.length)
   
    // console.log("filtered 982 ",updatedFilteredRowData)
@@ -2032,7 +2033,7 @@ updatedFilteredRowData = Array.from(partCountMap.values());
     rowCount = updatedFilteredRowData?.length;
     let combinedLogsLocationWise = [];
     let currentStockCode;
-    // console.log("unique ids ",uniqueLocationIds)
+   //  console.log("unique ids ",uniqueLocationIds)
    
     for (let i = 0; i < uniqueLocationIds.length; i++) {
       let locId = uniqueLocationIds[i];
