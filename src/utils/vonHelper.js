@@ -22,8 +22,7 @@ const partBrandCheck = async(dealerid,locationid,partid)=>{
     ) 
     THEN 'YES' 
     ELSE 'NO' 
-  END AS Result
-`
+  END AS Result`
 
         const result = await pool.request().query(partCheck)                        
         if(result.recordset[0].Result === 'YES' ){
@@ -42,14 +41,19 @@ const statusCheck = async(locationid,partid,table)=>{
   // console.log(locationid,partid,table);
   const query =  `select top 1 status from ${table} where locationid = ${locationid} and partid = ${partid} order by feedbackid desc`
   const result = await pool.request().query(query)
+  const resultarray = result.recordset
+  const isArrayEmpty = (arr) => !arr || arr.length === 0;
+  if(isArrayEmpty(resultarray)){
+    return true
+  }
   const status = result.recordset[0].status
-  // console.log(result.recordset[0]);
-  // console.log(`status`,status);
+  console.log(result.recordset[0]);
+  console.log(`status`,status);
 
 if(status == undefined){
   return true
 }
-  if(status === 'Pending'){
+  if(status === 'Pending'){ 
     return false
   }
 return true
@@ -268,7 +272,7 @@ function findLocationPartidDuplicates(data) {
       seen.set(key, 1);
     }
   });
-  console.log(duplicates);
+  // console.log(duplicates);
   
   return duplicates;
 }

@@ -14,7 +14,7 @@ try {
         if(!brandid || !usertype){
             return res.status(500).json({Error:`Brandid and usertype are required`})
         }
-        const query = `use [UAD_VON] select Remarkid , remark from UAD_VON_RemarksMaster where brandid = ${brandid} and status =1 and usertype = '${usertype}'`
+        const query = `use [UAD_VON] select Remarkid , remark from UAD_VON_RemarksMaster where brandid = ${brandid} and status = 1 and usertype = '${usertype}'`
         const result = await pool.request().query(query)
         res.status(200).json({Data:result.recordset})
 } catch (error) {
@@ -486,33 +486,56 @@ const dealerUpload = async (req, res) => {
     // console.log(req.file.path);
     
       let data = await readExcel(req.file.path);
-      console.log(`data` , data[0]);
+    //   console.log(`data` , data[0]);
       
       fs.unlinkSync(req.file.path); // Delete uploaded file after processing
    
       const cleanedData =  data
              .filter(item => item.UserRemark !== null && item.ProposedQty !== null && item.ProposedQty !== null && item.ProposedQty !== undefined)
-            .map(({ Brand, Dealer, Location, Maxvalue, Partid, UserRemark, ProposedQty }) => ({
+            .map(({ Brand, Dealer, Location, Maxvalue,partnumber ,UserRemark, ProposedQty }) => ({
                 Brand,
                 Dealer,
                 Location,
                 Maxvalue,
-                Partid,
+                partnumber,
                 UserRemark,
                 ProposedQty
             }));
     
-// console.log(cleanedData);
+console.log(cleanedData[0]);
+const partidpartnumbermapping = [];
+
+const query = `select distinct  partid , partnumber from Stockable_Nonstockable_TD001_8 where Locationid = 14 `;
+const partidpartnumberresult = await pool.request().query(query);
+
+if (partidpartnumberresult.recordset.length > 0) {
+  partidpartnumbermapping.push(...partidpartnumberresult.recordset);
+}
+// console.log(partidpartnumbermapping);
+
+const updatedCleanedData = cleanedData.map(item => {
+    const matched = partidpartnumbermapping.find(
+      mapItem => mapItem.partnumber === item.partnumber
+    );
+  
+    return {
+      ...item,
+      Partid: matched ? matched.partid : null
+    };
+  });
+  
+  console.log("Final Item with Partid:", updatedCleanedData[0]);
+
 // Get duplicates
 const isArrayEmpty = (arr) => !arr || arr.length === 0;
 if(isArrayEmpty(cleanedData)){
     return res.status(400).json({message:`UserFeedback and ProposedQty cannot be null or undefined`})
 }
-const duplicateEntries = findLocationPartidDuplicates(cleanedData);
+const duplicateEntries = findLocationPartidDuplicates(updatedCleanedData);
 if(!isArrayEmpty(duplicateEntries)){
     return res.status(400).json({Data:duplicateEntries})
 }
-// console.log('Duplicate combinations:', duplicateEntries);
+// console.log('Duplicate combinations:', duplicateEntries); 
 
 
 // Extract distinct values from data
@@ -599,7 +622,7 @@ for (const loc of distinctLocations) {
 
 const latestPartIDs = [];
 
-const queryLatestPartID = `SELECT partid, subpartid FROM z_scope..Substitution_Master WHERE brandid = 9`;
+const queryLatestPartID = `SELECT partid, subpartid FROM z_scope..Substitution_Master WHERE brandid = ${brandResults[0].brandid}`;
 const queryResult = await pool.request().query(queryLatestPartID);
 
 if (queryResult.recordset.length) {
@@ -684,7 +707,7 @@ if (maxResult.recordset.length) {
 // console.log("previousFBIDs:", previousFBIDs);
 
     // Transform the data to only include the required fields
-    const formattedData = cleanedData.map(item => {
+    const formattedData = updatedCleanedData.map(item => {
         const brandMapping = brandResults.find(b => b.brand === item.Brand);
         const dealerMapping = dealerResults.find(d => d.dealer === item.Dealer);
         const locationMapping = locationResults.find(l => l.location === item.Location);
