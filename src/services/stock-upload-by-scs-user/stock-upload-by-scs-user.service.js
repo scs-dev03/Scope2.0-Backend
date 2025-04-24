@@ -508,6 +508,7 @@ import xlsx from "xlsx";
 
 
 const singleUploadStockInService = async (req, res) => {
+
   const pool = await getPool1();
     let locationId = req.body.location_id;
     let addedBy = req.body.user_id;
@@ -517,32 +518,69 @@ const singleUploadStockInService = async (req, res) => {
     let date = req.body.date;
     const date1 = new Date(date);
     const formattedDate = date1.toLocaleDateString('en-CA');
+
+    const today = new Date();
+const formattedToday = today.toLocaleDateString('en-CA');
     // const formattedDate = date1.toISOString().split("T")[0]; 
+   // console.log("formattedToday ",formattedDate,formattedToday)
+let mapping;
+let isOlderUploadForHyundai=false;
+    if (formattedDate == formattedToday) {
+     // 2. Fetch Excel column mapping for the brand
+  let result = await pool.request()
+  .input("brandId", brandId)
+  .query(`USE [StockUpload]; SELECT part_number, stock_qty, loc,calculativeField, stock_type FROM stock_upload_mapping WHERE brand_id=@brandId AND stock_type='current'`);
+  mapping=result.recordset;
 
-  // 2. Fetch Excel column mapping for the brand
-  const { recordset: mapping } = await pool.request()
-    .input("brandId", brandId)
-    .query(`USE [StockUpload]; SELECT part_number, stock_qty, loc, stock_type FROM stock_upload_mapping WHERE brand_id=@brandId AND stock_type='current'`);
-
+    } else if (formattedDate < formattedToday) {
+     // console.log("exccuted ")
+      isOlderUploadForHyundai=true;
+      // Mapping logic for older date
+      // 2. Fetch Excel column mapping for the brand
+   let result = await pool.request()
+  .input("brandId", brandId)
+  .query(`USE [StockUpload]; SELECT part_number, stock_qty, loc,calculativeField, stock_type FROM stock_upload_mapping WHERE brand_id=@brandId AND stock_type='older'`);
+    mapping=result.recordset;
+   // console.log("mapping result ",mapping)
+    } 
+ 
   if (!mapping.length) return { mappingNotPresent: true };
   const mappedData = mapping[0];
 
   // 3. Read Excel data
-  const fileData = [11, 33].includes(brandId)
+  let fileData;
+  if(!isOlderUploadForHyundai){  //for current
+     fileData = [11, 33].includes(brandId)
     ? await readExcelFileWithSubColumns(req.file.path)
     : await readExcelFile(req.file.path);
+  }
+  else{
+    fileData = [33].includes(brandId)
+    ? await readExcelFileWithSubColumns(req.file.path)
+    : await readExcelFile(req.file.path); 
+  }
+  
 
   const headers = fileData.headers.map(h => h.trim().toLowerCase());
-  const rowDataArray = fileData.data.slice([11, 33].includes(brandId) ? 1 : 0);
-
+  let rowDataArray;
+  if(!isOlderUploadForHyundai){
+     rowDataArray = fileData.data.slice([11, 33].includes(brandId) ? 1 : 0);
+  }
+  else{
+    rowDataArray = fileData.data.slice([33].includes(brandId) ? 1 : 0);
+  }
+ // console.log("headers ",headers,mappedData)
    const requiredBrandIds = [17, 28];
   // console.log("headers ",headers)
+ // console.log("mapped data ",mappedData)
   const normalizedHeaders = headers.map(header => header.trim().toLowerCase());
   const isValid = Object.entries(mappedData)
-      .filter(([key]) => key != 'stock_type' && key != 'loc') // Exclude stock_type and loc
+      .filter(([key]) => key != 'stock_type' && key != 'loc' && key!= 'calculativeField' && key!='stock_qty') // Exclude stock_type and loc
       .every(([, value]) => headers.includes(value.trim().toLowerCase())); // Check if all values exist in headers
  // console.log("mapped data ",mappedData,headers,isValid)
   // If brandId is 17, 28, check for "availability" and "status" in headers
+
+  
   if (requiredBrandIds.includes(brandId)) {
       const requiredFields = ["availability", "status"];
       const hasRequiredFields = requiredFields.every(field => normalizedHeaders.includes(field));
@@ -551,6 +589,7 @@ const singleUploadStockInService = async (req, res) => {
           return { headerNotPresent: true };
       }
   }
+
   if ([22].includes(brandId)) {
     const requiredFields = ["availability"];
     const hasRequiredFields = requiredFields.every(field => normalizedHeaders.includes(field));
@@ -559,27 +598,102 @@ const singleUploadStockInService = async (req, res) => {
         return { headerNotPresent: true };
     }
   }
+
+
   
   // Return false if general validation fails
   if (!isValid) {
       return { headerNotPresent: true };
   }
 
+ // console.log("mapping ",mappedData)
 
   // 5. Format data
+  // const normalizedData = rowDataArray.map(row => {
+  //   const getVal = (key) => {
+  //     const match = Object.keys(row).find(k => k.toLowerCase() == key.toLowerCase());
+  //     return match ? row[match]?.toString().trim() : "";
+  //   };
+
+  //   return {
+  //     part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),
+  //     qty: parseFloat(getVal(mappedData.stock_qty)) || 0,
+  //     availability: getVal("availability"),
+  //     status: getVal("status")
+  //   };
+  // });
+
+ // console.log("headers not present",headerNotPresent);
+
+ // Step 1: Get headers from uploaded file (from the first row)
+let headers1 = Object.keys(rowDataArray[0] || {}).map(h => h.toLowerCase());
+
+// Step 2: Get column names from stock_qty field
+const stockQtyColumns = mappedData.stock_qty
+  .split(",")
+  .map(col => col.trim())
+  .filter(Boolean);
+
+// Step 3: Check for missing fields
+const missingFields = stockQtyColumns.filter(
+  col => !headers1.includes(col.toLowerCase())
+);
+
+// Step 4: If missing, throw clear error
+if (missingFields.length > 0) {
+ return {headerNotPresent:true,missingFields:missingFields}
+}
+ // console.log("missing field ",missingFields)
   const normalizedData = rowDataArray.map(row => {
     const getVal = (key) => {
-      const match = Object.keys(row).find(k => k.toLowerCase() == key.toLowerCase());
-      return match ? row[match]?.toString().trim() : "";
+      const match = Object.keys(row).find(k => k.toLowerCase() === key.toLowerCase());
+      const value = match ? row[match] : "";
+     // console.log("match key",key,"value",value);
+      return value != null ? value.toString().trim() : "";
     };
-
+  
+    const computeQty = () => {
+      const formula = mappedData.calculativeField;
+    
+      if (typeof formula === "string" && /[\+\-\*\/]/.test(formula)) {
+        let formulaWithValues = formula;
+    
+        // Sort keys by length (to replace longer keys first and avoid partial overlaps)
+        const keys = Object.keys(row).sort((a, b) => b.length - a.length);
+    
+        keys.forEach(key => {
+          // Escape special characters in key (like dash)
+          const escapedKey = key.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
+          const regex = new RegExp(`\\b${escapedKey}\\b`, 'gi');
+          const val = parseFloat(row[key]);
+          formulaWithValues = formulaWithValues.replace(regex, isNaN(val) ? "0" : val.toString());
+        });
+    
+        try {
+          console.log("Evaluating:", formulaWithValues);
+          return eval(formulaWithValues);
+        } catch (err) {
+          console.error("Error evaluating formula:", formulaWithValues, err);
+          return 0;
+        }
+      } else {
+        const val = parseFloat(row[mappedData.stock_qty]);
+        return isNaN(val) ? 0 : val;
+      }
+    };
+    
+  
     return {
       part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),
-      qty: parseFloat(getVal(mappedData.stock_qty)) || 0,
+      qty: computeQty(),
       availability: getVal("availability"),
       status: getVal("status")
     };
   });
+  
+  
+  
+//  console.log("normalized data ",normalizedData)
 
   // 6. Filter data by brand-specific rules
   // const filteredData = normalizedData.filter(row => {
@@ -594,7 +708,7 @@ const singleUploadStockInService = async (req, res) => {
   // });
   let filteredData = normalizedData.filter((row) => {
     const stockQty = parseFloat(row.qty);
-    const hasPartNumber = row.part_number && row.part_number.trim() !== "";
+    const hasPartNumber = row.part_number && row.part_number.trim() !== "" && row.part_number!=0;
     const availability = row["availability"]?.toLowerCase();
     const status = row["status"]?.toLowerCase();
   
@@ -677,7 +791,7 @@ const singleUploadStockInService = async (req, res) => {
     const existingMap = new Map(deduped.map(i => [i.partId, i]));
     for (const item of prevItems) {
       if (!existingMap.has(item.partID)) {
-        deduped.push({ partNumber: item.partNumber, qty: item.qty, partId: item.partID });
+        deduped.push({ part_number: item.partNumber, qty: item.qty, partId: item.partID });
       } else {
         existingMap.get(item.partID).qty += item.qty;
       }
@@ -693,7 +807,7 @@ const singleUploadStockInService = async (req, res) => {
     .query(`USE [StockUpload]; INSERT INTO currentStock1(locationID, stockdate, addedby) OUTPUT inserted.tcode VALUES(@locationID, @formattedDate, @addedBy)`);
 
   const newTcode = insertedStock.tcode;
-
+   //  console.log("depued data ",deduped)
   // 13. Bulk insert unknown parts
   if (unknownParts.length) {
     const table = new sql.Table("part_not_in_master");
@@ -704,14 +818,17 @@ const singleUploadStockInService = async (req, res) => {
   }
 
   // 14. Bulk insert to currentStock2
+  if(deduped.length){
+
+  
   const stockTable = new sql.Table("currentStock2");
   stockTable.columns.add("StockCode", sql.BigInt);
   stockTable.columns.add("PartNumber", sql.VarChar(35));
   stockTable.columns.add("Qty", sql.Decimal(18, 2));
   stockTable.columns.add("PartID", sql.Int);
-  deduped.forEach(row => stockTable.rows.add(newTcode, row.partNumber, row.qty, row.partId));
+  deduped.forEach(row => stockTable.rows.add(newTcode, row.part_number, row.qty, row.partId));
   await pool.request().bulk(stockTable);
-
+  }
   // 15. Log the upload
   const totalQty = (await pool.request()
     .input("StockCode", newTcode)
@@ -743,6 +860,8 @@ const singleUploadStockInService = async (req, res) => {
     prevRecords: prevRecordCount,
   };
 };
+
+
 const getPartNotInMasterSingleUploadInService = async (req, res) => {
   try {
     const pool = await getPool1();
@@ -1504,14 +1623,36 @@ const uploadBulkStock = async (req, res) => {
       .input("dealerId", dealerId)
       .query(getLocationsQuery);
     let locations = res56.recordset;
-
+    let isOlderUploadForHyundai=false;
     // console.log("locations ", locations);
-    let getMappingQuery = `use [StockUpload] select part_number,stock_qty,loc,stock_type from stock_upload_mapping where brand_id=@brandId and stock_type='current'`;
 
-    const mappingResult = await pool
-      .request()
-      .input("brandId", brandId)
-      .query(getMappingQuery);
+    const today = new Date();
+    const formattedToday = today.toLocaleDateString('en-CA');
+        // const formattedDate = date1.toISOString().split("T")[0]; 
+       // console.log("formattedToday ",formattedDate,formattedToday)
+    let mappingResult;
+        if (formattedDate == formattedToday) {
+         // 2. Fetch Excel column mapping for the brand
+         let getMappingQuery = `use [StockUpload] select part_number,stock_qty,loc,stock_type,calculativeField from stock_upload_mapping where brand_id=@brandId and stock_type='current'`;
+
+          mappingResult = await pool
+           .request()
+           .input("brandId", brandId)
+           .query(getMappingQuery);
+    
+        } else if (formattedDate < formattedToday) {
+          console.log("exccuted ")
+          isOlderUploadForHyundai=true;
+          // Mapping logic for older date
+          // 2. Fetch Excel column mapping for the brand
+          let getMappingQuery = `use [StockUpload] select part_number,stock_qty,loc,stock_type,calculativeField from stock_upload_mapping where brand_id=@brandId and stock_type='older'`;
+
+          mappingResult = await pool
+           .request()
+           .input("brandId", brandId)
+           .query(getMappingQuery);
+        } 
+    
 
     if (mappingResult.recordset.length == 0) {
       return { mappingNotPresent: true };
@@ -1535,25 +1676,45 @@ const uploadBulkStock = async (req, res) => {
     let rowDataArray;
     let filteredRowData;
     let combinedExistedData = [];
-    if (brandId == 11 || brandId == 33) {
-      fileData = await readExcelFileWithSubColumnsForBulk(req.file.path);
-      // rowData=fileData.data.splice(2);
-      rowDataArray = fileData.data.splice(1);
-    } else {
-      fileData = await readExcelFile(req.file.path);
-      // rowData=fileData.data.splice(1);
-      rowDataArray = fileData.data;
-    }
+    // if (brandId == 11 || brandId == 33) {
+    //   fileData = await readExcelFileWithSubColumnsForBulk(req.file.path);
+    //   // rowData=fileData.data.splice(2);
+    //   rowDataArray = fileData.data.splice(1);
+    // } else {
+    //   fileData = await readExcelFile(req.file.path);
+    //   // rowData=fileData.data.splice(1);
+    //   rowDataArray = fileData.data;
+    // }
 
+    if(!isOlderUploadForHyundai){  //for current
+      fileData = [11, 33].includes(brandId)
+     ? await readExcelFileWithSubColumnsForBulk(req.file.path)
+     : await readExcelFile(req.file.path);
+    //  rowDataArray = fileData.data.splice(1);
+   }
+   else{
+     fileData = [33].includes(brandId)
+     ? await readExcelFileWithSubColumns(req.file.path)
+     : await readExcelFile(req.file.path); 
+    //  rowDataArray = fileData.data;
+   }
+
+   if(!isOlderUploadForHyundai){
+      rowDataArray = fileData.data.slice([11, 33].includes(brandId) ? 1 : 0);
+   }
+   else{
+     rowDataArray = fileData.data.slice([33].includes(brandId) ? 1 : 0);
+   }
     headers = fileData.headers;
     const requiredBrandIds = [17, 28];
     const normalizedHeaders = headers.map((header) =>
       header.trim().toLowerCase()
     );
+  //  console.log("headers ",headers,mappedData)
     const isValid = Object.entries(mappedData)
-      .filter(([key]) => key !== "stock_type") // Exclude stock_type and loc
+      .filter(([key]) => key != 'stock_type'  && key!= 'calculativeField' && key!='stock_qty') // Exclude stock_type and loc
       .every(([, value]) => headers.includes(value)); // Check if all values exist in headers
-
+    
     // If brandId is 17, 28 check for "availability" and "status" in headers
     if (requiredBrandIds.includes(brandId)) {
       const requiredFields = ["availability", "status"];
@@ -1581,6 +1742,24 @@ const uploadBulkStock = async (req, res) => {
       return { headerNotPresent: true };
     }
 
+     // Step 1: Get headers from uploaded file (from the first row)
+let headers1 = Object.keys(rowDataArray[0] || {}).map(h => h.toLowerCase());
+
+// Step 2: Get column names from stock_qty field
+const stockQtyColumns = mappedData.stock_qty
+  .split(",")
+  .map(col => col.trim())
+  .filter(Boolean);
+
+// Step 3: Check for missing fields
+const missingFields = stockQtyColumns.filter(
+  col => !headers1.includes(col.toLowerCase())
+);
+
+// Step 4: If missing, throw clear error
+if (missingFields.length > 0) {
+ return {headerNotPresent:true,missingFields:missingFields}
+}
     let result567;
 
   //   rowData = rowDataArray.map((rowData1) => {
@@ -1614,19 +1793,65 @@ const uploadBulkStock = async (req, res) => {
   // });
 
     // 5. Format data
-    let normalizedData = rowDataArray.map(row => {
-      let getVal = (key) => {
-        let match = Object.keys(row).find(k => k.toLowerCase() == key.toLowerCase());
-        return match ? row[match]?.toString().trim() : "";
-      };
+    // let normalizedData = rowDataArray.map(row => {
+    //   let getVal = (key) => {
+    //     let match = Object.keys(row).find(k => k.toLowerCase() == key.toLowerCase());
+    //     return match ? row[match]?.toString().trim() : "";
+    //   };
   
-      return {
-        part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),
-        qty: parseFloat(getVal(mappedData.stock_qty)) || 0,
-        availability: getVal("availability"),
-        status: getVal("status"),
-        location: getVal(mappedData.loc) != null ? getVal(mappedData.loc) : "",
+    //   return {
+    //     part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),
+    //     qty: parseFloat(getVal(mappedData.stock_qty)) || 0,
+    //     availability: getVal("availability"),
+    //     status: getVal("status"),
+    //     location: getVal(mappedData.loc) != null ? getVal(mappedData.loc) : "",
+    //   };
+    // });
+
+    let normalizedData = rowDataArray.map(row => {
+      const getVal = (key) => {
+        const match = Object.keys(row).find(k => k.toLowerCase() === key.toLowerCase());
+        const value = match ? row[match] : "";
+        return value != null ? value.toString().trim() : "";
       };
+    
+      const computeQty = () => {
+        const formula = mappedData.calculativeField;
+      
+        if (typeof formula === "string" && /[\+\-\*\/]/.test(formula)) {
+          let formulaWithValues = formula;
+      
+          // Sort keys by length (to replace longer keys first and avoid partial overlaps)
+          const keys = Object.keys(row).sort((a, b) => b.length - a.length);
+      
+          keys.forEach(key => {
+            // Escape special characters in key (like dash)
+            const escapedKey = key.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
+            const regex = new RegExp(`\\b${escapedKey}\\b`, 'gi');
+            const val = parseFloat(row[key]);
+            formulaWithValues = formulaWithValues.replace(regex, isNaN(val) ? "0" : val.toString());
+          });
+      
+          try {
+           // console.log("Evaluating:", formulaWithValues);
+            return eval(formulaWithValues);
+          } catch (err) {
+            console.error("Error evaluating formula:", formulaWithValues, err);
+            return 0;
+          }
+        } else {
+          const val = parseFloat(row[mappedData.stock_qty]);
+          return isNaN(val) ? 0 : val;
+        }
+      };
+    
+      return {
+            part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),
+            qty: computeQty(),
+            availability: getVal("availability"),
+            status: getVal("status"),
+            location: getVal(mappedData.loc) != null ? getVal(mappedData.loc) : "",
+          };
     });
   
     filteredRowData = normalizedData.filter((row) => {
@@ -2017,7 +2242,7 @@ updatedFilteredRowData = Array.from(partCountMap.values());
       
     }
 
- //   console.log("updated filtered row ",updatedFilteredRowData,updatedFilteredRowData.length);
+  //  console.log("updated filtered row ",updatedFilteredRowData,updatedFilteredRowData.length);
    // console.log("previous data ",combinedExistedData,combinedExistedData.length)
   
    // console.log("filtered 982 ",updatedFilteredRowData)
@@ -2042,10 +2267,10 @@ updatedFilteredRowData = Array.from(partCountMap.values());
       let quantitySumPrev = 0;
     //   console.log("unique ids  ",uniqueLocationIds)
       let filteredData = updatedFilteredRowData.filter(
-        (item) => item.locationId === locId
+        (item) => item.locationId == locId
       );
 
-      //console.log("filtered data ",filteredData,locId,StockCodes);
+    //  console.log("filtered data ",filteredData);
       if (insertedDataResult.length != 0) {
         // console.log("countRecords inserted ",countPrevRecords)
         // StockCode = insertedDataResult[0].StockCode;
@@ -2097,7 +2322,9 @@ updatedFilteredRowData = Array.from(partCountMap.values());
         .query(insertQueryForCurrentStock1);
       currentStockCode = result1?.recordset[0]?.tcode;
 
-      //  console.log(currentStockCode)
+      //  console.log(filteredData)
+      if(filteredData.length){
+
       const values1 = filteredData.map((item) => {
         return [
           parseInt(currentStockCode, 10),
@@ -2131,7 +2358,7 @@ updatedFilteredRowData = Array.from(partCountMap.values());
         console.error("Error during bulk insert in single upload: ", error);
         return { error: error }; // Rethrow the error for further handling if necessary
       }
-
+    }
       let currentQuantSum = 0;
       let currentCountQuery = `use [StockUpload] select sum(qty) as currentQuantSum from currentStock2 where stockCode=@currentStockCode`;
       let result678 = await pool

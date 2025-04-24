@@ -512,7 +512,7 @@ const stockUploadSingleLocation = async (req, res) => {
   // 2. Fetch Excel column mapping for the brand
   const { recordset: mapping } = await pool.request()
     .input("brandId", brandId)
-    .query(`USE [StockUpload]; SELECT part_number, stock_qty, loc, stock_type FROM stock_upload_mapping WHERE brand_id=@brandId AND stock_type='current'`);
+    .query(`USE [StockUpload]; SELECT part_number, stock_qty, loc,calculativeField, stock_type FROM stock_upload_mapping WHERE brand_id=@brandId AND stock_type='current'`);
 
   if (!mapping.length) return { mappingNotPresent: true };
   const mappedData = mapping[0];
@@ -528,8 +528,9 @@ const stockUploadSingleLocation = async (req, res) => {
    const requiredBrandIds = [17, 28];
   // console.log("headers ",headers)
   const normalizedHeaders = headers.map(header => header.trim().toLowerCase());
+  //console.log("mapped datda ",mappedData)
   const isValid = Object.entries(mappedData)
-      .filter(([key]) => key != 'stock_type' && key != 'loc') // Exclude stock_type and loc
+      .filter(([key]) => key != 'stock_type' && key != 'loc' && key!='calculativeField' && key!='stock_qty') // Exclude stock_type and loc
       .every(([, value]) => headers.includes(value.trim().toLowerCase())); // Check if all values exist in headers
  // console.log("mapped data ",mappedData,headers,isValid)
   // If brandId is 17, 28, check for "availability" and "status" in headers
@@ -555,20 +556,73 @@ const stockUploadSingleLocation = async (req, res) => {
       return { headerNotPresent: true };
   }
 
+  let headers1 = Object.keys(rowDataArray[0] || {}).map(h => h.toLowerCase());
 
+  // Step 2: Get column names from stock_qty field
+  const stockQtyColumns = mappedData.stock_qty
+    .split(",")
+    .map(col => col.trim())
+    .filter(Boolean);
+  
+  // Step 3: Check for missing fields
+  const missingFields = stockQtyColumns.filter(
+    col => !headers1.includes(col.toLowerCase())
+  );
+  
+  // Step 4: If missing, throw clear error
+  if (missingFields.length > 0) {
+   return {headerNotPresent:true,missingFields:missingFields}
+  }
   // 5. Format data
-  const normalizedData = rowDataArray.map(row => {
-    const getVal = (key) => {
-      const match = Object.keys(row).find(k => k.toLowerCase() == key.toLowerCase());
-      return match ? row[match]?.toString().trim() : "";
-    };
+  // const normalizedData = rowDataArray.map(row => {
+  //   const getVal = (key) => {
+  //     const match = Object.keys(row).find(k => k.toLowerCase() == key.toLowerCase());
+  //     return match ? row[match]?.toString().trim() : "";
+  //   };
 
-    return {
-      part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),
-      qty: parseFloat(getVal(mappedData.stock_qty)) || 0,
-      availability: getVal("availability"),
-      status: getVal("status")
+  //   return {
+  //     part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),
+  //     qty: parseFloat(getVal(mappedData.stock_qty)) || 0,
+  //     availability: getVal("availability"),
+  //     status: getVal("status")
+  //   };
+  // });
+
+  let normalizedData = rowDataArray.map(row => {
+    const getVal = (key) => {
+      const match = Object.keys(row).find(k => k.toLowerCase() === key.toLowerCase());
+      const value = match ? row[match] : "";
+      return value != null ? value.toString().trim() : "";
     };
+  
+    const computeQty = () => {
+      const formula = mappedData.calculativeField;
+  
+      if (typeof formula === "string" && /[\+\-\*\/]/.test(formula)) {
+        const formulaWithValues = formula.replace(/[a-zA-Z_][a-zA-Z0-9_]*/g, (match) => {
+          const val = parseFloat(getVal(match));
+          return isNaN(val) ? 0 : val;
+        });
+  
+        try {
+          return eval(formulaWithValues);
+        } catch (err) {
+          console.error("Error evaluating formula:", formulaWithValues, err);
+          return 0;
+        }
+      } else {
+        const val = parseFloat(getVal(mappedData.stock_qty));
+        return isNaN(val) ? 0 : val;
+      }
+    };
+  
+    return {
+          part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),
+          qty: computeQty(),
+          availability: getVal("availability"),
+          status: getVal("status"),
+          location: getVal(mappedData.loc) != null ? getVal(mappedData.loc) : "",
+        };
   });
 
   // 6. Filter data by brand-specific rules
@@ -667,7 +721,7 @@ const stockUploadSingleLocation = async (req, res) => {
     const existingMap = new Map(deduped.map(i => [i.partId, i]));
     for (const item of prevItems) {
       if (!existingMap.has(item.partID)) {
-        deduped.push({ partNumber: item.partNumber, qty: item.qty, partId: item.partID });
+        deduped.push({ part_number: item.partNumber, qty: item.qty, partId: item.partID });
       } else {
         existingMap.get(item.partID).qty += item.qty;
       }
@@ -695,14 +749,15 @@ const stockUploadSingleLocation = async (req, res) => {
   }
 
   // 14. Bulk insert to currentStock2
+  if(deduped.length){
   const stockTable = new sql.Table("currentStock2");
   stockTable.columns.add("StockCode", sql.BigInt);
   stockTable.columns.add("PartNumber", sql.VarChar(35));
   stockTable.columns.add("Qty", sql.Decimal(18, 2));
   stockTable.columns.add("PartID", sql.Int);
-  deduped.forEach(row => stockTable.rows.add(newTcode, row.partNumber, row.qty, row.partId));
+  deduped.forEach(row => stockTable.rows.add(newTcode, row.part_number, row.qty, row.partId));
   await pool.request().bulk(stockTable);
-
+  }
   // 15. Log the upload
   const totalQty = (await pool.request()
     .input("StockCode", newTcode)
@@ -1416,7 +1471,7 @@ const brandId = parseInt(brandRes.recordset[0].brandId, 10);
 // Define queries
 const getMappingQuery = `
   USE [StockUpload] 
-  SELECT part_number, stock_qty, loc, stock_type 
+  SELECT part_number, stock_qty, loc, stock_type ,calculativeField
   FROM stock_upload_mapping 
   WHERE brand_id = @brandId AND stock_type = 'current'
 `;
@@ -1482,7 +1537,7 @@ let partMasterMap=new Map();
       const requiredBrandIds = [17, 28];
       const normalizedHeaders = headers.map(header => header.trim().toLowerCase());
       const isValid = Object.entries(mappedData)
-          .filter(([key]) => key !== 'stock_type' && key !== 'loc') // Exclude stock_type and loc
+          .filter(([key]) => key != 'stock_type' && key != 'loc' && key!='calculativeField' && key!='stock_qty') // Exclude stock_type and loc
           .every(([, value]) => headers.includes(value)); // Check if all values exist in headers
      // console.log("mapped data ",mappedData)
       // If brandId is 17, 28, check for "availability" and "status" in headers
@@ -1557,18 +1612,64 @@ let partMasterMap=new Map();
     //             : "",
     //     };
     // });
-    const normalizedData = rowDataArray.map(row => {
-      const getVal = (key) => {
-        const match = Object.keys(row).find(k => k.toLowerCase() == key.toLowerCase());
-        return match ? row[match]?.toString().trim() : "";
-      };
+    // const normalizedData = rowDataArray.map(row => {
+    //   const getVal = (key) => {
+    //     const match = Object.keys(row).find(k => k.toLowerCase() == key.toLowerCase());
+    //     return match ? row[match]?.toString().trim() : "";
+    //   };
   
-      return {
-        part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),
-        qty: parseFloat(getVal(mappedData.stock_qty)) || 0,
-        availability: getVal("availability"),
-        status: getVal("status")
+    //   return {
+    //     part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),
+    //     qty: parseFloat(getVal(mappedData.stock_qty)) || 0,
+    //     availability: getVal("availability"),
+    //     status: getVal("status")
+    //   };
+    // });
+
+    let normalizedData = rowDataArray.map(row => {
+      const getVal = (key) => {
+        const match = Object.keys(row).find(k => k.toLowerCase() === key.toLowerCase());
+        const value = match ? row[match] : "";
+        return value != null ? value.toString().trim() : "";
       };
+    
+      const computeQty = () => {
+        const formula = mappedData.calculativeField;
+      
+        if (typeof formula === "string" && /[\+\-\*\/]/.test(formula)) {
+          let formulaWithValues = formula;
+      
+          // Sort keys by length (to replace longer keys first and avoid partial overlaps)
+          const keys = Object.keys(row).sort((a, b) => b.length - a.length);
+      
+          keys.forEach(key => {
+            // Escape special characters in key (like dash)
+            const escapedKey = key.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
+            const regex = new RegExp(`\\b${escapedKey}\\b`, 'gi');
+            const val = parseFloat(row[key]);
+            formulaWithValues = formulaWithValues.replace(regex, isNaN(val) ? "0" : val.toString());
+          });
+      
+          try {
+            console.log("Evaluating:", formulaWithValues);
+            return eval(formulaWithValues);
+          } catch (err) {
+            console.error("Error evaluating formula:", formulaWithValues, err);
+            return 0;
+          }
+        } else {
+          const val = parseFloat(row[mappedData.stock_qty]);
+          return isNaN(val) ? 0 : val;
+        }
+      };
+    
+      return {
+            part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),
+            qty: computeQty(),
+            availability: getVal("availability"),
+            status: getVal("status"),
+            location: getVal(mappedData.loc) != null ? getVal(mappedData.loc) : "",
+          };
     });
  
   let query12=`use [StockUpload] Select tcode from currentStock1 where locationId=@locationId`;
@@ -1765,7 +1866,7 @@ const combinedData = updatedFilteredRowData1.map(item => {
   if(combinedData.length<=insertedDataResult.length){
     const updatedMap = new Map(combinedData.map(item => [item.partId, item]));
 
-    console.log("updatedMap",insertedDataResult)
+   // console.log("updatedMap",insertedDataResult)
     // Check for missing records in insertedDataResult
     const missingRecords = insertedDataResult
     .filter(item => !updatedMap.has(item.partID))
@@ -1776,7 +1877,7 @@ const combinedData = updatedFilteredRowData1.map(item => {
     }));
   
     
-   console.log("Missing Records:", missingRecords);
+  // console.log("Missing Records:", missingRecords);
     
     combinedData.forEach(item => {
       if (updatedMap.has(item.partId)) {
@@ -1849,7 +1950,7 @@ const combinedData = updatedFilteredRowData1.map(item => {
    // Create a map to track the occurrences of part_number and total stock_qty
    let updatedFilteredRowData2=[];
    updatedFilteredRowData2 =combinedData;
-     //  console.log("updated ",updatedFilteredRowData2)
+      // console.log("updated ",updatedFilteredRowData2)
       let rowCount = updatedFilteredRowData2?.length;
       let currentDate = new Date();
       const formattedDate = currentDate.toISOString().split("T")[0]; // Outputs: '2025-03-08'
@@ -1865,6 +1966,7 @@ const combinedData = updatedFilteredRowData1.map(item => {
         .query(insertQueryForCurrentStock1);
       let tCode = result1.recordset[0].tcode;
      
+      if(updatedFilteredRowData2.length){
         const values1 = updatedFilteredRowData2.map((item) => {
           return [
             parseInt(tCode, 10),
@@ -1904,7 +2006,7 @@ const combinedData = updatedFilteredRowData1.map(item => {
          })
         continue;
         }
-
+      }
      
       let currentCountQuery = `use [StockUpload] select sum(qty) as currentQuantSum from currentStock2 where stockCode=@tCode`;
       let result678 = await pool

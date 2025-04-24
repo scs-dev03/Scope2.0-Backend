@@ -16,15 +16,27 @@ export const getBrands = async () => {
 
 export const uploadFile = async (req) => {
   try {
-    let brandId = parseInt(req.body.brand_id);
+    let brandId = parseInt(req.body.brand_id,10);
     // console.log("brandId ",brandId,req)
     let filePath = req.file.path;
     let headers;
     let data;
+    let stockType=req.body.stock_type;
+  //  console.log("req ",req.body,req.file)
+   // console.log("stocktype ",stockType,brandId)
     if (brandId == 33 || brandId == 11) {
       //  console.log(brandId);
-      data = await readExcelFileWithSubColumnsForBulk(filePath);
+      if(brandId==11 && stockType=='older'){
+      //  console.log("excuted ")
+        data = await readExcelFile(filePath);
       headers = data.headers;
+     //   console.log("headerees ",headers)
+      }else{
+      //  console.log("exceuted one ")
+        data = await readExcelFileWithSubColumnsForBulk(filePath);
+        headers = data.headers;
+      }
+     
     } else {
       data = await readExcelFile(filePath);
       headers = data.headers;
@@ -243,6 +255,13 @@ const readExcelFileWithSubColumns = async (filePath) => {
       return decodeAndTrimObjectStrings(obj);
     });
    // console.log("merge headers ",jsonData)
+   fs.unlink(filePath, (err) => {
+    if (err) {
+      console.error("Error deleting the file:", err);
+    } else {
+      console.log("File deleted successfully:", filePath);
+    }
+  });
     return { headers: mergedHeaders, data: jsonData };
   } catch (error) {
     console.error("Error processing Excel file:", error);
@@ -294,6 +313,14 @@ const readExcelFileWithSubColumnsForBulk = async (filePath) => {
         obj[header] = row[index] !== undefined ? row[index] : ""; // or null, or "N/A"
       });
       return decodeAndTrimObjectStrings(obj);
+    });
+
+    fs.unlink(filePath, (err) => {
+      if (err) {
+        console.error("Error deleting the file:", err);
+      } else {
+        console.log("File deleted successfully:", filePath);
+      }
     });
    // console.log("merge headers ",jsonData)
     return { headers: mergedHeaders, data: jsonData };
