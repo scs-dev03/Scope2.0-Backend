@@ -1,5 +1,5 @@
 import Router from 'express'
-import {  getLedger, getLedgerbyPartid, partDetails } from '../controller/salesViewController.js'
+import {  getLedger,  partDetails } from '../controller/salesViewController.js'
 import { upload } from '../middlewares/multer.middleware.js'
 const router = Router()
 
