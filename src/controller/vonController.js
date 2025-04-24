@@ -153,7 +153,7 @@ const userFeedbacklog = async (req, res) => {
                                 where pm.partid = ${partid}`
             const result = await pool.request().query(LatestPartQuery)
             LatestPartID = result.recordset.length > 0 ? result.recordset[0].LatestPartNumber : null;
-            console.log(LatestPartID);
+            // console.log(LatestPartID);
 
         } catch (error) {
             return res.status(500).json({ Error: error.message, Error: `Error in Finding LatestPartID` })
@@ -459,32 +459,120 @@ const partFamilySale = async (req, res) => {
     }
 
 }
+// const adminPendingView = async (req, res) => {
+//     try {
+//         const pool = await getPool1()
+//         const { brandid, dealerid, locationid, status, seasonalid, modelid, natureid , partnumber , r1 , r2 , l1 , l2 ,flag , parttype } = req.body
+//         // console.log(brandid, dealerid, locationid, status, seasonalid, modelid, natureid , partnumber , r1 , r2 , l1 , l2 ,flag , parttype);
+//         if (!brandid) {
+//             return res.status(400).json({ message: `Brandid is required` })
+//         }
+//         const query = `use [UAD_VON] EXEC sp_GetAdminView @brandid = @brandid, @dealerid = @dealerid, @locationid = @locationid,@Status = @status,@seasonalid = @seasonalid, @natureid = @natureid, @modelid = @modelid, @PartNumber = @PartNumber,@r1=@r1,@r2=r2,@l1=@l1,@l2=@l2,@MaxValueFlag=@MaxValueFlag,@parttype=@parttype;`
+//         // console.log(query);
+
+//         const result = await pool.request()
+//             .input('brandid', sql.Int, brandid)
+//             .input('dealerid', sql.Int, dealerid)
+//             .input('locationid', sql.Int, locationid)
+//             .input('status', sql.Bit, status)
+//             .input('seasonalid', sql.Int, seasonalid ?? null)
+//             .input('natureid', sql.Int, natureid ?? null)
+//             .input('modelid', sql.Int, modelid ?? null)
+//             .input('partnumber', sql.VarChar(50), partnumber ?? null)
+//             .input('r1', sql.Decimal(10,2), r1 ?? null)
+//             .input('r2', sql.Decimal(10,2), r2 ?? null)
+//             .input('l1', sql.Decimal(10,2), l1 ?? null)
+//             .input('l2', sql.Decimal(10,2), l2 ?? null)
+//             .input('MaxValueFlag', sql.Int, flag ?? null)
+//             .input('parttype', sql.Int, parttype ?? null)
+//             .query(query)
+//         // console.log(result.recordset);
+//         res.status(200).json({ Data: result.recordset })
+//     } catch (error) {
+//         res.status(500).json({ Error: error.message })
+//     }
+// }
 const adminPendingView = async (req, res) => {
     try {
-        const pool = await getPool1()
-        const { brandid, dealerid, locationid, status, seasonalid, modelid, natureid } = req.body
-        
+        const pool = await getPool1();
+        let {
+            brandid,
+            dealerid,
+            locationid,
+            status,
+            seasonalid,
+            modelid,
+            natureid,
+            partnumber,
+            r1,
+            r2,
+            l1,
+            l2,
+            flag,
+            parttype
+        } = req.body;
+
+        // Ensure proper typing
+        brandid = Number(brandid);
+        dealerid = dealerid !== null ? Number(dealerid) : null;
+        locationid = locationid !== null ? Number(locationid) : null;
+        status = status !== null ? Number(status) : null;
+        seasonalid = seasonalid !== null ? Number(seasonalid) : null;
+        modelid = modelid !== null ? Number(modelid) : null;
+        natureid = natureid !== null ? Number(natureid) : null;
+        r1 = r1 !== null ? Number(r1) : null;
+        r2 = r2 !== null ? Number(r2) : null;
+        l1 = l1 !== null ? Number(l1) : null;
+        l2 = l2 !== null ? Number(l2) : null;
+        flag = flag !== null ? Number(flag) : null;
+        parttype = parttype !== null ? Number(parttype) : null;
+
         if (!brandid) {
-            return res.status(400).json({ message: `Brandid is required` })
+            return res.status(400).json({ message: `Brandid is required` });
         }
-        const query = `use [UAD_VON] EXEC sp_GetAdminView @brandid = @brandid, @dealerid = @dealerid, @locationid = @locationid,@Status = @status,@seasonalid = @seasonalid, @natureid = @natureid, @modelid = @modelid;`
-        // console.log(query);
+
+        const query = `
+            USE [UAD_VON]
+            EXEC sp_GetAdminView 
+                @brandid = @brandid,
+                @dealerid = @dealerid,
+                @locationid = @locationid,
+                @Status = @status,
+                @seasonalid = @seasonalid,
+                @natureid = @natureid,
+                @modelid = @modelid,
+                @PartNumber = @PartNumber,
+                @r1 = @r1,
+                @r2 = @r2,
+                @l1 = @l1,
+                @l2 = @l2,
+                @MaxValueFlag = @MaxValueFlag,
+                @parttype = @parttype;
+        `;
 
         const result = await pool.request()
             .input('brandid', sql.Int, brandid)
             .input('dealerid', sql.Int, dealerid)
             .input('locationid', sql.Int, locationid)
-            .input('status', sql.Int, status)
-            .input('seasonalid', sql.Int, seasonalid ?? null)
-            .input('natureid', sql.Int, natureid ?? null)
-            .input('modelid', sql.Int, modelid ?? null)
-            .query(query)
-        // console.log(result.recordset);
-        res.status(200).json({ Data: result.recordset })
+            .input('status', sql.Bit, status)
+            .input('seasonalid', sql.Int, seasonalid)
+            .input('natureid', sql.Int, natureid)
+            .input('modelid', sql.Int, modelid)
+            .input('PartNumber', sql.VarChar(50), partnumber)
+            .input('r1', sql.Decimal(10, 2), r1)
+            .input('r2', sql.Decimal(10, 2), r2)
+            .input('l1', sql.Decimal(10, 2), l1)
+            .input('l2', sql.Decimal(10, 2), l2)
+            .input('MaxValueFlag', sql.Int, flag)
+            .input('parttype', sql.Int, parttype)
+            .query(query);
+
+        res.status(200).json({ Data: result.recordset });
     } catch (error) {
-        res.status(500).json({ Error: error.message })
+        res.status(500).json({ Error: error.message });
     }
-}
+};
+
 const dealerUpload = async (req, res) => {
     let transaction; // Declare transaction outside try block
 
@@ -838,8 +926,10 @@ const adminUpload = async (req, res) => {
     }
     // console.log(req.file.path);
 
-    let data = await readExcel(req.file.path);
-    //   console.log(`data` , data[0]);
+    const {headers , data} = await readExcel(req.file.path);
+    //   console.log(`data` , data);
+    //   console.log(headers );
+      
 
     fs.unlinkSync(req.file.path); // Delete uploaded file after processing
     const REQUIRED_HEADERS = [
@@ -847,9 +937,8 @@ const adminUpload = async (req, res) => {
       ];
       
 
-    // ✅ Check for required headers
-        const uploadedHeaders = Object.keys(data[0] || {});
-        const missingHeaders = REQUIRED_HEADERS.filter(header => !uploadedHeaders.includes(header));
+    //  Check for required headers
+        const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
 
         if (missingHeaders.length > 0) {
           return res.status(400).json({
@@ -879,7 +968,9 @@ const adminUpload = async (req, res) => {
     if (!isArrayEmpty(duplicateEntries)) {
         // console.log(duplicateEntries);
 
-        return res.status(400).json({ Data: duplicateEntries })
+        return res.status(400).json({ 
+            message:`These Locations and feedbackid are duplicate`,
+            Data: duplicateEntries })
     }
     // Extract distinct values from data
     const distinctLocations = [...new Set(cleanedData.map(item => item.location))];
