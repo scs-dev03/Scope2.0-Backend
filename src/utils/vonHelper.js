@@ -22,8 +22,7 @@ const partBrandCheck = async(dealerid,locationid,partid)=>{
     ) 
     THEN 'YES' 
     ELSE 'NO' 
-  END AS Result
-`
+  END AS Result`
 
         const result = await pool.request().query(partCheck)                        
         if(result.recordset[0].Result === 'YES' ){
@@ -42,14 +41,19 @@ const statusCheck = async(locationid,partid,table)=>{
   // console.log(locationid,partid,table);
   const query =  `select top 1 status from ${table} where locationid = ${locationid} and partid = ${partid} order by feedbackid desc`
   const result = await pool.request().query(query)
+  const resultarray = result.recordset
+  const isArrayEmpty = (arr) => !arr || arr.length === 0;
+  if(isArrayEmpty(resultarray)){
+    return true
+  }
   const status = result.recordset[0].status
-  // console.log(result.recordset[0]);
-  // console.log(`status`,status);
+  console.log(result.recordset[0]);
+  console.log(`status`,status);
 
 if(status == undefined){
   return true
 }
-  if(status === 'Pending'){
+  if(status === 'Pending'){ 
     return false
   }
 return true
@@ -268,7 +272,7 @@ function findLocationPartidDuplicates(data) {
       seen.set(key, 1);
     }
   });
-  console.log(duplicates);
+  // console.log(duplicates);
   
   return duplicates;
 }
@@ -329,6 +333,8 @@ return pendingRecords.length > 0 ? pendingRecords : [];
 
 const checkReviewedFeedbackByBrand = async (brandid, formattedData) => {
   try {
+    // console.log(brandid,formattedData);
+    
     // Get database connection
     const pool = await getPool1();
 
@@ -337,7 +343,7 @@ const checkReviewedFeedbackByBrand = async (brandid, formattedData) => {
       SELECT af.feedbackid, af.locationid, af.dealerid
       FROM UAD_VON..UAD_VON_AdminFeedback_${brandid} af
       JOIN UAD_VON..UAD_VON_SPMFeedback_${brandid} sf ON sf.FeedbackID = af.FeedbackID
-      WHERE sf.Brandid = ${brandid} AND sf.status = 'Reviewed'
+      WHERE sf.Brandid = ${brandid} AND sf.status = 'Pending'
     `;
 
     const result = await pool
@@ -346,7 +352,8 @@ const checkReviewedFeedbackByBrand = async (brandid, formattedData) => {
       .query(query);
 
     const reviewedStatusData = result.recordset;
-
+    console.log(reviewedStatusData);
+    
     // Create a Set for quick lookup
     const reviewedSet = new Set(reviewedStatusData.map(item => 
       `${item.feedbackid}-${item.locationid}-${item.dealerid}`
@@ -356,8 +363,10 @@ const checkReviewedFeedbackByBrand = async (brandid, formattedData) => {
     const reviewedRecords = formattedData.filter(item => 
       reviewedSet.has(`${item.feedbackid}-${item.locationid}-${item.dealerid}`)
     );
-
+      console.log( reviewedRecords.length > 0 ? reviewedRecords : []);
+      
     return reviewedRecords.length > 0 ? reviewedRecords : [];
+
 
   } catch (error) {
     console.error("Error checking reviewed feedback by brand:", error);
