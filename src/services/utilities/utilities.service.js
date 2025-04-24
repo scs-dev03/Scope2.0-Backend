@@ -26,7 +26,7 @@ export const uploadFile = async (req) => {
    // console.log("stocktype ",stockType,brandId)
     if (brandId == 33 || brandId == 11) {
       //  console.log(brandId);
-      if(brandId==11 && stockType=='older'){
+      if(stockType=='older'){
       //  console.log("excuted ")
         data = await readExcelFile(filePath);
       headers = data.headers;

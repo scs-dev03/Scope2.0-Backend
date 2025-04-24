@@ -555,9 +555,11 @@ let isOlderUploadForHyundai=false;
     : await readExcelFile(req.file.path);
   }
   else{
-    fileData = [33].includes(brandId)
-    ? await readExcelFileWithSubColumns(req.file.path)
-    : await readExcelFile(req.file.path); 
+    // fileData = [33].includes(brandId)
+    // ? await readExcelFileWithSubColumns(req.file.path)
+    // : await readExcelFile(req.file.path); 
+
+    fileData=await readExcelFile(req.file.path);
   }
   
 
@@ -1693,9 +1695,10 @@ const uploadBulkStock = async (req, res) => {
     //  rowDataArray = fileData.data.splice(1);
    }
    else{
-     fileData = [33].includes(brandId)
-     ? await readExcelFileWithSubColumns(req.file.path)
-     : await readExcelFile(req.file.path); 
+    //  fileData = [33].includes(brandId)
+    //  ? await readExcelFileWithSubColumns(req.file.path)
+    //  : await readExcelFile(req.file.path); 
+   fileData= await readExcelFile(req.file.path);
     //  rowDataArray = fileData.data;
    }
 
