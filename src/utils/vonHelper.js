@@ -47,8 +47,8 @@ const statusCheck = async(locationid,partid,table)=>{
     return true
   }
   const status = result.recordset[0].status
-  console.log(result.recordset[0]);
-  console.log(`status`,status);
+  // console.log(result.recordset[0]);
+  // console.log(`status`,status);
 
 if(status == undefined){
   return true
@@ -58,13 +58,27 @@ if(status == undefined){
   }
 return true
 }
-const readExcel = async (filePath)=>{
-      let data
-      //  filePath = req.file.path;
-      const workbook = xlsx.readFile(filePath);
-      const sheetName = workbook.SheetNames[0]; // Read the first sheet
-      return data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
-}
+// const readExcel = async (filePath)=>{
+//       let data
+//       //  filePath = req.file.path;
+//       const workbook = xlsx.readFile(filePath);
+//       const sheetName = workbook.SheetNames[0]; // Read the first sheet
+//       return data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+// }
+const readExcel = async (filePath) => {
+  const workbook = xlsx.readFile(filePath);
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+
+  // Get data as array of rows
+  const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+
+  const headers = rows[0]; // First row
+  const data = xlsx.utils.sheet_to_json(sheet); // Normal JSON data using headers
+
+  return { headers, data };
+};
+
 
 //----------ROW BY ROW INSERTION -----------
 
@@ -101,7 +115,7 @@ const readExcel = async (filePath)=>{
 const insertData = async (formattedData, tableName) => {
   const pool = await getPool1();
   const transaction = pool.transaction();
-  console.log(tableName);
+  // console.log(tableName);
   
   try {
     await transaction.begin();
@@ -191,7 +205,7 @@ const insertAdminFeedback = async (formattedData, brandId) => {
         const schemaName = "dbo"; // Replace with your schema if different
         const fullTableName = `${databaseName}.${schemaName}.UAD_VON_AdminFeedback_9`;
      
-    console.log(fullTableName);
+    // console.log(fullTableName);
     
     const table = new sql.Table(fullTableName);
     table.create = false;
@@ -260,7 +274,7 @@ function findLocationPartidDuplicates(data) {
 
   data.forEach(item => {
     const key = `${item.Location}-${item.Partid}`;
-    console.log(key);
+    // console.log(key);
     
     if (seen.has(key)) {
       // Add duplicate entry if not already tracked
@@ -343,7 +357,7 @@ const checkReviewedFeedbackByBrand = async (brandid, formattedData) => {
       SELECT af.feedbackid, af.locationid, af.dealerid
       FROM UAD_VON..UAD_VON_AdminFeedback_${brandid} af
       JOIN UAD_VON..UAD_VON_SPMFeedback_${brandid} sf ON sf.FeedbackID = af.FeedbackID
-      WHERE sf.Brandid = ${brandid} AND sf.status = 'Pending'
+      --WHERE sf.Brandid = ${brandid} AND sf.status = 'Pending'
     `;
 
     const result = await pool
@@ -352,7 +366,7 @@ const checkReviewedFeedbackByBrand = async (brandid, formattedData) => {
       .query(query);
 
     const reviewedStatusData = result.recordset;
-    console.log(reviewedStatusData);
+    // console.log(reviewedStatusData);
     
     // Create a Set for quick lookup
     const reviewedSet = new Set(reviewedStatusData.map(item => 
@@ -363,7 +377,7 @@ const checkReviewedFeedbackByBrand = async (brandid, formattedData) => {
     const reviewedRecords = formattedData.filter(item => 
       reviewedSet.has(`${item.feedbackid}-${item.locationid}-${item.dealerid}`)
     );
-      console.log( reviewedRecords.length > 0 ? reviewedRecords : []);
+      // console.log( reviewedRecords.length > 0 ? reviewedRecords : []);
       
     return reviewedRecords.length > 0 ? reviewedRecords : [];
 
