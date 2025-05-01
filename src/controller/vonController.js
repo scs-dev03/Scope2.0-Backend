@@ -585,9 +585,9 @@ const dealerUpload = async (req, res) => {
         }
         // console.log(req.file.path);
 
-        let data = await readExcel(req.file.path);
+        let {headers,data} = await readExcel(req.file.path);
         //   console.log(`data` , data[0]);
-
+        // console.log(headers)
         fs.unlinkSync(req.file.path); // Delete uploaded file after processing
 
         const REQUIRED_HEADERS = [
@@ -602,10 +602,11 @@ const dealerUpload = async (req, res) => {
           
 
         // ✅ Check for required headers
-            const uploadedHeaders = Object.keys(data[0] || {});
+            // const uploadedHeaders = Object.keys(data[0] || {});
             // console.log(uploadedHeaders);
-            const missingHeaders = REQUIRED_HEADERS.filter(header => !uploadedHeaders.includes(header));
-
+            const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
+            // console.log(missingHeaders);
+            
             if (missingHeaders.length > 0) {
               return res.status(400).json({
                 message: "Missing headers or data",
@@ -624,11 +625,11 @@ const dealerUpload = async (req, res) => {
                 UserRemark,
                 ProposedQty
             }));
-
+// 
         // console.log(cleanedData);
         const partidpartnumbermapping = [];
 
-        const query = `select distinct  partid , partnumber from Stockable_Nonstockable_TD001_8 where Locationid = 14 `;
+        const query = `select distinct  partid , partnumber from z_scope..Stockable_Nonstockable_TD001_8 where Locationid = 14 `;
         const partidpartnumberresult = await pool.request().query(query);
 
         if (partidpartnumberresult.recordset.length > 0) {
@@ -678,7 +679,7 @@ const dealerUpload = async (req, res) => {
 
 
         const queryIds = `SELECT brandid, dealerid 
-                    FROM locationinfo 
+                    FROM z_scope..locationinfo 
                     WHERE brand LIKE '${brand}' AND dealer LIKE '${dealer}'`;
 
         const resultIds = await pool.request().query(queryIds);
@@ -688,7 +689,7 @@ const dealerUpload = async (req, res) => {
         // Now, similarly, fetch IDs for each distinct brand
         const brandResults = [];
         for (const b of distinctBrands) {
-            const queryBrand = `SELECT brandid FROM locationinfo WHERE brand LIKE '${b}'`;
+            const queryBrand = `SELECT brandid FROM z_scope..locationinfo WHERE brand LIKE '${b}'`;
             const brandResult = await pool.request().query(queryBrand);
             if (brandResult.recordset.length) {
                 brandResults.push({
@@ -704,7 +705,7 @@ const dealerUpload = async (req, res) => {
         // And similarly, for each distinct dealer
         const dealerResults = [];
         for (const d of distinctDealers) {
-            const queryDealer = `SELECT dealerid FROM locationinfo WHERE dealer LIKE '${d}'`;
+            const queryDealer = `SELECT dealerid FROM z_scope..locationinfo WHERE dealer LIKE '${d}'`;
             const dealerResult = await pool.request().query(queryDealer);
             if (dealerResult.recordset.length) {
                 dealerResults.push({
@@ -724,7 +725,7 @@ const dealerUpload = async (req, res) => {
         for (const loc of distinctLocations) {
             const queryLocation = `
     SELECT locationid 
-    FROM locationinfo 
+    FROM z_scope..locationinfo 
     WHERE brandid = ${brandid} 
       AND dealerid = '${dealerid}'
       AND location LIKE '${loc}'
@@ -905,7 +906,9 @@ const dealerUpload = async (req, res) => {
         // await transaction.commit(); // Commit transaction
 
 
-        res.status(200).json({ message: "Data inserted successfully", data: formattedData });
+        res.status(200).json({ message: "Data inserted successfully"
+            // , data: formattedData 
+        });
 
     } catch (error) {
         console.error("Error in dealerUpload:", error);
@@ -920,7 +923,7 @@ const dealerUpload = async (req, res) => {
 
 const adminUpload = async (req, res) => {
     const pool = await getPool1()
-    // const {file} = req.body
+    const {file} = req.body
     if (!req.file || req.file.length === 0) {
         return res.status(400).json({ message: "No files received" });
     }
@@ -939,7 +942,6 @@ const adminUpload = async (req, res) => {
 
     //  Check for required headers
         const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
-
         if (missingHeaders.length > 0) {
           return res.status(400).json({
             message: "Missing headers or data",

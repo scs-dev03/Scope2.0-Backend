@@ -185,11 +185,11 @@ const insertData = async (formattedData, tableName) => {
     const request = new sql.Request(transaction); // Use transaction, not pool
     await request.bulk(table);
     await transaction.commit();
-    console.log('Bulk insert successful');
+    // console.log('Bulk insert successful');
     return
 
   } catch (err) {
-    console.error('Error during bulk insert:', err);
+    console.error('Error during bulk insert:', err , tableName);
     await transaction.rollback();
     throw err; // Re-throw for upstream handling
   } 
