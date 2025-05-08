@@ -190,5 +190,86 @@ try {
 }
 
 }
+const homePageData =  async (req, res) => {
+    const {locationId , dealerid} = req.body 
+    const pool = await getPool1();
+    if(!locationId || !dealerid){
+       return  res.status(400).json({message:`locationId and dealerid is required`})
+    }
+        const stockquery = `select sum(qty)as StockQty , AddedDate from [10.10.152.16].[z_scope].dbo.CurrentStock1 cs1
+                        join  [10.10.152.16].[z_scope].dbo.CurrentStock2 cs2 on cs1.tCode=cs2.StockCode
+                        where LocationID = ${locationId}
+                        group by AddedDate`
 
-export {getBrands,getDealers,getLocation,getWorkspace,getDashboard,partNature,model,seasonal,partType,userInfo}
+        const stockvaluequery = `select sum((cs2.Qty*pm.landedcost))as stockvalue from [10.10.152.16].[z_scope].dbo.CurrentStock1 cs1 
+                                join [10.10.152.16].[z_scope].dbo.CurrentStock2 cs2 on  cs2.StockCode = cs1.tCode
+                                join [10.10.152.16].[z_scope].dbo.locationinfo li on li.LocationID=cs1.LocationID
+                                join [10.10.152.16].[z_scope].dbo.Part_Master pm on pm.brandid = li.BrandID and cs2.PartNumber = pm.partnumber
+                                where cs1.locationid = ${locationId}`
+
+        const ppnivaluequery = `select sum(PPNI_Val)as PPNIValue from [10.10.152.16].[UAD_BI_PPNI].dbo.PPNI_report_${dealerid}
+                                where locationid = ${locationId}`
+
+        const snstockvaluequery = `WITH LatestSN AS (
+    SELECT *
+    FROM stockable_nonstockable_td001_${dealerid}
+    WHERE locationid = ${locationId}
+      AND stockdate = (
+          SELECT MAX(stockdate)
+                  FROM stockable_nonstockable_td001_${dealerid}
+                  WHERE locationid = ${locationId}
+              )
+        )
+        SELECT  
+            SUM(CASE WHEN sn.MaxValue IS NULL OR sn.MaxValue = 0 THEN 1 ELSE 0 END) AS NonStockable,
+            SUM(CASE WHEN sn.MaxValue IS NOT NULL AND sn.MaxValue > 0 THEN 1 ELSE 0 END) AS Stockable,
+            SUM(CASE WHEN sn.MaxValue IS NOT NULL AND sn.MaxValue > 0 THEN ISNULL(cs2.Qty, 0) * ISNULL(pm.landedcost, 0) ELSE 0 END) AS StockableValue,
+            SUM(CASE WHEN sn.MaxValue IS NULL OR sn.MaxValue = 0 THEN ISNULL(cs2.Qty, 0) * ISNULL(pm.landedcost, 0) ELSE 0 END) AS NonStockableValue
+        FROM
+            CurrentStock2 cs2
+        INNER JOIN
+            CurrentStock1 cs1 ON cs2.StockCode = cs1.tCode
+        LEFT JOIN
+            LatestSN sn ON cs1.LocationID = sn.LocationID AND cs2.PartNumber = sn.partnumber1
+        INNER JOIN
+            Dealer_Workshop_Master li ON cs1.LocationID = li.bigid
+        LEFT JOIN
+            Part_Master pm ON pm.brandid = li.BrandID AND cs2.PartNumber = pm.partnumber
+        WHERE
+            cs1.LocationID = ${locationId}`
+
+                const lastorderValuequery = `select scsorderno, sum(finalorderqty)as QTY , sum(finalorderval)as Value , addeddate from [10.10.152.17].[z_scope].dbo.ogs_orderdata_td001_${dealerid}
+                                        where addeddate = (select max(addeddate) from [10.10.152.17].[z_scope].dbo.ogs_orderdata_td001_8 where locationid = ${locationId} )
+                                        and locationid = ${locationId}
+                                        group by scsorderno , addeddate`
+        
+        const jobcardDatequery = `select max(Close_Date) joblineupdatedate,max(Final_Close_Date) jobcardcloseddate from [10.10.152.16].[z_scope].dbo.create_order_request_td001_${dealerid} 
+                                    where locationid = ${locationId} `
+                                    // console.log(snstockvaluequery);
+         try {
+           const stock =  await pool.request().query(stockquery)
+           const stockValue = await pool.request().query(stockvaluequery)
+           const ppniValue = await pool.request().query(ppnivaluequery)
+           const snstockvalue = await pool.request().query(snstockvaluequery)
+           const lastOrderValue = await pool.request().query(lastorderValuequery)
+           const lastjobcard = await pool.request().query(jobcardDatequery)
+           
+       
+        
+           res.status(200).json(
+            {
+            StockQty:stock.recordset,
+            StockValue:stockValue.recordset,
+            PPNIValue:ppniValue.recordset,
+            SNStockValue:snstockvalue.recordset,
+            lastOrderDetails:lastOrderValue.recordset,
+            JobCardDate:lastjobcard.recordset
+
+        }
+        )
+         } catch (error) {
+            res.status(500).json(error.message)
+         }                           
+  };    
+
+export {homePageData,getBrands,getDealers,getLocation,getWorkspace,getDashboard,partNature,model,seasonal,partType,userInfo}
