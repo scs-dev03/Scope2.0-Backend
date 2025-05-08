@@ -6,7 +6,7 @@ const getBrands = async(req,res)=>{
         const pool = getPool1();
         const result = await pool
         .request()
-        .query('use z_scope select bigid , vcbrand from Brand_master')
+        .query('use z_scope select bigid , vcbrand from [10.10.152.16].z_scope.dbo.Brand_master')
         res.status(200).json(result.recordset)
     } catch (error) {
         res.status(500).json(error)
@@ -16,7 +16,7 @@ const getDealers =  async(req,res)=>{
     try {
         const pool = getPool1();
         const {brandid} = req.body;
-        const result = await pool.request().input('brandid',sql.Int,brandid).query(` use z_scope select distinct(dealerid),dealer from locationinfo where brandid = @brandid`)
+        const result = await pool.request().input('brandid',sql.Int,brandid).query(` use z_scope select distinct(dealerid),dealer from [10.10.152.16].z_scope.dbo.locationinfo where brandid = @brandid`)
         res.status(200).json(result.recordset)
     } catch (error) {
         res.status(500).json(error)
@@ -27,7 +27,7 @@ const getLocation = async(req,res)=>{
     try {
         const pool = getPool1();
         const {dealerid} = req.body;
-        const result = await pool.request().input('dealerid',sql.Int,dealerid).query(`use z_scope select locationid,location from locationinfo where dealerid = @dealerid and status = 1 and ogsStatus = 1 order by location`)
+        const result = await pool.request().input('dealerid',sql.Int,dealerid).query(`use z_scope select locationid,location from [10.10.152.16].z_scope.dbo.locationinfo where dealerid = @dealerid and status = 1 and ogsStatus = 1 order by location`)
         res.status(200).json(result.recordset)
     } catch (error) {
         res.status(500).json(error)
@@ -49,7 +49,7 @@ const getDashboard = async(req,res)=>{
     try {
         const pool = getPool1();
         // const {dealerid} = req.body;
-        const result = await pool.request().query(`select tcode , Dashboard from z_scope..DB_DASHboardmaster where status = 1`)
+        const result = await pool.request().query(`select tcode , Dashboard from [10.10.152.16].z_scope.dbo.DB_DASHboardmaster where status = 1`)
         res.status(200).json(result.recordset)
     } catch (error) {
         res.status(500).json(error)
@@ -59,7 +59,7 @@ const getDashboard = async(req,res)=>{
 const partNature = async(req,res)=>{
     try {
          const pool = await getPool1()
-         const query = `select  tCode , Description  from PartNatureMaster`
+         const query = `select  tCode , Description  from [10.10.152.16].z_scope.dbo.PartNatureMaster`
          const result = await pool.request().query(query)
          res.status(200).json({Data:result.recordset})
     } catch (error) {
@@ -69,7 +69,7 @@ const partNature = async(req,res)=>{
 const seasonal = async(req,res)=>{
     try {
          const pool = await getPool1()
-         const query = `use [z_scope] select tCode , Description  from seasonalmaster`
+         const query = `use [z_scope] select tCode , Description  from [10.10.152.16].z_scope.dbo.seasonalmaster`
          const result = await pool.request().query(query)
          res.status(200).json({Data:result.recordset})
     } catch (error) {
@@ -80,7 +80,7 @@ const model = async(req,res)=>{
     try {
          const pool = await getPool1()
          const {brandid} = req.body
-         const query = `select ModelID , Model  from ModelMaster where Brandid = ${brandid}`
+         const query = `select ModelID , Model  from [10.10.152.16].z_scope.dbo.ModelMaster where Brandid = ${brandid}`
          const result = await pool.request().query(query)
          res.status(200).json({Data:result.recordset})
     } catch (error) {
@@ -90,7 +90,7 @@ const model = async(req,res)=>{
 const partType = async(req,res)=>{
 try {
         const pool = await getPool1()
-        const query = `select parttypeid , Description from z_scope..parttypemaster`
+        const query = `select parttypeid , Description from [10.10.152.16].z_scope.dbo.parttypemaster`
         const result = await pool.request().query(query)
         res.status(200).json({Data:result.recordset})
 } catch (error) {
@@ -172,15 +172,15 @@ try {
         return res.status(400).json({message:`Token and Usertype Both are required`})
       }
       if(usertype === 'a'){
-      const query = `select bintid_pk , concat(vcfirstname , ' ', vcLastname)as username , designation from z_scope..adminmaster_gen where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `
+      const query = `select bintid_pk , concat(vcfirstname , ' ', vcLastname)as username , designation from [10.10.152.16].z_scope.dbo.adminmaster_gen where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `
       
       const result = await pool.request().query(query)
       res.status(200).json({Data:result.recordset})
       }
       else{
-        const query = `SELECT distinct li.BrandID, dur.dealerid , dur.locationid , concat(amg.vcfirstname , ' ', amg.vcLastname)as username  FROM z_scope..AdminMaster_GEN amg
-    join z_scope..Dealer_User_Relation dur on amg.bintid_pk = dur.userid
-    join z_scope..locationinfo li on dur.locationid = li.LocationID
+        const query = `SELECT distinct li.BrandID, dur.dealerid , dur.locationid , concat(amg.vcfirstname , ' ', amg.vcLastname)as username  FROM [10.10.152.16].z_scope.dbo.AdminMaster_GEN amg
+    join [10.10.152.16].z_scope.dbo.Dealer_User_Relation dur on amg.bintid_pk = dur.userid
+    join [10.10.152.16].z_scope.dbo.locationinfo li on dur.locationid = li.LocationID
     where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `
     const result = await pool.request().query(query)
     res.status(200).json({Data:result.recordset})

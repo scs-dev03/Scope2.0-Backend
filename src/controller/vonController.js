@@ -148,8 +148,8 @@ const userFeedbacklog = async (req, res) => {
         let LatestPartID = null;
         try {
             const LatestPartQuery = `select (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END) AS LatestPartNumber 
-                                from z_scope..substitution_master sm
-                                 join part_master pm on pm.brandid = sm.brandid and pm.partnumber = sm.partnumber 
+                                from [10.10.152.16].z_scope.dbo.substitution_master sm
+                                 join [10.10.152.16].z_scope.dbo.part_master pm on pm.brandid = sm.brandid and pm.partnumber = sm.partnumber 
                                 where pm.partid = ${partid}`
             const result = await pool.request().query(LatestPartQuery)
             LatestPartID = result.recordset.length > 0 ? result.recordset[0].LatestPartNumber : null;
@@ -401,9 +401,87 @@ const partFamily = async (req, res) => {
         //                 join [10.10.152.16].[z_scope].dbo.part_master pm on pm.brandid = sm.brandid and pm.partnumber1 = sm.partnumber1
         //                 where sm.subpartnumber = (select distinct subpartnumber1 from [10.10.152.16].[z_scope].dbo.substitution_master where partnumber1 = @partnumber)`
         const query = `use z_scope
-                        select pm.partnumber1, (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END)as LatestPartNumber , pm.partdesc, pm.category,pm.landedcost from Substitution_Master sm
-                        join part_master pm on pm.brandid = sm.brandid and sm.partnumber = pm.partnumber
+                        select pm.partnumber1, (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END)as LatestPartNumber , pm.partdesc, pm.category,pm.landedcost from [10.10.152.16].z_scope.dbo.Substitution_Master sm
+                        join [10.10.152.16].z_scope.dbo.part_master pm on pm.brandid = sm.brandid and sm.partnumber = pm.partnumber
                         where sm.subpartnumber = '${partnumber}' and sm.brandid = ${brandid}`
+                    //     DECLARE 
+                    //     @InputPart    VARCHAR(40) = '0827099901L',   -- ← your input part
+                    //     @InputBrandID INT         = 14;               -- ← your input brand
+                    
+                    // DECLARE @RowsInserted INT;
+                    
+                    // -- 0) Drop any old temp‐table
+                    // IF OBJECT_ID('tempdb..#PartFamily','U') IS NOT NULL
+                    //     DROP TABLE #PartFamily;
+                    
+                    // -- 1) Create a holding table: one row per (Part, BrandID)
+                    // CREATE TABLE #PartFamily (
+                    //     Part    VARCHAR(40),
+                    //     BrandID INT,
+                    //     CONSTRAINT PK_PartFamily PRIMARY KEY (Part, BrandID)
+                    // );
+                    
+                    // -- 2) Seed it with exactly your input (part, brand)
+                    // INSERT INTO #PartFamily(Part, BrandID)
+                    // VALUES (@InputPart, @InputBrandID);
+                    
+                    // -- 3) Iteratively grow the family within that brand
+                    // SET @RowsInserted = 1;
+                    // WHILE @RowsInserted > 0
+                    // BEGIN
+                    //     INSERT INTO #PartFamily(Part, BrandID)
+                    //     SELECT DISTINCT
+                    //         sm.SubPartNumber1,
+                    //         sm.BrandID
+                    //     FROM Substitution_Master AS sm
+                    //     JOIN #PartFamily AS f
+                    //       ON sm.PartNumber1 = f.Part
+                    //      AND sm.BrandID    = f.BrandID
+                    //     WHERE NOT EXISTS (
+                    //        SELECT 1
+                    //        FROM #PartFamily x
+                    //        WHERE x.Part    = sm.SubPartNumber1
+                    //          AND x.BrandID = sm.BrandID
+                    //     )
+                    
+                    //     UNION
+                    
+                    //     SELECT DISTINCT
+                    //         sm.PartNumber1,
+                    //         sm.BrandID
+                    //     FROM Substitution_Master AS sm
+                    //     JOIN #PartFamily AS f
+                    //       ON sm.SubPartNumber1 = f.Part
+                    //      AND sm.BrandID        = f.BrandID
+                    //     WHERE NOT EXISTS (
+                    //        SELECT 1
+                    //        FROM #PartFamily x
+                    //        WHERE x.Part    = sm.PartNumber1
+                    //          AND x.BrandID = sm.BrandID
+                    //     );
+                    
+                    //     SET @RowsInserted = @@ROWCOUNT;
+                    // END
+                    
+                    // -- 4) Pull full details for every (Part, BrandID) found
+                    // SELECT  
+                    //     pm.PartNumber1,
+                    //     pm.PartDesc,
+                    //     pm.LandedCost,
+                    //     pm.MRP,
+                    //     pm.PartID,
+                    //     pm.Category,
+                    //     pm.MOQ,
+                    //     pm.BrandID
+                    // FROM Part_Master pm
+                    // JOIN #PartFamily pf
+                    //   ON pm.PartNumber1 = pf.Part
+                    //  AND pm.BrandID     = pf.BrandID
+                    // ORDER BY pm.PartNumber1, pm.BrandID;
+                    
+                    // -- 5) Clean up
+                    // DROP TABLE #PartFamily;
+                    
         const result = await pool.request().input('partnumber', sql.VarChar, partnumber).query(query)
         // console.log(result.recordset);
 
@@ -422,7 +500,7 @@ DECLARE @sql NVARCHAR(MAX) = N'';
 SELECT @sql = @sql + 
     'SELECT li.Brand,li.brandid, li.dealer,li.dealerid, li.location,li.locationid, COUNT(*) AS Pending ' +
     'FROM ' + QUOTENAME(name) + ' a ' + 
-    'JOIN z_scope..locationinfo li ON li.locationid = a.locationid ' + 
+    'JOIN [10.10.152.16].z_scope.dbo.locationinfo li ON li.locationid = a.locationid ' + 
     'WHERE a.status = ''Pending'' ' +
     'GROUP BY li.Brand,li.brandid, li.dealer,li.dealerid,li.locationid, li.location UNION ALL ' 
 FROM sys.tables
@@ -1027,7 +1105,7 @@ WHERE brand LIKE '${brand}'`;
     for (const loc of distinctLocations) {
         const queryLocation = `
     SELECT locationid 
-    FROM z_scope..locationinfo 
+    FROM [10.10.152.16].z_scope.dbo.locationinfo 
     WHERE brandid = ${resultIds.recordset[0].brandid} 
       AND dealerid = '${dealerResults[0].dealerid}'
       AND location LIKE '${loc}'

@@ -8,8 +8,8 @@ const getDashboardbyDealer = async(req,res)=>{
   const pool = await getPool1();
   const {dealerid} = req.body
 try {  
-    const query = `select dm.tCode , dm.Dashboard  from z_scope..DB_DashboardURL du
-                    join z_scope..DB_DashboardMaster dm on dm.tcode = du.DashboardCode
+    const query = `select dm.tCode , dm.Dashboard  from [10.10.152.16].z_scope.dbo.DB_DashboardURL du
+                    join [10.10.152.16].z_scope.dbo.DB_DashboardMaster dm on dm.tcode = du.DashboardCode
                     where du.status = 1 and dm.Status = 1 and  dealerid  = @dealerid`
     const result = await pool.request().input('dealerid',sql.Int,dealerid).query(query)
     if(Array.isArray(result.recordset) && result.recordset.length === 0){
@@ -248,7 +248,7 @@ const getBDM = async(req,res)=>{
 try {
     // const {bigint_pk} = req.body
     // const query = `use [z_scope] select bintId_Pk, vcFirstName , vcLastName from AdminMaster_GEN where isBDM = 'y' and bintId_Pk = @bigint_pk`
-      const query= `use [z_scope] select bintId_Pk, concat(vcFirstName ,' ', vcLastName) Name from AdminMaster_GEN where isBDM = 'y' or Designation = 5 order by bintId_Pk`
+      const query= `select bintId_Pk, concat(vcFirstName ,' ', vcLastName) Name from [10.10.152.16].z_scope.dbo.AdminMaster_GEN where isBDM = 'y' or Designation = 5 order by bintId_Pk`
     const result = await pool.request().query(query)
     res.status(200).json(result.recordset)
 } catch (error) {
@@ -288,7 +288,7 @@ const editSchedule = async (req, res) => {
     // Fetch data from both databases
     const query = `
       SELECT addedby, status FROM UAD_BI.dbo.SBS_DBS_ScheduledDashboard WHERE reqid = @reqid;
-      SELECT designation, isBDM FROM z_scope.dbo.adminmaster_gen WHERE bintid_pk = @bintid_pk;
+      SELECT designation, isBDM FROM [10.10.152.16].z_scope.dbo.adminmaster_gen WHERE bintid_pk = @bintid_pk;
     `;
 
     const result = await pool
@@ -367,13 +367,13 @@ const fetchRequests = async () => {
       CASE WHEN sd.Deletedby = amg3.bintId_Pk THEN CONCAT(amg3.vcFirstName, ' ', amg3.vcLastName) END AS Deletedby, sd.Deletedon,
       CASE WHEN d.BDMCode = amg4.bintId_Pk THEN CONCAT(amg4.vcFirstName, ' ', amg4.vcLastName) END AS BDM
       from SBS_DBS_ScheduledDashboard sd
-      join z_scope..DB_DashboardMaster dm ON sd.DashboardCode = dm.tCode
+      join [10.10.152.16].z_scope.dbo.DB_DashboardMaster dm ON sd.DashboardCode = dm.tCode
       join UAD_BI..SBS_DBS_STATUS_MASTER sm on sd.status = sm.status
-      join z_scope..Dealer_Master d on d.bigid = sd.Dealerid
-      LEFT JOIN z_scope..AdminMaster_GEN amg1 ON sd.Addedby = amg1.bintId_Pk
-      LEFT JOIN z_scope..AdminMaster_GEN amg2 ON sd.Editedby = amg2.bintId_Pk
-      LEFT JOIN z_scope..AdminMaster_GEN amg3 ON sd.Editedby = amg3.bintId_Pk
-      LEFT JOIN z_scope..AdminMaster_GEN amg4 ON d.BDMCode = amg4.bintId_Pk
+      join [10.10.152.16].z_scope.dbo.Dealer_Master d on d.bigid = sd.Dealerid
+      LEFT JOIN [10.10.152.16].z_scope.dbo.AdminMaster_GEN amg1 ON sd.Addedby = amg1.bintId_Pk
+      LEFT JOIN [10.10.152.16].z_scope.dbo.AdminMaster_GEN amg2 ON sd.Editedby = amg2.bintId_Pk
+      LEFT JOIN [10.10.152.16].z_scope.dbo.AdminMaster_GEN amg3 ON sd.Editedby = amg3.bintId_Pk
+      LEFT JOIN [10.10.152.16].z_scope.dbo.AdminMaster_GEN amg4 ON d.BDMCode = amg4.bintId_Pk
       order by reqid desc`;
     const result = await pool.request().query(query);
     return result.recordset;
@@ -414,11 +414,11 @@ const changelogView = async(req,res)=>{
       const query = ` use [UAD_BI]
                       SELECT DISTINCT dm.Dashboard,  wm.Workspace,  li.Brand,  li.Dealer,  CONCAT(adm.vcFirstName, ' ', adm.vcLastName) AS ChangedBy,   cl.ChangedOn, am.Name AS RequestedBy,   cl.RequestOn,   cl.Url , cl.remarks 
                       FROM SBS_DBS_ChangeLog cl  
-                      LEFT JOIN z_scope..locationinfo li ON li.dealerid = cl.refdealerid  
-                      LEFT JOIN z_scope..db_dashboardmaster dm ON dm.tcode = cl.DashboardCode  
+                      LEFT JOIN [10.10.152.16].z_scope.dbo.locationinfo li ON li.dealerid = cl.refdealerid  
+                      LEFT JOIN [10.10.152.16].z_scope.dbo.db_dashboardmaster dm ON dm.tcode = cl.DashboardCode  
                       LEFT JOIN SBS_DBS_AdminMaster am ON am.Aid = cl.Requestby  
                       LEFT JOIN SBS_DBS_WorkspaceMaster wm ON wm.WorkspaceID = cl.Workspaceid  
-                      LEFT JOIN z_scope..AdminMaster_GEN adm ON adm.bintId_Pk = cl.Changedby  
+                      LEFT JOIN [10.10.152.16].z_scope.dbo.AdminMaster_GEN adm ON adm.bintId_Pk = cl.Changedby  
                       GROUP BY  dm.Dashboard,  wm.Workspace,  li.Brand,  li.Dealer,  adm.vcFirstName,  adm.vcLastName,  cl.ChangedOn,  am.Name,  cl.RequestOn,  cl.Url , cl.remarks;`
   
       const result = await pool.request().query(query)
@@ -550,10 +550,10 @@ const requestNewDashboard = async (req,res)=>{
  try {
    const pool = await getPool1()
    const {dealerid} = req.body
-   const query = `select tcode , Dashboard from DB_DashboardMaster where tcode not in (
+   const query = `select tcode , Dashboard from [10.10.152.16].z_scope.dbo.DB_DashboardMaster where tcode not in (
                    select dm.tCode  from DB_DashboardLocMapping dlm                  
- 				          join LocationInfo li on li.LocationID = dlm.LocationID
-                  join DB_DashboardMaster dm on dm.tCode = dlm.DashboardCode
+ 				          join [10.10.152.16].z_scope.dbo.LocationInfo li on li.LocationID = dlm.LocationID
+                  join [10.10.152.16].z_scope.dbo.DB_DashboardMaster dm on dm.tCode = dlm.DashboardCode
                   where dealerid = @dealerid and dlm.Status = 1 and li.OgsStatus = 1 and li.Status = 1 and dm.Status = 1
                   group by dm.tcode , dm.Dashboard
                  ) and status = 1`
@@ -580,8 +580,8 @@ try {
     const pool = await getPool1()
     const query = `use [UAD_BI] select distinct  nrt.id,  li.brand , li.dealer , dm.dashboard ,concat(amg.vcFirstName,' ',amg.vcLastName) as Addedby,nrt.addedon  from UAD_BI..SBS_DBS_newrequesttracker nrt
                     join locationinfo li on li.DealerID = nrt.dealerid and li.BrandID = nrt.brandid
-                    join z_scope..DB_DashboardMaster dm on dm.tcode = nrt.dashboardcode 
-                    join z_scope..AdminMaster_GEN amg on amg.bintId_Pk =  nrt.addedby
+                    join [10.10.152.16].z_scope.dbo.DB_DashboardMaster dm on dm.tcode = nrt.dashboardcode 
+                    join [10.10.152.16].z_scope.dbo.AdminMaster_GEN amg on amg.bintId_Pk =  nrt.addedby
                     group by nrt.id,  li.brand , li.dealer , dm.dashboard , nrt.addedon ,concat(amg.vcFirstName,' ',amg.vcLastName)`
     const result = await pool.request().query(query)
     res.status(200).json({Data:result.recordset})

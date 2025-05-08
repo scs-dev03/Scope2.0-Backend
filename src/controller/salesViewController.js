@@ -294,7 +294,7 @@ const partDetails = async (req, res) => {
   try {
     const pool = getPool1();
     const { Brandid, Partnumber, excel } = req.body;
-
+    
     if (!Brandid || !excel) {
       return res.status(400).json({ error: 'Brandid and Excel flag are required' });
     }
@@ -372,8 +372,8 @@ const partDetails = async (req, res) => {
         END) AS LatestPartno,
         pm.partdesc, pm.moq, pm.category, 
         pm.landedcost, pm.mrp, pm.dateadded, pm.lastupdated 
-      FROM part_master pm
-      LEFT JOIN substitution_master sm ON pm.partnumber = sm.partnumber
+      FROM [10.10.152.16].z_scope.dbo.part_master pm
+      LEFT JOIN [10.10.152.16].z_scope.dbo.substitution_master sm ON pm.partnumber = sm.partnumber
       WHERE pm.partnumber IN (${partnumberString}) AND pm.brandid = ${Brandid}
     `;
 
@@ -492,7 +492,7 @@ const partBrandMappingCheck = async (Brandid, Data) => {
     const pool = await getPool1();
     const query = `
       USE z_scope;
-      SELECT brandid, partnumber FROM Part_Master WHERE brandid = ${Brandid}
+      SELECT brandid, partnumber FROM [10.10.152.16].z_scope.dbo.Part_Master WHERE brandid = ${Brandid}
     `;
     const result = await pool.request().query(query);
 
