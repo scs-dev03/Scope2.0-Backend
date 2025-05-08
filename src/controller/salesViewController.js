@@ -472,7 +472,7 @@ const getLedger = async (req, res) => {
     const partidString = matchedPartids.join(',');
 
     // Call stored procedure with mapped part IDs
-    const query = `USE z_scope EXEC SP_MonthwisemultiPartLedger ${Dealerid}, ${Locationid}, '${partidString}', ${from}, ${to}`;
+    const query = `exec [10.10.152.16].[z_scope].dbo.SP_MonthwisemultiPartLedger ${Dealerid}, ${Locationid}, '${partidString}', ${from}, ${to}`;
     const result = await pool.request().query(query);
 
     res.status(200).json({ Data: result.recordsets });

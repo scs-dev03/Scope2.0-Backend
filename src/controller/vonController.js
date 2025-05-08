@@ -97,7 +97,7 @@ const userView = async (req, res) => {
         if (!dealerid && !brandid) {
             return res.status(400).json({ Error: `Dealerid and Brandid is a required Parameter` })
         }
-        const query = `use z_scope EXEC GetMAXData @brandid, @dealerid , @r1, @r2, @l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@parttype;`
+        const query = `exec [10.10.152.16].[z_scope].dbo.GetMAXData @brandid, @dealerid , @r1, @r2, @l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@parttype;`
 
         if (!partnumber && !locationid) {
             return res.status(400).json({ Error: `partnumber or locationid is required` })
@@ -291,7 +291,7 @@ const adminView = async (req, res) => {
         if (!brandid || !dealerid) {
             return res.status(400).json({ Error: `Brandid and Dealerid are required Parameter` })
         }
-        const query = `use z_scope EXEC GetMAXDataAdmin @brandid,@dealerid , @r1, @r2,@l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@status,@parttype;`
+        const query = `exec [10.10.152.16].[z_scope].dbo.GetMAXDataAdmin @brandid,@dealerid , @r1, @r2,@l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@status,@parttype;`
         // console.log(query);
 
         if (!partnumber && !locationid) {
