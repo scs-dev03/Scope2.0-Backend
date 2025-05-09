@@ -166,10 +166,11 @@ const userInfo = async(req,res)=>{
 try {
       const pool = await getPool1()
       const {token , usertype} = req.body
-
+      
+    //   console.log(token , usertype);
       
       if(!token || !usertype){
-        return res.status(400).json({message:`Token and Usertype Both are required`})
+        return res.status(400).json({message:`token and usertype both are required`})
       }
       if(usertype === 'a'){
       const query = `select bintid_pk , concat(vcfirstname , ' ', vcLastname)as username , designation from [10.10.152.16].z_scope.dbo.adminmaster_gen where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `
@@ -178,7 +179,7 @@ try {
       res.status(200).json({Data:result.recordset})
       }
       else{
-        const query = `SELECT distinct li.BrandID, dur.dealerid , dur.locationid , concat(amg.vcfirstname , ' ', amg.vcLastname)as username  FROM [10.10.152.16].z_scope.dbo.AdminMaster_GEN amg
+        const query = `SELECT distinct li.BrandID, dur.dealerid , dur.locationid , concat(amg.vcfirstname , ' ', amg.vcLastname)as username ,li.location  FROM [10.10.152.16].z_scope.dbo.AdminMaster_GEN amg
     join [10.10.152.16].z_scope.dbo.Dealer_User_Relation dur on amg.bintid_pk = dur.userid
     join [10.10.152.16].z_scope.dbo.locationinfo li on dur.locationid = li.LocationID
     where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `
