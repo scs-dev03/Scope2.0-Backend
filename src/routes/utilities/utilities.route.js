@@ -1,6 +1,8 @@
 import express from 'express';
 const router=express.Router();
-import {getBrandsInController,uploadFileInController,getDealers,getLocations} from '../../controller/utilities/utilities.controller.js';
+import {getBrandsInController,uploadFileInController,getDealers
+  ,getLocations,getLocationsBasedOnBrandInController,
+   getDesignationsInController, getRolesInController, getBusinessVerticalInController} from '../../controller/utilities/utilities.controller.js';
 import fs from 'fs'
 import multer from 'multer';
 // import {multer} from 'multer';
@@ -24,4 +26,9 @@ router.route('/brands').get(getBrandsInController)
 router.post('/upload',upload.single('excelFile'),uploadFileInController)
 router.post('/dealers',getDealers)
 router.post('/locations',getLocations)
+// router.post('/locations',locationController.getLocations)
+router.post('/selected-locations',getLocationsBasedOnBrandInController)
+router.get('/designations',getDesignationsInController)
+router.get('/roles',getRolesInController)
+router.get('/business-vertical',getBusinessVerticalInController)
 export default router;

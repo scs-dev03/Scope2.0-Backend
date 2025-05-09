@@ -597,25 +597,34 @@ const stockUploadSingleLocation = async (req, res) => {
   
     const computeQty = () => {
       const formula = mappedData.calculativeField;
-  
+    
       if (typeof formula === "string" && /[\+\-\*\/]/.test(formula)) {
-        const formulaWithValues = formula.replace(/[a-zA-Z_][a-zA-Z0-9_]*/g, (match) => {
-          const val = parseFloat(getVal(match));
-          return isNaN(val) ? 0 : val;
+        let formulaWithValues = formula;
+    
+        // Sort keys by length (to replace longer keys first and avoid partial overlaps)
+        const keys = Object.keys(row).sort((a, b) => b.length - a.length);
+    
+        keys.forEach(key => {
+          // Escape special characters in key (like dash)
+          const escapedKey = key.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
+          const regex = new RegExp(`\\b${escapedKey}\\b`, 'gi');
+          const val = parseFloat(row[key]);
+          formulaWithValues = formulaWithValues.replace(regex, isNaN(val) ? "0" : val.toString());
         });
-  
+    
         try {
+        //  console.log("Evaluating:", formulaWithValues);
           return eval(formulaWithValues);
         } catch (err) {
           console.error("Error evaluating formula:", formulaWithValues, err);
           return 0;
         }
       } else {
-        const val = parseFloat(getVal(mappedData.stock_qty));
+        const val = parseFloat(row[mappedData.stock_qty]);
         return isNaN(val) ? 0 : val;
       }
     };
-  
+    
     return {
           part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),
           qty: computeQty(),
@@ -1651,7 +1660,7 @@ let partMasterMap=new Map();
           });
       
           try {
-            console.log("Evaluating:", formulaWithValues);
+          //  console.log("Evaluating:", formulaWithValues);
             return eval(formulaWithValues);
           } catch (err) {
             console.error("Error evaluating formula:", formulaWithValues, err);
@@ -1662,6 +1671,10 @@ let partMasterMap=new Map();
           return isNaN(val) ? 0 : val;
         }
       };
+      
+      
+      
+      
     
       return {
             part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),

@@ -1,5 +1,8 @@
 
-import {getBrands,uploadFile,getDealersBasedOnBrandIDInService,getLocationsInService} from '../../services/utilities/utilities.service.js'
+import {getBrands,uploadFile,getDealersBasedOnBrandIDInService,
+    getLocationsInService,getLocationsBasedOnBrand,getDesignations,
+    getRoles,getBusinessVertical
+} from '../../services/utilities/utilities.service.js'
 export const getBrandsInController=async (req,res)=>{
 
     try{
@@ -58,3 +61,43 @@ export const  getLocations=async function(req,res){
     }
 }
 
+export const getLocationsBasedOnBrandInController=async function (req,res) {
+    try{
+        const result=await getLocationsBasedOnBrand(req.body);
+        return res.json({status:200,data:result.recordset});
+    }
+    catch(error)
+    {
+        res.json({error:"Dealers are not fetched",status:500})
+        return error;
+    }
+}
+
+export const getDesignationsInController=async function(req,res){
+    try{
+  const result=await getDesignations(req);
+   res.send({status:200,data:result.recordset})
+    }
+    catch(error){
+res.send(201).json({error:error.message});
+    }
+
+}
+export const getRolesInController=async function(req,res){
+    try{
+        const result=await getRoles(req);
+        res.send({status:200,data:result})
+    }
+    catch(error){
+        res.send(201).json({error:error.message})
+    }
+}
+export const getBusinessVerticalInController=async function(req,res){
+    try{
+        const result=await getBusinessVertical(req);
+        res.send({status:200,data:result.recordset})
+    }
+    catch(error){
+        res.send(201).json({error:error.message})
+    }
+}
