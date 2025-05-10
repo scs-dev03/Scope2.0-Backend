@@ -8,7 +8,8 @@ const partSale = async (req,res)=>{
         if (!partnumber || !brandid || !dealerid || !locationid) {
             return res.status(400).json({ message: `All fields are required` })
         }
-        const data = await partfamilySaleservice(brandid,dealerid,locationid,partnumber,res)
+        // console.log(typeof(partnumber) ,typeof(brandid) , typeof(dealerid) , typeof(locationid));
+        const data = await partfamilySaleservice(brandid,dealerid,locationid,partnumber)
         // console.log(data);
         res.status(200).json({Data:data.recordset})
     } catch (error) {
