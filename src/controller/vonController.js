@@ -3,6 +3,7 @@ import sql from 'mssql'
 
 import fs from 'fs'
 import { partBrandCheck, readExcel, insertData, findLocationPartidDuplicates, checkPendingFeedbackAndStatus, findLocationPartidDuplicatesAdmin, insertAdminFeedback, checkReviewedFeedbackByBrand, statusCheck } from '../utils/vonHelper.js'
+import { partfamilySaleservice } from '../services/norms-management/utils.service.js'
 
 
 
@@ -525,14 +526,13 @@ EXEC sp_executesql @sql;`
 }
 const partFamilySale = async (req, res) => {
     try {
-        const pool = await getPool1()
+        // const pool = await getPool2()
         const { partnumber, brandid, dealerid, locationid } = req.body
         if (!partnumber || !brandid || !dealerid || !locationid) {
             return res.status(400).json({ message: `All fields are required` })
         }
-        const query = `use [UAD_VON] EXEC  sp_partfamilysale '${partnumber}',${brandid},${dealerid},${locationid}`
-        const result = await pool.request().query(query)
-        res.status(200).json({ Data: result.recordset })
+        const data = await partfamilySaleservice(brandid,dealerid,locationid,partnumber)
+        res.status(200).json({ Data: data.recordset })
     } catch (error) {
         res.status(500).json({ Error: error.message })
     }
