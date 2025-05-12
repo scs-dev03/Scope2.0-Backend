@@ -672,7 +672,7 @@ if (missingFields.length > 0) {
         });
     
         try {
-          console.log("Evaluating:", formulaWithValues);
+        //  console.log("Evaluating:", formulaWithValues);
           return eval(formulaWithValues);
         } catch (err) {
           console.error("Error evaluating formula:", formulaWithValues, err);
@@ -1643,7 +1643,7 @@ const uploadBulkStock = async (req, res) => {
            .query(getMappingQuery);
     
         } else if (formattedDate < formattedToday) {
-          console.log("exccuted ")
+       //   console.log("exccuted ")
           isOlderUploadForHyundai=true;
           // Mapping logic for older date
           // 2. Fetch Excel column mapping for the brand

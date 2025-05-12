@@ -466,4 +466,79 @@ export const getLocationsInService= async function (req) {
     return {error:error};
   }
 }
+
+export const getDesignations=async function(req){
+  try{
+      let pool=await getPool1();
+      let query=`use [z_scope] Select id,designation_name from designation_master`;
+
+     let result= await pool.request().query(query);
+      return result;
+
+  }
+  catch(error){
+      return error;
+  }
+}
+
+export const getRoles=async function(req){
+  try{
+      let pool=await getPool1();
+      let query=`use [z_scope] Select id,role_name from role_module_master where status=1`;
+     let result= await pool.request().query(query);
+   //  console.log("result ",result.recordset)
+      return result.recordset;
+
+  }
+  catch(error){
+      return error;
+  }
+}
+
+export const getBusinessVertical=async function(req){
+  try{
+      let pool=await getPool1();
+      let query=`use [z_scope] SELECT id,business_vertical from business_vertical_master`;
+
+     let result= await pool.request().query(query);
+      return result;
+
+  }
+  catch(error){
+      return error;
+  }
+}
+
+export const  getLocationsBasedOnBrand= async function (req) {
+  try {
+    const pool = await getPool1();
+    //console.log("Connected to the database successfully!");
+    // Begin a transaction for inserting data
+    brand_id = req.brand_id;
+    dealer_id = req.dealer_id;
+    // const request = new sql.Request(transaction);
+    const query = `
+       Select locationID as Location_id,location as Location_name from z_scope.dbo.locationInfo where dealerID=@dealer_id and status=1 and ogsStatus=1 order by location
+      `;
+
+    // Execute the insert query for each row
+    const result = await pool
+      .request()
+      .input("brand_id", brand_id)
+      .input("dealer_id", dealer_id)
+      .query(query);
+
+    // console.log("result ",result.recordset)
+    // Commit the transaction
+    // await transaction.commit();
+    // console.log("result ",result.recordset)
+    
+
+    return result.recordset;
+  } catch (err) {
+    console.log("error in fetching data", err.message);
+    // await transaction.rollback();
+    return err;
+  } 
+}
 export { readExcelFile, readExcelFileWithSubColumns,readExcelFileWithSubColumnsForBulk };
