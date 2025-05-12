@@ -7,6 +7,7 @@ import salesView from './routes/salesViewRoute.js'
 import MasterApi from './routes/MasterApiRoute.js'
 import von from './routes/vonRoute.js'
 import appRoutes from './routes/index.js'
+import dm from './routes/dealermonitoringRoute.js'
 const app = express()
 app.use(cors())
 app.use(express.json());
@@ -20,6 +21,7 @@ app.use("/api/v1/master", MasterApi)
 app.use("/api/v1/dashboardscheduler", dashboardSchedule)
 app.use("/api/v1/salesview", salesView)
 app.use("/api/v1/von",von)
+app.use("/api/v1/dm",dm)
 
 
 

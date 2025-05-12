@@ -97,7 +97,7 @@ const userView = async (req, res) => {
         if (!dealerid && !brandid) {
             return res.status(400).json({ Error: `Dealerid and Brandid is a required Parameter` })
         }
-        const query = `use z_scope EXEC GetMAXData @brandid, @dealerid , @r1, @r2, @l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@parttype;`
+        const query = `exec [10.10.152.16].[z_scope].dbo.GetMAXData @brandid, @dealerid , @r1, @r2, @l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@parttype;`
 
         if (!partnumber && !locationid) {
             return res.status(400).json({ Error: `partnumber or locationid is required` })
@@ -148,12 +148,12 @@ const userFeedbacklog = async (req, res) => {
         let LatestPartID = null;
         try {
             const LatestPartQuery = `select (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END) AS LatestPartNumber 
-                                from z_scope..substitution_master sm
-                                 join part_master pm on pm.brandid = sm.brandid and pm.partnumber = sm.partnumber 
+                                from [10.10.152.16].z_scope.dbo.substitution_master sm
+                                 join [10.10.152.16].z_scope.dbo.part_master pm on pm.brandid = sm.brandid and pm.partnumber = sm.partnumber 
                                 where pm.partid = ${partid}`
             const result = await pool.request().query(LatestPartQuery)
             LatestPartID = result.recordset.length > 0 ? result.recordset[0].LatestPartNumber : null;
-            console.log(LatestPartID);
+            // console.log(LatestPartID);
 
         } catch (error) {
             return res.status(500).json({ Error: error.message, Error: `Error in Finding LatestPartID` })
@@ -291,7 +291,7 @@ const adminView = async (req, res) => {
         if (!brandid || !dealerid) {
             return res.status(400).json({ Error: `Brandid and Dealerid are required Parameter` })
         }
-        const query = `use z_scope EXEC GetMAXDataAdmin @brandid,@dealerid , @r1, @r2,@l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@status,@parttype;`
+        const query = `exec [10.10.152.16].[z_scope].dbo.GetMAXDataAdmin @brandid,@dealerid , @r1, @r2,@l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@status,@parttype;`
         // console.log(query);
 
         if (!partnumber && !locationid) {
@@ -401,9 +401,87 @@ const partFamily = async (req, res) => {
         //                 join [10.10.152.16].[z_scope].dbo.part_master pm on pm.brandid = sm.brandid and pm.partnumber1 = sm.partnumber1
         //                 where sm.subpartnumber = (select distinct subpartnumber1 from [10.10.152.16].[z_scope].dbo.substitution_master where partnumber1 = @partnumber)`
         const query = `use z_scope
-                        select pm.partnumber1, (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END)as LatestPartNumber , pm.partdesc, pm.category,pm.landedcost from Substitution_Master sm
-                        join part_master pm on pm.brandid = sm.brandid and sm.partnumber = pm.partnumber
+                        select pm.partnumber1, (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END)as LatestPartNumber , pm.partdesc, pm.category,pm.landedcost from [10.10.152.16].z_scope.dbo.Substitution_Master sm
+                        join [10.10.152.16].z_scope.dbo.part_master pm on pm.brandid = sm.brandid and sm.partnumber = pm.partnumber
                         where sm.subpartnumber = '${partnumber}' and sm.brandid = ${brandid}`
+                    //     DECLARE 
+                    //     @InputPart    VARCHAR(40) = '0827099901L',   -- ← your input part
+                    //     @InputBrandID INT         = 14;               -- ← your input brand
+                    
+                    // DECLARE @RowsInserted INT;
+                    
+                    // -- 0) Drop any old temp‐table
+                    // IF OBJECT_ID('tempdb..#PartFamily','U') IS NOT NULL
+                    //     DROP TABLE #PartFamily;
+                    
+                    // -- 1) Create a holding table: one row per (Part, BrandID)
+                    // CREATE TABLE #PartFamily (
+                    //     Part    VARCHAR(40),
+                    //     BrandID INT,
+                    //     CONSTRAINT PK_PartFamily PRIMARY KEY (Part, BrandID)
+                    // );
+                    
+                    // -- 2) Seed it with exactly your input (part, brand)
+                    // INSERT INTO #PartFamily(Part, BrandID)
+                    // VALUES (@InputPart, @InputBrandID);
+                    
+                    // -- 3) Iteratively grow the family within that brand
+                    // SET @RowsInserted = 1;
+                    // WHILE @RowsInserted > 0
+                    // BEGIN
+                    //     INSERT INTO #PartFamily(Part, BrandID)
+                    //     SELECT DISTINCT
+                    //         sm.SubPartNumber1,
+                    //         sm.BrandID
+                    //     FROM Substitution_Master AS sm
+                    //     JOIN #PartFamily AS f
+                    //       ON sm.PartNumber1 = f.Part
+                    //      AND sm.BrandID    = f.BrandID
+                    //     WHERE NOT EXISTS (
+                    //        SELECT 1
+                    //        FROM #PartFamily x
+                    //        WHERE x.Part    = sm.SubPartNumber1
+                    //          AND x.BrandID = sm.BrandID
+                    //     )
+                    
+                    //     UNION
+                    
+                    //     SELECT DISTINCT
+                    //         sm.PartNumber1,
+                    //         sm.BrandID
+                    //     FROM Substitution_Master AS sm
+                    //     JOIN #PartFamily AS f
+                    //       ON sm.SubPartNumber1 = f.Part
+                    //      AND sm.BrandID        = f.BrandID
+                    //     WHERE NOT EXISTS (
+                    //        SELECT 1
+                    //        FROM #PartFamily x
+                    //        WHERE x.Part    = sm.PartNumber1
+                    //          AND x.BrandID = sm.BrandID
+                    //     );
+                    
+                    //     SET @RowsInserted = @@ROWCOUNT;
+                    // END
+                    
+                    // -- 4) Pull full details for every (Part, BrandID) found
+                    // SELECT  
+                    //     pm.PartNumber1,
+                    //     pm.PartDesc,
+                    //     pm.LandedCost,
+                    //     pm.MRP,
+                    //     pm.PartID,
+                    //     pm.Category,
+                    //     pm.MOQ,
+                    //     pm.BrandID
+                    // FROM Part_Master pm
+                    // JOIN #PartFamily pf
+                    //   ON pm.PartNumber1 = pf.Part
+                    //  AND pm.BrandID     = pf.BrandID
+                    // ORDER BY pm.PartNumber1, pm.BrandID;
+                    
+                    // -- 5) Clean up
+                    // DROP TABLE #PartFamily;
+                    
         const result = await pool.request().input('partnumber', sql.VarChar, partnumber).query(query)
         // console.log(result.recordset);
 
@@ -422,7 +500,7 @@ DECLARE @sql NVARCHAR(MAX) = N'';
 SELECT @sql = @sql + 
     'SELECT li.Brand,li.brandid, li.dealer,li.dealerid, li.location,li.locationid, COUNT(*) AS Pending ' +
     'FROM ' + QUOTENAME(name) + ' a ' + 
-    'JOIN z_scope..locationinfo li ON li.locationid = a.locationid ' + 
+    'JOIN [10.10.152.16].z_scope.dbo.locationinfo li ON li.locationid = a.locationid ' + 
     'WHERE a.status = ''Pending'' ' +
     'GROUP BY li.Brand,li.brandid, li.dealer,li.dealerid,li.locationid, li.location UNION ALL ' 
 FROM sys.tables
@@ -459,32 +537,120 @@ const partFamilySale = async (req, res) => {
     }
 
 }
+// const adminPendingView = async (req, res) => {
+//     try {
+//         const pool = await getPool1()
+//         const { brandid, dealerid, locationid, status, seasonalid, modelid, natureid , partnumber , r1 , r2 , l1 , l2 ,flag , parttype } = req.body
+//         // console.log(brandid, dealerid, locationid, status, seasonalid, modelid, natureid , partnumber , r1 , r2 , l1 , l2 ,flag , parttype);
+//         if (!brandid) {
+//             return res.status(400).json({ message: `Brandid is required` })
+//         }
+//         const query = `use [UAD_VON] EXEC sp_GetAdminView @brandid = @brandid, @dealerid = @dealerid, @locationid = @locationid,@Status = @status,@seasonalid = @seasonalid, @natureid = @natureid, @modelid = @modelid, @PartNumber = @PartNumber,@r1=@r1,@r2=r2,@l1=@l1,@l2=@l2,@MaxValueFlag=@MaxValueFlag,@parttype=@parttype;`
+//         // console.log(query);
+
+//         const result = await pool.request()
+//             .input('brandid', sql.Int, brandid)
+//             .input('dealerid', sql.Int, dealerid)
+//             .input('locationid', sql.Int, locationid)
+//             .input('status', sql.Bit, status)
+//             .input('seasonalid', sql.Int, seasonalid ?? null)
+//             .input('natureid', sql.Int, natureid ?? null)
+//             .input('modelid', sql.Int, modelid ?? null)
+//             .input('partnumber', sql.VarChar(50), partnumber ?? null)
+//             .input('r1', sql.Decimal(10,2), r1 ?? null)
+//             .input('r2', sql.Decimal(10,2), r2 ?? null)
+//             .input('l1', sql.Decimal(10,2), l1 ?? null)
+//             .input('l2', sql.Decimal(10,2), l2 ?? null)
+//             .input('MaxValueFlag', sql.Int, flag ?? null)
+//             .input('parttype', sql.Int, parttype ?? null)
+//             .query(query)
+//         // console.log(result.recordset);
+//         res.status(200).json({ Data: result.recordset })
+//     } catch (error) {
+//         res.status(500).json({ Error: error.message })
+//     }
+// }
 const adminPendingView = async (req, res) => {
     try {
-        const pool = await getPool1()
-        const { brandid, dealerid, locationid, status, seasonalid, modelid, natureid } = req.body
-        
+        const pool = await getPool1();
+        let {
+            brandid,
+            dealerid,
+            locationid,
+            status,
+            seasonalid,
+            modelid,
+            natureid,
+            partnumber,
+            r1,
+            r2,
+            l1,
+            l2,
+            flag,
+            parttype
+        } = req.body;
+
+        // Ensure proper typing
+        brandid = Number(brandid);
+        dealerid = dealerid !== null ? Number(dealerid) : null;
+        locationid = locationid !== null ? Number(locationid) : null;
+        status = status !== null ? Number(status) : null;
+        seasonalid = seasonalid !== null ? Number(seasonalid) : null;
+        modelid = modelid !== null ? Number(modelid) : null;
+        natureid = natureid !== null ? Number(natureid) : null;
+        r1 = r1 !== null ? Number(r1) : null;
+        r2 = r2 !== null ? Number(r2) : null;
+        l1 = l1 !== null ? Number(l1) : null;
+        l2 = l2 !== null ? Number(l2) : null;
+        flag = flag !== null ? Number(flag) : null;
+        parttype = parttype !== null ? Number(parttype) : null;
+
         if (!brandid) {
-            return res.status(400).json({ message: `Brandid is required` })
+            return res.status(400).json({ message: `Brandid is required` });
         }
-        const query = `use [UAD_VON] EXEC sp_GetAdminView @brandid = @brandid, @dealerid = @dealerid, @locationid = @locationid,@Status = @status,@seasonalid = @seasonalid, @natureid = @natureid, @modelid = @modelid;`
-        // console.log(query);
+
+        const query = `
+            USE [UAD_VON]
+            EXEC sp_GetAdminView 
+                @brandid = @brandid,
+                @dealerid = @dealerid,
+                @locationid = @locationid,
+                @Status = @status,
+                @seasonalid = @seasonalid,
+                @natureid = @natureid,
+                @modelid = @modelid,
+                @PartNumber = @PartNumber,
+                @r1 = @r1,
+                @r2 = @r2,
+                @l1 = @l1,
+                @l2 = @l2,
+                @MaxValueFlag = @MaxValueFlag,
+                @parttype = @parttype;
+        `;
 
         const result = await pool.request()
             .input('brandid', sql.Int, brandid)
             .input('dealerid', sql.Int, dealerid)
             .input('locationid', sql.Int, locationid)
-            .input('status', sql.Int, status)
-            .input('seasonalid', sql.Int, seasonalid ?? null)
-            .input('natureid', sql.Int, natureid ?? null)
-            .input('modelid', sql.Int, modelid ?? null)
-            .query(query)
-        // console.log(result.recordset);
-        res.status(200).json({ Data: result.recordset })
+            .input('status', sql.Bit, status)
+            .input('seasonalid', sql.Int, seasonalid)
+            .input('natureid', sql.Int, natureid)
+            .input('modelid', sql.Int, modelid)
+            .input('PartNumber', sql.VarChar(50), partnumber)
+            .input('r1', sql.Decimal(10, 2), r1)
+            .input('r2', sql.Decimal(10, 2), r2)
+            .input('l1', sql.Decimal(10, 2), l1)
+            .input('l2', sql.Decimal(10, 2), l2)
+            .input('MaxValueFlag', sql.Int, flag)
+            .input('parttype', sql.Int, parttype)
+            .query(query);
+
+        res.status(200).json({ Data: result.recordset });
     } catch (error) {
-        res.status(500).json({ Error: error.message })
+        res.status(500).json({ Error: error.message });
     }
-}
+};
+
 const dealerUpload = async (req, res) => {
     let transaction; // Declare transaction outside try block
 
@@ -497,9 +663,9 @@ const dealerUpload = async (req, res) => {
         }
         // console.log(req.file.path);
 
-        let data = await readExcel(req.file.path);
+        let {headers,data} = await readExcel(req.file.path);
         //   console.log(`data` , data[0]);
-
+        // console.log(headers)
         fs.unlinkSync(req.file.path); // Delete uploaded file after processing
 
         const REQUIRED_HEADERS = [
@@ -514,10 +680,11 @@ const dealerUpload = async (req, res) => {
           
 
         // ✅ Check for required headers
-            const uploadedHeaders = Object.keys(data[0] || {});
+            // const uploadedHeaders = Object.keys(data[0] || {});
             // console.log(uploadedHeaders);
-            const missingHeaders = REQUIRED_HEADERS.filter(header => !uploadedHeaders.includes(header));
-
+            const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
+            // console.log(missingHeaders);
+            
             if (missingHeaders.length > 0) {
               return res.status(400).json({
                 message: "Missing headers or data",
@@ -536,11 +703,11 @@ const dealerUpload = async (req, res) => {
                 UserRemark,
                 ProposedQty
             }));
-
+// 
         // console.log(cleanedData);
         const partidpartnumbermapping = [];
 
-        const query = `select distinct  partid , partnumber from Stockable_Nonstockable_TD001_8 where Locationid = 14 `;
+        const query = `select distinct  partid , partnumber from z_scope..Stockable_Nonstockable_TD001_8 where Locationid = 14 `;
         const partidpartnumberresult = await pool.request().query(query);
 
         if (partidpartnumberresult.recordset.length > 0) {
@@ -590,7 +757,7 @@ const dealerUpload = async (req, res) => {
 
 
         const queryIds = `SELECT brandid, dealerid 
-                    FROM locationinfo 
+                    FROM z_scope..locationinfo 
                     WHERE brand LIKE '${brand}' AND dealer LIKE '${dealer}'`;
 
         const resultIds = await pool.request().query(queryIds);
@@ -600,7 +767,7 @@ const dealerUpload = async (req, res) => {
         // Now, similarly, fetch IDs for each distinct brand
         const brandResults = [];
         for (const b of distinctBrands) {
-            const queryBrand = `SELECT brandid FROM locationinfo WHERE brand LIKE '${b}'`;
+            const queryBrand = `SELECT brandid FROM z_scope..locationinfo WHERE brand LIKE '${b}'`;
             const brandResult = await pool.request().query(queryBrand);
             if (brandResult.recordset.length) {
                 brandResults.push({
@@ -616,7 +783,7 @@ const dealerUpload = async (req, res) => {
         // And similarly, for each distinct dealer
         const dealerResults = [];
         for (const d of distinctDealers) {
-            const queryDealer = `SELECT dealerid FROM locationinfo WHERE dealer LIKE '${d}'`;
+            const queryDealer = `SELECT dealerid FROM z_scope..locationinfo WHERE dealer LIKE '${d}'`;
             const dealerResult = await pool.request().query(queryDealer);
             if (dealerResult.recordset.length) {
                 dealerResults.push({
@@ -636,7 +803,7 @@ const dealerUpload = async (req, res) => {
         for (const loc of distinctLocations) {
             const queryLocation = `
     SELECT locationid 
-    FROM locationinfo 
+    FROM z_scope..locationinfo 
     WHERE brandid = ${brandid} 
       AND dealerid = '${dealerid}'
       AND location LIKE '${loc}'
@@ -817,7 +984,9 @@ const dealerUpload = async (req, res) => {
         // await transaction.commit(); // Commit transaction
 
 
-        res.status(200).json({ message: "Data inserted successfully", data: formattedData });
+        res.status(200).json({ message: "Data inserted successfully"
+            // , data: formattedData 
+        });
 
     } catch (error) {
         console.error("Error in dealerUpload:", error);
@@ -832,14 +1001,16 @@ const dealerUpload = async (req, res) => {
 
 const adminUpload = async (req, res) => {
     const pool = await getPool1()
-    // const {file} = req.body
+    const {file} = req.body
     if (!req.file || req.file.length === 0) {
         return res.status(400).json({ message: "No files received" });
     }
     // console.log(req.file.path);
 
-    let data = await readExcel(req.file.path);
-    //   console.log(`data` , data[0]);
+    const {headers , data} = await readExcel(req.file.path);
+    //   console.log(`data` , data);
+    //   console.log(headers );
+      
 
     fs.unlinkSync(req.file.path); // Delete uploaded file after processing
     const REQUIRED_HEADERS = [
@@ -847,10 +1018,8 @@ const adminUpload = async (req, res) => {
       ];
       
 
-    // ✅ Check for required headers
-        const uploadedHeaders = Object.keys(data[0] || {});
-        const missingHeaders = REQUIRED_HEADERS.filter(header => !uploadedHeaders.includes(header));
-
+    //  Check for required headers
+        const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
         if (missingHeaders.length > 0) {
           return res.status(400).json({
             message: "Missing headers or data",
@@ -879,7 +1048,9 @@ const adminUpload = async (req, res) => {
     if (!isArrayEmpty(duplicateEntries)) {
         // console.log(duplicateEntries);
 
-        return res.status(400).json({ Data: duplicateEntries })
+        return res.status(400).json({ 
+            message:`These Locations and feedbackid are duplicate`,
+            Data: duplicateEntries })
     }
     // Extract distinct values from data
     const distinctLocations = [...new Set(cleanedData.map(item => item.location))];
@@ -934,7 +1105,7 @@ WHERE brand LIKE '${brand}'`;
     for (const loc of distinctLocations) {
         const queryLocation = `
     SELECT locationid 
-    FROM z_scope..locationinfo 
+    FROM [10.10.152.16].z_scope.dbo.locationinfo 
     WHERE brandid = ${resultIds.recordset[0].brandid} 
       AND dealerid = '${dealerResults[0].dealerid}'
       AND location LIKE '${loc}'

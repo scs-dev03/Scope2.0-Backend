@@ -6,7 +6,7 @@ const getBrands = async(req,res)=>{
         const pool = getPool1();
         const result = await pool
         .request()
-        .query('use z_scope select bigid , vcbrand from Brand_master')
+        .query('use z_scope select bigid , vcbrand from [10.10.152.16].z_scope.dbo.Brand_master')
         res.status(200).json(result.recordset)
     } catch (error) {
         res.status(500).json(error)
@@ -16,7 +16,7 @@ const getDealers =  async(req,res)=>{
     try {
         const pool = getPool1();
         const {brandid} = req.body;
-        const result = await pool.request().input('brandid',sql.Int,brandid).query(` use z_scope select distinct(dealerid),dealer from locationinfo where brandid = @brandid`)
+        const result = await pool.request().input('brandid',sql.Int,brandid).query(` use z_scope select distinct(dealerid),dealer from [10.10.152.16].z_scope.dbo.locationinfo where brandid = @brandid`)
         res.status(200).json(result.recordset)
     } catch (error) {
         res.status(500).json(error)
@@ -27,7 +27,7 @@ const getLocation = async(req,res)=>{
     try {
         const pool = getPool1();
         const {dealerid} = req.body;
-        const result = await pool.request().input('dealerid',sql.Int,dealerid).query(`use z_scope select locationid,location from locationinfo where dealerid = @dealerid and status = 1 and ogsStatus = 1 order by location`)
+        const result = await pool.request().input('dealerid',sql.Int,dealerid).query(`use z_scope select locationid,location from [10.10.152.16].z_scope.dbo.locationinfo where dealerid = @dealerid and status = 1 and ogsStatus = 1 order by location`)
         res.status(200).json(result.recordset)
     } catch (error) {
         res.status(500).json(error)
@@ -49,7 +49,7 @@ const getDashboard = async(req,res)=>{
     try {
         const pool = getPool1();
         // const {dealerid} = req.body;
-        const result = await pool.request().query(`select tcode , Dashboard from z_scope..DB_DASHboardmaster where status = 1`)
+        const result = await pool.request().query(`select tcode , Dashboard from [10.10.152.16].z_scope.dbo.DB_DASHboardmaster where status = 1`)
         res.status(200).json(result.recordset)
     } catch (error) {
         res.status(500).json(error)
@@ -59,7 +59,7 @@ const getDashboard = async(req,res)=>{
 const partNature = async(req,res)=>{
     try {
          const pool = await getPool1()
-         const query = `select  tCode , Description  from PartNatureMaster`
+         const query = `select  tCode , Description  from [10.10.152.16].z_scope.dbo.PartNatureMaster`
          const result = await pool.request().query(query)
          res.status(200).json({Data:result.recordset})
     } catch (error) {
@@ -69,7 +69,7 @@ const partNature = async(req,res)=>{
 const seasonal = async(req,res)=>{
     try {
          const pool = await getPool1()
-         const query = `use [z_scope] select tCode , Description  from seasonalmaster`
+         const query = `use [z_scope] select tCode , Description  from [10.10.152.16].z_scope.dbo.seasonalmaster`
          const result = await pool.request().query(query)
          res.status(200).json({Data:result.recordset})
     } catch (error) {
@@ -80,7 +80,7 @@ const model = async(req,res)=>{
     try {
          const pool = await getPool1()
          const {brandid} = req.body
-         const query = `select ModelID , Model  from ModelMaster where Brandid = ${brandid}`
+         const query = `select ModelID , Model  from [10.10.152.16].z_scope.dbo.ModelMaster where Brandid = ${brandid}`
          const result = await pool.request().query(query)
          res.status(200).json({Data:result.recordset})
     } catch (error) {
@@ -90,7 +90,7 @@ const model = async(req,res)=>{
 const partType = async(req,res)=>{
 try {
         const pool = await getPool1()
-        const query = `select parttypeid , Description from z_scope..parttypemaster`
+        const query = `select parttypeid , Description from [10.10.152.16].z_scope.dbo.parttypemaster`
         const result = await pool.request().query(query)
         res.status(200).json({Data:result.recordset})
 } catch (error) {
@@ -166,21 +166,22 @@ const userInfo = async(req,res)=>{
 try {
       const pool = await getPool1()
       const {token , usertype} = req.body
-
+      
+    //   console.log(token , usertype);
       
       if(!token || !usertype){
-        return res.status(400).json({message:`Token and Usertype Both are required`})
+        return res.status(400).json({message:`token and usertype both are required`})
       }
       if(usertype === 'a'){
-      const query = `select bintid_pk , concat(vcfirstname , ' ', vcLastname)as username , designation from z_scope..adminmaster_gen where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `
+      const query = `select bintid_pk , concat(vcfirstname , ' ', vcLastname)as username , designation from [10.10.152.16].z_scope.dbo.adminmaster_gen where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `
       
       const result = await pool.request().query(query)
       res.status(200).json({Data:result.recordset})
       }
       else{
-        const query = `SELECT distinct li.BrandID, dur.dealerid , dur.locationid ,amg.bintId_pk as UserId, concat(amg.vcfirstname , ' ', amg.vcLastname)as username  FROM z_scope..AdminMaster_GEN amg
-    join z_scope..Dealer_User_Relation dur on amg.bintid_pk = dur.userid
-    join z_scope..locationinfo li on dur.locationid = li.LocationID
+        const query = `SELECT distinct li.BrandID, dur.dealerid , dur.locationid , concat(amg.vcfirstname , ' ', amg.vcLastname)as username ,li.location  FROM [10.10.152.16].z_scope.dbo.AdminMaster_GEN amg
+    join [10.10.152.16].z_scope.dbo.Dealer_User_Relation dur on amg.bintid_pk = dur.userid
+    join [10.10.152.16].z_scope.dbo.locationinfo li on dur.locationid = li.LocationID
     where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `
     const result = await pool.request().query(query)
     res.status(200).json({Data:result.recordset})
@@ -190,5 +191,86 @@ try {
 }
 
 }
+const homePageData =  async (req, res) => {
+    const {locationId , dealerid} = req.body 
+    const pool = await getPool1();
+    if(!locationId || !dealerid){
+       return  res.status(400).json({message:`locationId and dealerid is required`})
+    }
+        const stockquery = `select sum(qty)as StockQty , AddedDate from [10.10.152.16].[z_scope].dbo.CurrentStock1 cs1
+                        join  [10.10.152.16].[z_scope].dbo.CurrentStock2 cs2 on cs1.tCode=cs2.StockCode
+                        where LocationID = ${locationId}
+                        group by AddedDate`
 
-export {getBrands,getDealers,getLocation,getWorkspace,getDashboard,partNature,model,seasonal,partType,userInfo}
+        const stockvaluequery = `select sum((cs2.Qty*pm.landedcost))as stockvalue from [10.10.152.16].[z_scope].dbo.CurrentStock1 cs1 
+                                join [10.10.152.16].[z_scope].dbo.CurrentStock2 cs2 on  cs2.StockCode = cs1.tCode
+                                join [10.10.152.16].[z_scope].dbo.locationinfo li on li.LocationID=cs1.LocationID
+                                join [10.10.152.16].[z_scope].dbo.Part_Master pm on pm.brandid = li.BrandID and cs2.PartNumber = pm.partnumber
+                                where cs1.locationid = ${locationId}`
+
+        const ppnivaluequery = `select sum(PPNI_Val)as PPNIValue from [10.10.152.16].[UAD_BI_PPNI].dbo.PPNI_report_${dealerid}
+                                where locationid = ${locationId}`
+
+        const snstockvaluequery = `WITH LatestSN AS (
+    SELECT *
+    FROM stockable_nonstockable_td001_${dealerid}
+    WHERE locationid = ${locationId}
+      AND stockdate = (
+          SELECT MAX(stockdate)
+                  FROM stockable_nonstockable_td001_${dealerid}
+                  WHERE locationid = ${locationId}
+              )
+        )
+        SELECT  
+            SUM(CASE WHEN sn.MaxValue IS NULL OR sn.MaxValue = 0 THEN 1 ELSE 0 END) AS NonStockable,
+            SUM(CASE WHEN sn.MaxValue IS NOT NULL AND sn.MaxValue > 0 THEN 1 ELSE 0 END) AS Stockable,
+            SUM(CASE WHEN sn.MaxValue IS NOT NULL AND sn.MaxValue > 0 THEN ISNULL(cs2.Qty, 0) * ISNULL(pm.landedcost, 0) ELSE 0 END) AS StockableValue,
+            SUM(CASE WHEN sn.MaxValue IS NULL OR sn.MaxValue = 0 THEN ISNULL(cs2.Qty, 0) * ISNULL(pm.landedcost, 0) ELSE 0 END) AS NonStockableValue
+        FROM
+            CurrentStock2 cs2
+        INNER JOIN
+            CurrentStock1 cs1 ON cs2.StockCode = cs1.tCode
+        LEFT JOIN
+            LatestSN sn ON cs1.LocationID = sn.LocationID AND cs2.PartNumber = sn.partnumber1
+        INNER JOIN
+            Dealer_Workshop_Master li ON cs1.LocationID = li.bigid
+        LEFT JOIN
+            Part_Master pm ON pm.brandid = li.BrandID AND cs2.PartNumber = pm.partnumber
+        WHERE
+            cs1.LocationID = ${locationId}`
+
+                const lastorderValuequery = `select scsorderno, sum(finalorderqty)as QTY , sum(finalorderval)as Value , addeddate from [10.10.152.17].[z_scope].dbo.ogs_orderdata_td001_${dealerid}
+                                        where addeddate = (select max(addeddate) from [10.10.152.17].[z_scope].dbo.ogs_orderdata_td001_8 where locationid = ${locationId} )
+                                        and locationid = ${locationId}
+                                        group by scsorderno , addeddate`
+        
+        const jobcardDatequery = `select max(Close_Date) joblineupdatedate,max(Final_Close_Date) jobcardcloseddate from [10.10.152.16].[z_scope].dbo.create_order_request_td001_${dealerid} 
+                                    where locationid = ${locationId} `
+                                    // console.log(snstockvaluequery);
+         try {
+           const stock =  await pool.request().query(stockquery)
+           const stockValue = await pool.request().query(stockvaluequery)
+           const ppniValue = await pool.request().query(ppnivaluequery)
+           const snstockvalue = await pool.request().query(snstockvaluequery)
+           const lastOrderValue = await pool.request().query(lastorderValuequery)
+           const lastjobcard = await pool.request().query(jobcardDatequery)
+           
+       
+        
+           res.status(200).json(
+            {
+            StockQty:stock.recordset,
+            StockValue:stockValue.recordset,
+            PPNIValue:ppniValue.recordset,
+            SNStockValue:snstockvalue.recordset,
+            lastOrderDetails:lastOrderValue.recordset,
+            JobCardDate:lastjobcard.recordset
+
+        }
+        )
+         } catch (error) {
+            res.status(500).json(error.message)
+         }                           
+  };    
+
+export {homePageData,getBrands,getDealers,getLocation,getWorkspace,getDashboard,partNature,model,seasonal,partType,userInfo}
