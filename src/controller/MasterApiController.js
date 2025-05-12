@@ -310,7 +310,7 @@ const homePageData =  async (req, res) => {
                     EXEC sp_executesql @sql;
         `
 
-        console.log(lastorderValuequery);
+        // console.log(lastorderValuequery);
         
          try {
            const stock =  await pool.request().query(stockquery)
