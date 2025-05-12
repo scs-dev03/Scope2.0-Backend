@@ -16,7 +16,7 @@ const getDealers =  async(req,res)=>{
     try {
         const pool = getPool2();
         const {brandid} = req.body;
-        const result = await pool.request().input('brandid',sql.Int,brandid).query(` use z_scope select distinct(dealerid),dealer from locationinfo where brandid = @brandid`)
+        const result = await pool.request().input('brandid',sql.Int,brandid).query(`select distinct(dealerid),dealer from locationinfo where brandid = @brandid and dealerStatus = 1 `)
         res.status(200).json(result.recordset)
     } catch (error) {
         res.status(500).json(error)
