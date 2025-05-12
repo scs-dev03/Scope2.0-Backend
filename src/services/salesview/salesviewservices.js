@@ -1,10 +1,10 @@
-import { getPool1 } from "../../db/db.js"
+import { getPool1 , getPool2} from "../../db/db.js"
 
 
 // Part Details with location-wise part quality -> (stockable , non-stockable , non-moving)
 const partDetailsservice = async (brandid,dealerid,locationid,partnumber,res)=>{
     try {
-            const pool = getPool1()
+            const pool = getPool2()
             const query = `
             SELECT DISTINCT
                 pm.partnumber, pm.partid,
@@ -31,10 +31,11 @@ const partDetailsservice = async (brandid,dealerid,locationid,partnumber,res)=>{
             const result = await pool.request().query(query)
             return result
     } catch (error) {
-            return res.status(500).json({
-                Error:error.message,
-                Service:`partDetailsservice`
-            })
+            // return res.status(500).json({
+            //     Error:error.message,
+            //     Service:`partDetailsservice`
+            // })
+            throw new Error(`partfamilyDetailsservice failed: ${error.message}`);
     }
 }
 

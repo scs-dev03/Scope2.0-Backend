@@ -1,4 +1,4 @@
-import { getPool1 } from '../db/db.js'
+import { getPool1 , getPool2 } from '../db/db.js'
 import sql from 'mssql'
 
 import fs from 'fs'
@@ -92,12 +92,12 @@ const viewRemark = async (req, res) => {
 }
 const userView = async (req, res) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool2()
         const { brandid, dealerid, r1, r2, l1, l2, partnumber, locationid, flag, seasonalid, modelid, natureid, parttype } = req.body
         if (!dealerid && !brandid) {
             return res.status(400).json({ Error: `Dealerid and Brandid is a required Parameter` })
         }
-        const query = `exec [10.10.152.16].[z_scope].dbo.GetMAXData @brandid, @dealerid , @r1, @r2, @l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@parttype;`
+        const query = `exec [z_scope].dbo.GetMAXData @brandid, @dealerid , @r1, @r2, @l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@parttype;`
 
         if (!partnumber && !locationid) {
             return res.status(400).json({ Error: `partnumber or locationid is required` })
@@ -130,6 +130,7 @@ const userView = async (req, res) => {
 const userFeedbacklog = async (req, res) => {
     try {
         const pool = await getPool1()
+        const pool2 = getPool2()
         const { brandid, dealerid, locationid, partid, max, remarkid, customrem, proposedqty } = req.body
         if (!brandid || !dealerid || !locationid || !partid || max == null || proposedqty == null || !remarkid) {
             return res.status(400).json({ Error: `All Fields are required` })
@@ -148,10 +149,10 @@ const userFeedbacklog = async (req, res) => {
         let LatestPartID = null;
         try {
             const LatestPartQuery = `select (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END) AS LatestPartNumber 
-                                from [10.10.152.16].z_scope.dbo.substitution_master sm
-                                 join [10.10.152.16].z_scope.dbo.part_master pm on pm.brandid = sm.brandid and pm.partnumber = sm.partnumber 
+                                from z_scope.dbo.substitution_master sm
+                                 join z_scope.dbo.part_master pm on pm.brandid = sm.brandid and pm.partnumber = sm.partnumber 
                                 where pm.partid = ${partid}`
-            const result = await pool.request().query(LatestPartQuery)
+            const result = await pool2.request().query(LatestPartQuery)
             LatestPartID = result.recordset.length > 0 ? result.recordset[0].LatestPartNumber : null;
             // console.log(LatestPartID);
 
@@ -284,14 +285,14 @@ const viewLog = async (req, res) => {
 }
 const adminView = async (req, res) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool2()
         const { brandid, dealerid, r1, r2, l1, l2, partnumber, locationid, flag, seasonalid, modelid, natureid, status, parttype } = req.body
         // console.log(brandid, dealerid, r1, r2 ,l1,l2, partnumber , locationid , flag, seasonalid, modelid, natureid, status,parttype);
 
         if (!brandid || !dealerid) {
             return res.status(400).json({ Error: `Brandid and Dealerid are required Parameter` })
         }
-        const query = `exec [10.10.152.16].[z_scope].dbo.GetMAXDataAdmin @brandid,@dealerid , @r1, @r2,@l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@status,@parttype;`
+        const query = `exec [z_scope].dbo.GetMAXDataAdmin @brandid,@dealerid , @r1, @r2,@l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@status,@parttype;`
         // console.log(query);
 
         if (!partnumber && !locationid) {
@@ -389,7 +390,7 @@ const adminFeedbackLog = async (req, res) => {
 }
 const partFamily = async (req, res) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool2()
         const { partnumber, brandid } = req.body
         if (!partnumber || !brandid) {
             return res.status(400).json({ Error: `partnumber and brandid is required` })
@@ -401,8 +402,8 @@ const partFamily = async (req, res) => {
         //                 join [10.10.152.16].[z_scope].dbo.part_master pm on pm.brandid = sm.brandid and pm.partnumber1 = sm.partnumber1
         //                 where sm.subpartnumber = (select distinct subpartnumber1 from [10.10.152.16].[z_scope].dbo.substitution_master where partnumber1 = @partnumber)`
         const query = `use z_scope
-                        select pm.partnumber1, (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END)as LatestPartNumber , pm.partdesc, pm.category,pm.landedcost from [10.10.152.16].z_scope.dbo.Substitution_Master sm
-                        join [10.10.152.16].z_scope.dbo.part_master pm on pm.brandid = sm.brandid and sm.partnumber = pm.partnumber
+                        select pm.partnumber1, (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END)as LatestPartNumber , pm.partdesc, pm.category,pm.landedcost from z_scope.dbo.Substitution_Master sm
+                        join z_scope.dbo.part_master pm on pm.brandid = sm.brandid and sm.partnumber = pm.partnumber
                         where sm.subpartnumber = '${partnumber}' and sm.brandid = ${brandid}`
                     //     DECLARE 
                     //     @InputPart    VARCHAR(40) = '0827099901L',   -- ← your input part
@@ -1001,6 +1002,7 @@ const dealerUpload = async (req, res) => {
 
 const adminUpload = async (req, res) => {
     const pool = await getPool1()
+    const pool2 = await getPool2()
     const {file} = req.body
     if (!req.file || req.file.length === 0) {
         return res.status(400).json({ message: "No files received" });
@@ -1105,12 +1107,12 @@ WHERE brand LIKE '${brand}'`;
     for (const loc of distinctLocations) {
         const queryLocation = `
     SELECT locationid 
-    FROM [10.10.152.16].z_scope.dbo.locationinfo 
+    FROM z_scope.dbo.locationinfo 
     WHERE brandid = ${resultIds.recordset[0].brandid} 
       AND dealerid = '${dealerResults[0].dealerid}'
       AND location LIKE '${loc}'
   `;
-        const locResult = await pool.request().query(queryLocation);
+        const locResult = await pool2.request().query(queryLocation);
         if (locResult.recordset.length) {
             locationResults.push({
                 location: loc,

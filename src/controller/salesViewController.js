@@ -282,7 +282,7 @@
 
 // export {partDetails,getLedger}
 
-import { getPool1 } from '../db/db.js';
+import { getPool1  , getPool2 } from '../db/db.js';
 import { readExcel } from '../utils/vonHelper.js';
 import fs from 'fs';
 
@@ -292,7 +292,7 @@ import fs from 'fs';
  */
 const partDetails = async (req, res) => {
   try {
-    const pool = getPool1();
+    const pool = getPool2();
     const { Brandid, Partnumber, excel } = req.body;
     
     if (!Brandid || !excel) {
@@ -372,8 +372,8 @@ const partDetails = async (req, res) => {
         END) AS LatestPartno,
         pm.partdesc, pm.moq, pm.category, 
         pm.landedcost, pm.mrp, pm.dateadded, pm.lastupdated 
-      FROM [10.10.152.16].z_scope.dbo.part_master pm
-      LEFT JOIN [10.10.152.16].z_scope.dbo.substitution_master sm ON pm.partnumber = sm.partnumber
+      FROM z_scope.dbo.part_master pm
+      LEFT JOIN z_scope.dbo.substitution_master sm ON pm.partnumber = sm.partnumber
       WHERE pm.partnumber IN (${partnumberString}) AND pm.brandid = ${Brandid}
     `;
 
@@ -391,7 +391,7 @@ const partDetails = async (req, res) => {
  * Supports reading from body or Excel file
  */
 const getLedger = async (req, res) => {
-  const pool = await getPool1();
+  const pool = await getPool2();
   const { Brandid, Dealerid, Locationid, PartNumber, from, to, excel } = req.body;
   if(!Brandid || !Dealerid || !Locationid == null || !from || !to || !excel){
     return res.status(400).json({message:`All Fields are required`})
@@ -472,7 +472,7 @@ const getLedger = async (req, res) => {
     const partidString = matchedPartids.join(',');
 
     // Call stored procedure with mapped part IDs
-    const query = `exec [10.10.152.16].[z_scope].dbo.SP_MonthwisemultiPartLedger ${Dealerid}, ${Locationid}, '${partidString}', ${from}, ${to}`;
+    const query = `exec [z_scope].dbo.SP_MonthwisemultiPartLedger ${Dealerid}, ${Locationid}, '${partidString}', ${from}, ${to}`;
     const result = await pool.request().query(query);
 
     res.status(200).json({ Data: result.recordsets });
@@ -493,7 +493,7 @@ const partBrandMappingCheck = async (Brandid, Data) => {
     const pool = await getPool1();
     const query = `
       USE z_scope;
-      SELECT brandid, partnumber FROM [10.10.152.16].z_scope.dbo.Part_Master WHERE brandid = ${Brandid}
+      SELECT brandid, partnumber FROM z_scope.dbo.Part_Master WHERE brandid = ${Brandid}
     `;
     const result = await pool.request().query(query);
 
