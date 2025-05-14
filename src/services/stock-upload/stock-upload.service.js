@@ -829,14 +829,14 @@ const getAllRecordsSingleLocation = async (req, res) => {
   try {
     const pool = await getPool1();
     let locationId = req.location_id;
-    let userId=req.added_by;
-    let getQuery = `use [StockUpload] select added_on,added_by,stockUploadCount,quantitySum,prevQuantitySum,prevStockUploadCount from stock_upload_logs where location_id=@locationId and added_by=@userId`;
+   // let userId=req.added_by;
+    let getQuery = `use [StockUpload] select added_on,added_by,stockUploadCount,quantitySum,prevQuantitySum,prevStockUploadCount from stock_upload_logs where location_id=@locationId`;
 
     const result = await pool
       .request()
       .input("locationId", locationId)
-      .input("userId", userId)
       .query(getQuery);
+      // .input("userId", userId)
 
     return result.recordset;
   } catch (error) {
@@ -2118,16 +2118,16 @@ const getAllRecordsMultiLocation=async (req,res)=>{
         const pool = await getPool1();
         let locations=req.locations;
         let data=[];
-        let userId=req.added_by;
+     //   let userId=req.added_by;
         for(let i=0;i<locations.length;i++){
             let locationId =locations[i].location;
-            let getQuery = `use [StockUpload] select location_id,added_on,added_by,stockUploadCount,quantitySum,prevQuantitySum,prevStockUploadCount from stock_upload_logs where location_id=@locationId and added_by=@userId`;
+            let getQuery = `use [StockUpload] select location_id,added_on,added_by,stockUploadCount,quantitySum,prevQuantitySum,prevStockUploadCount from stock_upload_logs where location_id=@locationId`;
     
             let result = await pool
               .request()
               .input("locationId", locationId)
-              .input("userId", userId)
               .query(getQuery);
+              // .input("userId", userId)
         
             data.push(result.recordset);
         }
@@ -2265,7 +2265,7 @@ const getPartNotInMasterMultiLocationInService=async(req,res)=>{
        
 }
 
-export {
+export {  
   stockUploadSingleLocation,
   getPartNotInMasterSingleLocationInService,
   getAllRecordsSingleLocation,

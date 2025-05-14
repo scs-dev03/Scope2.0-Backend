@@ -1128,10 +1128,10 @@ const viewDealerLocationMappingInService=async(req)=>{
         let brandId=req.brand_id;
         let added_by=req.user_id;
         
-        let getDealerQuery=`use [stockUpload] Select dealer,location,added_on,inventory_location,status,id from dealer_location_mapping 
-        where brandId=@brandId and added_by=@added_by `;
+        let getDealerQuery=`use [stockUpload] Select dealer,location,added_on,inventory_location,status,id ,added_by from dealer_location_mapping 
+        where brandId=@brandId `;
         const res= await pool.request().input('brandId',brandId)
-        .input('added_by',added_by).query(getDealerQuery);
+        .query(getDealerQuery);
 
         return {data:res.recordset};
 
