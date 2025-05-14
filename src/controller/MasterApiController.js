@@ -167,7 +167,7 @@ try {
       const pool = await getPool2()
       const {token , usertype} = req.body
       
-    //   console.log(token , usertype);
+    //   console.log(token , usertypehj);
       
       if(!token || !usertype){
         return res.status(400).json({message:`token and usertype both are required`})
