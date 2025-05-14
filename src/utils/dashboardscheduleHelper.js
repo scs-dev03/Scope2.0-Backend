@@ -1,11 +1,11 @@
-import { getPool1 } from "../db/db.js";
+import {getPool2 } from "../db/db.js";
 import sql from 'mssql';
 
 const dataValidator = async (dealerid) => {    
-  const pool = await getPool1();
+  const pool = await getPool2();
 
   try {
-    const dynamicTable = `[10.10.152.16].z_scope.dbo.dealer_sale_upload1_td001_${dealerid}`;
+    const dynamicTable = `z_scope.dbo.dealer_sale_upload1_td001_${dealerid}`;
 //     const query = `
 //     WITH data AS (
 //     SELECT li.locationid, dsm.NonMovingSale
@@ -32,8 +32,8 @@ const dataValidator = async (dealerid) => {
 // WHERE ds.locationid IS NULL;`
 const query = `WITH data AS (
   SELECT li.locationid, dsm.NonMovingSale
-  FROM [10.10.152.16].z_scope.dbo.Dealer_Setting_Master dsm -- Direct server reference
-  JOIN [10.10.152.16].z_scope.dbo.locationinfo li ON li.LocationID = dsm.locationid
+  FROM z_scope.dbo.Dealer_Setting_Master dsm -- Direct server reference
+  JOIN z_scope.dbo.locationinfo li ON li.LocationID = dsm.locationid
   WHERE dsm.dealerid = @dealerid AND li.Status = 1
 )
 SELECT li.location, d.NonMovingSale
@@ -51,7 +51,7 @@ LEFT JOIN ${dynamicTable} ds
             WHEN MONTH(GETDATE()) = 1 THEN YEAR(GETDATE()) - 1
             ELSE YEAR(GETDATE()) 
         END
-JOIN [10.10.152.16].z_scope.dbo.locationinfo li ON d.LocationID = li.LocationID AND li.Status = 1
+JOIN z_scope.dbo.locationinfo li ON d.LocationID = li.LocationID AND li.Status = 1
 WHERE ds.locationid IS NULL;`
 
 const result = await pool.request()
@@ -82,7 +82,7 @@ return pending;
 };
 const checkisAlreadyScheduled = async (dashboardcode, brandid, dealerid) => {
   try {
-  const pool = await getPool1();
+  const pool = await getPool2();
     const query = `
     use [UAD_BI] 
     SELECT scheduledon 
@@ -156,8 +156,8 @@ return false;
 // }
 // Checking User is Authorised to Perform Actions or not 
 const checkisUserValid = async(addedby)=>{
-  const pool = await getPool1()
-  const query = `use [z_scope] select designation , isBDM from [10.10.152.16].[z_scope].[dbo].adminmaster_gen where bintid_pk = @addedby`
+  const pool = await getPool2()
+  const query = `use [z_scope] select designation , isBDM from [z_scope].[dbo].adminmaster_gen where bintid_pk = @addedby`
   const result = await pool.request().input('addedby',sql.Int,addedby).query(query)
   if(result.recordset[0].designation == 5 || result.recordset[0].isBDM == 'Y'){
     return true;
@@ -166,15 +166,15 @@ const checkisUserValid = async(addedby)=>{
   }
 }
 const checkGroupSetting = async(dealerid)=>{
-  const pool = await getPool1()
-  let query = `select count(dealerid) from [10.10.152.16].z_scope.dbo.locationinfo where dealerid =  @dealerid `
+  const pool = await getPool2()
+  let query = `select count(dealerid) from z_scope.dbo.locationinfo where dealerid =  @dealerid `
   let result = await pool.request().input('dealerid',sql.Int,dealerid).query(query)
   if(result.recordset.count = 1 ){
     return true
   }
   else{
     query = ` use z_scope 
-                  SELECT  CASE WHEN EXISTS (SELECT 1 FROM [10.10.152.16].z_scope.dbo.Dealer_setting_master WHERE dealerid = @dealerid AND locationid = 0) THEN 'YES'
+                  SELECT  CASE WHEN EXISTS (SELECT 1 FROM z_scope.dbo.Dealer_setting_master WHERE dealerid = @dealerid AND locationid = 0) THEN 'YES'
                   ELSE 'NO' END AS CID;`
    result = await pool.request().input('dealerid',sql.Int,dealerid).query(query)
   if(result.recordset[0].CID === 'YES'){
@@ -186,7 +186,7 @@ const checkGroupSetting = async(dealerid)=>{
 const checkisMappingExists = async (dashboardcode,dealerid)=>{
   // console.log(dashboardcode,dealerid);
   try {
-    const pool  = await getPool1()
+    const pool  = await getPool2()
     const query = `select dashboardcode , dealerid from UAD_BI..SBS_DBS_DashboardDealerMapping where dealerid = @dealerid and dashboardcode = @dashboardcode`
     const result =  await pool.request()
                     .input('dealerid',sql.Int,dealerid)
