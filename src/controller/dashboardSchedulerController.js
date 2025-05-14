@@ -1,15 +1,46 @@
 import sql from 'mssql'
 import cron from 'node-cron'
-import {getPool1} from '../db/db.js'
+import {getPool2} from '../db/db.js'
 import {dataValidator,checkisAlreadyScheduled,checkisUserValid, checkisMappingExists,checkGroupSetting} from '../utils/dashboardscheduleHelper.js'
 import {refreshBenchmarking, refreshPPNI, refreshSI, refreshTOPS, refreshCID, refreshSpecialList, refreshGainerMini} from '../utils/refreshDashboard.js'
 
+const getBrandByUser = async (req, res) => {
+  try {
+    const pool = await getPool2();
+    const { userid } = req.body;
+
+    const result = await pool.request()
+      .input('userid', sql.Int, userid) 
+      .query(`
+        SELECT DISTINCT Brand, BrandID
+        FROM LocationInfo
+        WHERE bdmcode = @userid
+      `);
+        console.log(result);
+        
+    res.status(200).json({ Data: result.recordset });
+  } catch (error) {
+    res.status(500).json({ Error: error.message });
+  }
+};
+
+const getDealerByUser = async(req,res)=>{
+const pool = await getPool2()
+const {userid,brandid} = req.body
+const query = `select distinct Dealer , DealerID from LocationInfo where  brandid = ${brandid} and bdmcode = ${userid}`
+console.log(query);
+
+const result = await pool.request().query(query)
+  res.status(200).json({
+    Data : result.recordset
+  })
+}
 const getDashboardbyDealer = async(req,res)=>{
-  const pool = await getPool1();
+  const pool = await getPool2();
   const {dealerid} = req.body
 try {  
-    const query = `select dm.tCode , dm.Dashboard  from [10.10.152.16].z_scope.dbo.DB_DashboardURL du
-                    join [10.10.152.16].z_scope.dbo.DB_DashboardMaster dm on dm.tcode = du.DashboardCode
+    const query = `select dm.tCode , dm.Dashboard  from z_scope.dbo.DB_DashboardURL du
+                    join z_scope.dbo.DB_DashboardMaster dm on dm.tcode = du.DashboardCode
                     where du.status = 1 and dm.Status = 1 and  dealerid  = @dealerid`
     const result = await pool.request().input('dealerid',sql.Int,dealerid).query(query)
     if(Array.isArray(result.recordset) && result.recordset.length === 0){
@@ -135,7 +166,7 @@ if(error.message=== `Invalid object name'DB_DashboardMaster'.`){
 //     }
 // };
 const uploadSchedule = async (req, res) => {
-  const pool =await  getPool1();
+  const pool =await  getPool2();
   try {
     const {dashboardcodes, brandid, brand, dealer, dealerid, scheduledon, addedby } = req.body;    
      // Validate other required fields
@@ -244,11 +275,11 @@ const uploadSchedule = async (req, res) => {
   }
 };
 const getBDM = async(req,res)=>{
-  const pool = await getPool1()
+  const pool = await getPool2()
 try {
     // const {bigint_pk} = req.body
     // const query = `use [z_scope] select bintId_Pk, vcFirstName , vcLastName from AdminMaster_GEN where isBDM = 'y' and bintId_Pk = @bigint_pk`
-      const query= `select bintId_Pk, concat(vcFirstName ,' ', vcLastName) Name from [10.10.152.16].z_scope.dbo.AdminMaster_GEN where isBDM = 'y' or Designation = 5 order by bintId_Pk`
+      const query= `select bintId_Pk, concat(vcFirstName ,' ', vcLastName) Name from z_scope.dbo.AdminMaster_GEN where isBDM = 'y' or Designation = 5 order by bintId_Pk`
     const result = await pool.request().query(query)
     res.status(200).json(result.recordset)
 } catch (error) {
@@ -257,14 +288,18 @@ try {
 }
 const getRequests = async (req, res) => {
     try {
-      const requests = await fetchRequests();
+      const {userid} = req.body
+      if(!userid){
+        return res.status(400).json({message:`userid is required`})
+      }
+      const requests = await fetchRequests(userid);
       res.status(200).json({ Request: requests });
     } catch (error) {
       res.status(500).json({ details: error.message });
     }
 };  
 const editSchedule = async (req, res) => {
-  const pool = await getPool1();
+  const pool = await getPool2();
   try {
     const { reqid, bintid_pk, scheduledon } = req.body;
 
@@ -288,7 +323,7 @@ const editSchedule = async (req, res) => {
     // Fetch data from both databases
     const query = `
       SELECT addedby, status FROM UAD_BI.dbo.SBS_DBS_ScheduledDashboard WHERE reqid = @reqid;
-      SELECT designation, isBDM FROM [10.10.152.16].z_scope.dbo.adminmaster_gen WHERE bintid_pk = @bintid_pk;
+      SELECT designation, isBDM FROM .z_scope.dbo.adminmaster_gen WHERE bintid_pk = @bintid_pk;
     `;
 
     const result = await pool
@@ -342,7 +377,7 @@ const editSchedule = async (req, res) => {
 };
 const deleteReq = async(req,res)=>{
 try {
-    const pool = await getPool1()
+    const pool = await getPool2()
   const {reqid,bintid_pk} = req.body
   if(!reqid , !bintid_pk){
     return res.status(401).json({details:'reqid and userid is required in this request'})
@@ -350,14 +385,14 @@ try {
   // status = 6 (Marked status = 6 when schedule is deleted explicitly only be done when status = 0)
   const query = `use UAD_BI update SBS_DBS_ScheduledDashboard set status = 6 , Deletedby = @bintid_pk , Deletedon = GETDATE() where reqid = @reqid`
   await pool.request().input('reqid',sql.Int,reqid).input('bintid_pk',sql.Int,bintid_pk).query(query)
-  const updatedRequests = await fetchRequests();
+  const updatedRequests = await fetchRequests(bintid_pk);
      res.status(200).json({ message: 'Schedule Deleted successfully.', Requests: updatedRequests.recordset });
 } catch (error) {
   res.status(500).json({details:error.message})
 }
 }
-const fetchRequests = async () => {
-  const pool = await getPool1();
+const fetchRequests = async (userid) => {
+  const pool = await getPool2();
   try {
     const query = `
       use [UAD_BI] select 
@@ -367,13 +402,14 @@ const fetchRequests = async () => {
       CASE WHEN sd.Deletedby = amg3.bintId_Pk THEN CONCAT(amg3.vcFirstName, ' ', amg3.vcLastName) END AS Deletedby, sd.Deletedon,
       CASE WHEN d.BDMCode = amg4.bintId_Pk THEN CONCAT(amg4.vcFirstName, ' ', amg4.vcLastName) END AS BDM
       from SBS_DBS_ScheduledDashboard sd
-      join [10.10.152.16].z_scope.dbo.DB_DashboardMaster dm ON sd.DashboardCode = dm.tCode
+      join z_scope.dbo.DB_DashboardMaster dm ON sd.DashboardCode = dm.tCode
       join UAD_BI..SBS_DBS_STATUS_MASTER sm on sd.status = sm.status
-      join [10.10.152.16].z_scope.dbo.Dealer_Master d on d.bigid = sd.Dealerid
-      LEFT JOIN [10.10.152.16].z_scope.dbo.AdminMaster_GEN amg1 ON sd.Addedby = amg1.bintId_Pk
-      LEFT JOIN [10.10.152.16].z_scope.dbo.AdminMaster_GEN amg2 ON sd.Editedby = amg2.bintId_Pk
-      LEFT JOIN [10.10.152.16].z_scope.dbo.AdminMaster_GEN amg3 ON sd.Editedby = amg3.bintId_Pk
-      LEFT JOIN [10.10.152.16].z_scope.dbo.AdminMaster_GEN amg4 ON d.BDMCode = amg4.bintId_Pk
+      join z_scope.dbo.Dealer_Master d on d.bigid = sd.Dealerid
+      LEFT JOIN z_scope.dbo.AdminMaster_GEN amg1 ON sd.Addedby = amg1.bintId_Pk
+      LEFT JOIN z_scope.dbo.AdminMaster_GEN amg2 ON sd.Editedby = amg2.bintId_Pk
+      LEFT JOIN z_scope.dbo.AdminMaster_GEN amg3 ON sd.Editedby = amg3.bintId_Pk
+      LEFT JOIN z_scope.dbo.AdminMaster_GEN amg4 ON d.BDMCode = amg4.bintId_Pk
+      where sd.Addedby = ${userid}
       order by reqid desc`;
     const result = await pool.request().query(query);
     return result.recordset;
@@ -384,7 +420,7 @@ const fetchRequests = async () => {
 };
 const changeLog = async(req,res)=>{
 try {
-    const pool = await getPool1()
+    const pool = await getPool2()
     const {dashboardcode , workspaceid , refbrandid , refdealerid ,changeby , requestby , requeston , url , remarks} = req.body
     if(!dashboardcode || !workspaceid || !refbrandid || !refdealerid || !changeby || !requestby || !requeston || !url || !remarks){
       return res.status(400).json({message:`All fields are required`})
@@ -410,15 +446,15 @@ try {
 }
 const changelogView = async(req,res)=>{
     try {
-      const pool  = await getPool1()
+      const pool  = await getPool2()
       const query = ` use [UAD_BI]
                       SELECT DISTINCT dm.Dashboard,  wm.Workspace,  li.Brand,  li.Dealer,  CONCAT(adm.vcFirstName, ' ', adm.vcLastName) AS ChangedBy,   cl.ChangedOn, am.Name AS RequestedBy,   cl.RequestOn,   cl.Url , cl.remarks 
                       FROM SBS_DBS_ChangeLog cl  
-                      LEFT JOIN [10.10.152.16].z_scope.dbo.locationinfo li ON li.dealerid = cl.refdealerid  
-                      LEFT JOIN [10.10.152.16].z_scope.dbo.db_dashboardmaster dm ON dm.tcode = cl.DashboardCode  
+                      LEFT JOIN z_scope.dbo.locationinfo li ON li.dealerid = cl.refdealerid  
+                      LEFT JOIN z_scope.dbo.db_dashboardmaster dm ON dm.tcode = cl.DashboardCode  
                       LEFT JOIN SBS_DBS_AdminMaster am ON am.Aid = cl.Requestby  
                       LEFT JOIN SBS_DBS_WorkspaceMaster wm ON wm.WorkspaceID = cl.Workspaceid  
-                      LEFT JOIN [10.10.152.16].z_scope.dbo.AdminMaster_GEN adm ON adm.bintId_Pk = cl.Changedby  
+                      LEFT JOIN z_scope.dbo.AdminMaster_GEN adm ON adm.bintId_Pk = cl.Changedby  
                       GROUP BY  dm.Dashboard,  wm.Workspace,  li.Brand,  li.Dealer,  adm.vcFirstName,  adm.vcLastName,  cl.ChangedOn,  am.Name,  cl.RequestOn,  cl.Url , cl.remarks;`
   
       const result = await pool.request().query(query)
@@ -430,7 +466,7 @@ const changelogView = async(req,res)=>{
   }
 const newDashboardSchedule = async (req, res) => {
   try {
-    const pool = await getPool1();
+    const pool = await getPool2();
     const { brandid, brand, dealer, dealerid, dashboardcodes, scheduledon, addedby } = req.body;
 
     // Validate required fields
@@ -548,12 +584,12 @@ const newDashboardSchedule = async (req, res) => {
 };
 const requestNewDashboard = async (req,res)=>{
  try {
-   const pool = await getPool1()
+   const pool = await getPool2()
    const {dealerid} = req.body
-   const query = `select tcode , Dashboard from [10.10.152.16].z_scope.dbo.DB_DashboardMaster where tcode not in (
+   const query = `select tcode , Dashboard from z_scope.dbo.DB_DashboardMaster where tcode not in (
                    select dm.tCode  from DB_DashboardLocMapping dlm                  
- 				          join [10.10.152.16].z_scope.dbo.LocationInfo li on li.LocationID = dlm.LocationID
-                  join [10.10.152.16].z_scope.dbo.DB_DashboardMaster dm on dm.tCode = dlm.DashboardCode
+ 				          join z_scope.dbo.LocationInfo li on li.LocationID = dlm.LocationID
+                  join z_scope.dbo.DB_DashboardMaster dm on dm.tCode = dlm.DashboardCode
                   where dealerid = @dealerid and dlm.Status = 1 and li.OgsStatus = 1 and li.Status = 1 and dm.Status = 1
                   group by dm.tcode , dm.Dashboard
                  ) and status = 1`
@@ -566,7 +602,7 @@ const requestNewDashboard = async (req,res)=>{
 }
 const requestBy = async(req,res)=>{
   try {
-    const pool = await getPool1()
+    const pool = await getPool2()
     const query = `select * from UAD_BI..SBS_DBS_AdminMaster`
     const result = await pool.request().query(query)
     res.status(200).json({Data:result.recordset})
@@ -577,11 +613,11 @@ const requestBy = async(req,res)=>{
 }
 const newDashboardView = async(req,res)=>{
 try {
-    const pool = await getPool1()
+    const pool = await getPool2()
     const query = `use [UAD_BI] select distinct  nrt.id,  li.brand , li.dealer , dm.dashboard ,concat(amg.vcFirstName,' ',amg.vcLastName) as Addedby,nrt.addedon  from UAD_BI..SBS_DBS_newrequesttracker nrt
                     join locationinfo li on li.DealerID = nrt.dealerid and li.BrandID = nrt.brandid
-                    join [10.10.152.16].z_scope.dbo.DB_DashboardMaster dm on dm.tcode = nrt.dashboardcode 
-                    join [10.10.152.16].z_scope.dbo.AdminMaster_GEN amg on amg.bintId_Pk =  nrt.addedby
+                    join z_scope.dbo.DB_DashboardMaster dm on dm.tcode = nrt.dashboardcode 
+                    join z_scope.dbo.AdminMaster_GEN amg on amg.bintId_Pk =  nrt.addedby
                     group by nrt.id,  li.brand , li.dealer , dm.dashboard , nrt.addedon ,concat(amg.vcFirstName,' ',amg.vcLastName)`
     const result = await pool.request().query(query)
     res.status(200).json({Data:result.recordset})
@@ -594,7 +630,7 @@ function scheduleTask() {
   cron.schedule('*/15 * * * *', async () => { 
     console.log("Running scheduler every 15 minutes")
     try {
-      const pool = await getPool1()
+      const pool = await getPool2()
       // Fetch tasks to be executed (status = 0 means pending)
       const query = `use [UAD_BI]
                      SELECT TOP 5  reqid, dashboardcode, brand, brandid, dealer, dealerid, scheduledon
@@ -647,7 +683,7 @@ function scheduleTask() {
 }
 const countView =  async(req,res)=>{
   try {
-    const pool = await getPool1()
+    const pool = await getPool2()
     const query =`SELECT 
       COUNT(reqid) AS Total,
       SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) AS InProgress,
@@ -664,7 +700,7 @@ const countView =  async(req,res)=>{
 }
 const statusTimelime = async(req,res)=>{
   try {
-    const pool = await getPool1()
+    const pool = await getPool2()
     const {reqid} = req.body
     if(!reqid){
       return res.status(400).send(`Reqid is Required`)
@@ -709,7 +745,7 @@ const statusTimelime = async(req,res)=>{
 //     }
 //   })
 // }
-export {getDashboardbyDealer,uploadSchedule,getRequests,getBDM,editSchedule,scheduleTask,deleteReq,changeLog,changelogView,requestNewDashboard,newDashboardSchedule,requestBy,newDashboardView,countView,statusTimelime}
+export {getBrandByUser,getDealerByUser,getDashboardbyDealer,uploadSchedule,getRequests,getBDM,editSchedule,scheduleTask,deleteReq,changeLog,changelogView,requestNewDashboard,newDashboardSchedule,requestBy,newDashboardView,countView,statusTimelime}
 
 
 
