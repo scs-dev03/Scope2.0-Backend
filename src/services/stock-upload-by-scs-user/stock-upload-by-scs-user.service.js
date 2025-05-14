@@ -893,14 +893,14 @@ const getAllRecords = async (req, res) => {
   try {
     const pool = await getPool1();
     let locationId = req.location_id;
-    let userId = req.added_by;
-    let getQuery = `use [StockUpload] select added_on,added_by,stockUploadCount,quantitySum,prevQuantitySum,prevStockUploadCount from stock_upload_logs where location_id=@locationId and added_by=@userId`;
+   // let userId = req.added_by;
+    let getQuery = `use [StockUpload] select added_on,added_by,stockUploadCount,quantitySum,prevQuantitySum,prevStockUploadCount from stock_upload_logs where location_id=@locationId`;
 
     const result = await pool
       .request()
       .input("locationId", locationId)
-      .input("userId", userId)
       .query(getQuery);
+      // .input("userId", userId)
 
     return result.recordset;
   } catch (error) {
@@ -2440,39 +2440,23 @@ const getBulkRecordsInService = async (req, res) => {
   try {
     const pool = await getPool1();
     let dealerId = parseInt(req.dealer_id, 10);
-    let userId = req.added_by;
-    // let getLocationQuery = `Select locationId from locationInfo where status=1 and dealerId=@dealerId`;
-    // const result13 = await pool
-    //   .request()
-    //   .input("dealerId", dealerId)
-    //   .query(getLocationQuery);
-    // const locations = result13.recordset;
-
-    // let locationIds = locations.map((row) => row.locationId); // Extract locationIds from locations
-
-    // if (locationIds.length === 0) {
-    //   return []; // Return an empty array if no locationIds are provided
-    // }
-
-    // Dynamically generate parameter placeholders for the IN clause
-    // const locationParams = locationIds
-    //   .map((_, index) => `@loc${index}`)
-    //   .join(",");
+   // let userId = req.added_by;
+    
 
     let getQuery = ` use [stockupload]
   SELECT added_on, added_by, stockUploadCount, location_id,quantitySum, prevQuantitySum, prevStockUploadCount 
   FROM stock_upload_logs
-  WHERE dealer_id =@dealerId AND added_by = @userId
+  WHERE dealer_id =@dealerId
 `;
 
     const request = await pool.request();
 
     // Bind each locationId separately
-    // locationIds.forEach((id, index) => {
+    // locationIds.forEach((id, index) => { 
     //   request.input(`loc${index}`, id);
     // });
     request.input("dealerId", dealerId);
-    request.input("userId", userId);
+    // request.input("userId", userId);
 
     const result = await request.query(getQuery);
     //console.log("result.recordset ",result.recordset)

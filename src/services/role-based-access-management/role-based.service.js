@@ -73,7 +73,7 @@ import { getPool1 } from "../../db/db.js";
 
         //  console.log("inseerted id ",insertedId)
 
-          let query2 = ` Insert into [${process.env.Live_IP}].[UAD_BI_LEAD_TIME].[dbo].[Audit_log](roleName,userID,status
+          let query2 = ` Insert into [UAD_BI_LEAD_TIME].[dbo].[Audit_log](roleName,userID,status
                     ,SIMS
                     ,AUDIT
                     ,GAINER
@@ -255,7 +255,7 @@ import { getPool1 } from "../../db/db.js";
             .input("delete1", delete1)
             .input("edit1", edit1)
             .query(query34);
-          let query2 = ` Insert into [${process.env.Live_IP}].[UAD_BI_LEAD_TIME].[dbo].[Audit_log](roleName,userID,status
+          let query2 = ` Insert into [UAD_BI_LEAD_TIME].[dbo].[Audit_log](roleName,userID,status
                     ,SIMS
                     ,AUDIT
                     ,GAINER
@@ -282,6 +282,8 @@ import { getPool1 } from "../../db/db.js";
         }
      // }
       if (resultQuery.length > 0) {
+
+       // console.log("line 285 executed in edit role service")
         let modulesNotUpdated = resultQuery.filter(
           (module) => module.isUpdated === false
         ); // Filter out modules where isUpdated is false
@@ -289,14 +291,14 @@ import { getPool1 } from "../../db/db.js";
 
         if (modulesNotUpdated.length>0) {
           // console.log("Modules not updated ",modulesNotUpdated)
-
-        let   view1 = 0;
+          for(let k=0;k<modulesNotUpdated.length;k++){
+let   view1 = 0;
           let delete1 = 0;
           let add1 = 0;
           let edit1 = 0;
-          let pageId = modulesNotUpdated[0]?.module_id;
+          let pageId = modulesNotUpdated[k]?.module_id;
          // console.log("pageId",pageId,modulesNotUpdated)
-          let moduleParentId1 = modulesNotUpdated[0].moduleParentId;
+          let moduleParentId1 = modulesNotUpdated[k].moduleParentId;
           // console.log(pageId,moduleParentId1)
           let query23 = `use [z_scope] Update role_module_mapping 
                                         set 
@@ -317,6 +319,8 @@ import { getPool1 } from "../../db/db.js";
             .input("edit1", edit1)
             .query(query23);
         }
+          }
+        
       }
     } catch (error) {
       console.log("error in role service ", error.message);
@@ -358,9 +362,9 @@ import { getPool1 } from "../../db/db.js";
       let query2 = "";
       // console.log("----------",result)
       if (status == "Inactive" || status == "inactive") {
-        query2 = ` Insert into [${process.env.Live_IP}].[UAD_BI_LEAD_TIME].[dbo].[Audit_log](userID,operation,IP,token,status,roleId) values(@userId,'delete user',@publicIp,@token,0,@id)`;
+        query2 = ` Insert into [UAD_BI_LEAD_TIME].[dbo].[Audit_log](userID,operation,IP,token,status,roleId) values(@userId,'delete user',@publicIp,@token,0,@id)`;
       } else {
-        query2 = ` Insert into [${process.env.Live_IP}].[UAD_BI_LEAD_TIME].[dbo].[Audit_log](userID,operation,IP,token,status,roleId) values(@userId,'delete user',@publicIp,@token,1,@id)`;
+        query2 = ` Insert into [UAD_BI_LEAD_TIME].[dbo].[Audit_log](userID,operation,IP,token,status,roleId) values(@userId,'delete user',@publicIp,@token,1,@id)`;
       }
 
       await pool
@@ -593,7 +597,7 @@ import { getPool1 } from "../../db/db.js";
           .input("parentId", parentId)
           .query(query3);
 
-        let query234 = ` Insert into [${process.env.Live_IP}].[UAD_BI_LEAD_TIME].[dbo].[Audit_log](roleName,userID,status
+        let query234 = ` Insert into [UAD_BI_LEAD_TIME].[dbo].[Audit_log](roleName,userID,status
                ,SIMS
                ,AUDIT
                ,GAINER

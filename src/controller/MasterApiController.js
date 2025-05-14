@@ -179,7 +179,7 @@ try {
       res.status(200).json({Data:result.recordset})
       }
       else{
-        const query = `SELECT distinct li.BrandID, dur.dealerid , dur.locationid , concat(amg.vcfirstname , ' ', amg.vcLastname)as username ,li.location  FROM AdminMaster_GEN amg
+        const query = `SELECT distinct li.BrandID, dur.dealerid , dur.locationid , concat(amg.vcfirstname , ' ', amg.vcLastname)as username ,li.location,amg.bintId_pk as UserId  FROM AdminMaster_GEN amg
     join Dealer_User_Relation dur on amg.bintid_pk = dur.userid
     join locationinfo li on dur.locationid = li.LocationID
     where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `
