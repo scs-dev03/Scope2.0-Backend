@@ -229,7 +229,7 @@ import { getPool1 } from "../../db/db.js"
             sheet4= xlsx.utils.json_to_sheet(data[7]);
 
           }
-           let size=fileTypes.length
+           let size=fileTypes.length;
         for(let i=0;i<size;i++){
           if(fileTypes[i]==='Partwise OrderType'){
          //   console.log("fileTypes",fileTypes.length)
