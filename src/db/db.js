@@ -49,7 +49,7 @@ const config1 = {
     database: process.env.DATABASE1,
     user: process.env.USER1,
     password: process.env.PASSWORD1,
-    port: Number(process.env.DB_PORT1),
+    // port: Number(process.env.DB_PORT1),
     options: {
         encrypt: false,
         enableArithAbort: true,
@@ -64,7 +64,7 @@ const config2 = {
     database: process.env.DATABASE2,
     user: process.env.USER2,
     password: process.env.PASSWORD2,
-    port: Number(process.env.DB_PORT2),
+    // port: Number(process.env.DB_PORT2),
     options: {
         encrypt: false,
         enableArithAbort: true,
@@ -74,20 +74,20 @@ const config2 = {
     connectionTimeout: 30000,
 };
 
-// const config3 = {
-//     server: process.env.SERVER3,
-//     database: process.env.DATABASE3,
-//     user: process.env.USER3,
-//     password: process.env.PASSWORD3,
-//     port: Number(process.env.DB_PORT3),
-//     options: {
-//         encrypt: false,
-//         enableArithAbort: true,
-//         trustServerCertificate: true,
-//     },
-//     requestTimeout: 6000000,
-//     connectionTimeout: 30000,
-// };
+const config3 = {
+    server: process.env.SERVER3,
+    database: process.env.DATABASE3,
+    user: process.env.USER3,
+    password: process.env.PASSWORD3,
+    // port: Number(process.env.DB_PORT3),
+    options: {
+        encrypt: false,
+        enableArithAbort: true,
+        trustServerCertificate: true,
+    },
+    requestTimeout: 6000000,
+    connectionTimeout: 30000,
+};
 
 let pool1, pool2 , pool3;
 
@@ -99,8 +99,8 @@ const connectDB = async () => {
         pool2 = await new sql.ConnectionPool(config2).connect();
         console.log(`Connected to DB2: ${process.env.SERVER2} using ${process.env.USER2}`);
 
-        // pool3 = await new sql.ConnectionPool(config3).connect();
-        // console.log(`Connected to DB3: ${process.env.SERVER3} using ${process.env.USER3}`);
+        pool3 = await new sql.ConnectionPool(config3).connect();
+        console.log(`Connected to DB3: ${process.env.SERVER3} using ${process.env.USER3}`);
     } catch (err) {
         console.error("Database connection failed!", err);
         throw err;
@@ -117,10 +117,10 @@ const getPool2 = () => {
     return pool2;
 };
 
-// const getPool3 = () => {
-//     if (!pool3) throw new Error("DB3 not connected");
-//     return pool3;
-// };
+const getPool3 = () => {
+    if (!pool3) throw new Error("DB3 not connected");
+    return pool3;
+};
 // getPool1 -> for UAT Connection 
 // getPool2 -> for Live Connection
 // getPool3 -> for OGS Server Connection

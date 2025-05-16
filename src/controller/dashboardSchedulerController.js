@@ -8,7 +8,11 @@ const getBrandByUser = async (req, res) => {
   try {
     const pool = await getPool2();
     const { userid } = req.body;
-
+    if(!userid){
+      return res.status(400).json({
+        message:`userid is required`
+      })
+    }
     const result = await pool.request()
       .input('userid', sql.Int, userid) 
       .query(`
@@ -16,7 +20,7 @@ const getBrandByUser = async (req, res) => {
         FROM LocationInfo
         WHERE bdmcode = @userid
       `);
-        console.log(result);
+        // console.log(result);
         
     res.status(200).json({ Data: result.recordset });
   } catch (error) {
@@ -27,8 +31,13 @@ const getBrandByUser = async (req, res) => {
 const getDealerByUser = async(req,res)=>{
 const pool = await getPool2()
 const {userid,brandid} = req.body
-const query = `select distinct Dealer , DealerID from LocationInfo where  brandid = ${brandid} and bdmcode = ${userid}`
-console.log(query);
+if(!userid || !brandid){
+  return res.status(400).json({
+    message:`userid and brandid are required`
+  })
+}
+const query = `select distinct dealer , dealerid from LocationInfo where  brandid = ${brandid} and bdmcode = ${userid}`
+// console.log(query);
 
 const result = await pool.request().query(query)
   res.status(200).json({
