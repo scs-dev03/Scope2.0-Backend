@@ -99,8 +99,8 @@ const connectDB = async () => {
         pool2 = await new sql.ConnectionPool(config2).connect();
         console.log(`Connected to DB2: ${process.env.SERVER2} using ${process.env.USER2}`);
 
-        pool3 = await new sql.ConnectionPool(config3).connect();
-        console.log(`Connected to DB3: ${process.env.SERVER3} using ${process.env.USER3}`);
+        // pool3 = await new sql.ConnectionPool(config3).connect();
+        // console.log(`Connected to DB3: ${process.env.SERVER3} using ${process.env.USER3}`);
     } catch (err) {
         console.error("Database connection failed!", err);
         throw err;

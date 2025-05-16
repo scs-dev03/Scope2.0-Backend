@@ -117,8 +117,9 @@ const transporter = nodemailer.createTransport({
    const allUsers=async function(req){
         try{
             const pool=await getPool1();
-            let query=`Select bintId_pk as userId,vcFirstName,vcLastName,concat(vcFirstName,' ',vcLastName) as name, roleId,designation as designationId,business_vertical,vcEmail as emailId,vcMobile as mobileNo,btstatus as status from [z_scope].dbo.[adminmaster_gen] order by vcFirstName,vcLastName`;
-            const result=await pool.request().query(query);
+            let userType=req.userType;
+            let query=`Select bintId_pk as userId,vcFirstName,vcLastName,concat(vcFirstName,' ',vcLastName) as name, roleId,designation as designationId,business_vertical,vcEmail as emailId,vcMobile as mobileNo,btstatus as status from [z_scope].dbo.[adminmaster_gen] where type=@userType order by vcFirstName,vcLastName`;
+            const result=await pool.request().input('userType',userType).query(query);
             // console.log("----------",result)
             return result.recordset;
         }

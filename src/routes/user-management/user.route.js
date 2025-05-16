@@ -5,7 +5,7 @@ const router=express.Router();
 
 router.get('/get-user',getUsersInController);
 router.post('/create-user',createUserInController)
-router.get('/view-user',viewUserInController)
+router.post('/view-user',viewUserInController)
 router.post('/delete-user',deleteUserInController);
 router.post('/edit-user',editUserInController);
 router.post('/request-new-mail',requestNewMailInController);
