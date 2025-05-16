@@ -232,7 +232,7 @@ import { getPool1 } from "../../db/db.js"
            let size=fileTypes.length
         for(let i=0;i<size;i++){
           if(fileTypes[i]==='Partwise OrderType'){
-            console.log("fileTypes",fileTypes.length)
+         //   console.log("fileTypes",fileTypes.length)
             xlsx.utils.book_append_sheet(wb, sheet1, "Partwise OrderType");
           }
           if(fileTypes[i]==='Partwise Summary'){
@@ -277,7 +277,7 @@ import { getPool1 } from "../../db/db.js"
         let sheet1 ,sheet2,sheet3,sheet4,sheet5,sheet6;
         // console.log("fileTypes")
         // Create a new workbook
-         console.log("data of multi sheets ",data)
+        // console.log("data of multi sheets ",data)
         if(!data){
           const wb2=xlsx.utils.book_new();
           sheet3 = xlsx.utils.json_to_sheet(data[0]);
