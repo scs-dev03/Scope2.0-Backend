@@ -231,7 +231,7 @@ import { getPool1 } from "../../db/db.js";
           const existingModuleIndex = resultQuery.findIndex(
             (module) => module.module_id === pageId
           );
-          //console.log("existing index ",existingModuleIndex)
+          console.log("existing index ",existingModuleIndex)
           if (existingModuleIndex == -1) {
             query34 = `use [z_scope] Insert into role_module_mapping(role_id,module_id,view1,add1,delete1,edit1,moduleParentId) 
                         values(@roleId,@pageId,@view1,@add1,@delete1,@edit1,@parentId)`;
