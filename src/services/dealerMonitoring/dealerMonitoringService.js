@@ -284,4 +284,77 @@ try {
     throw new Error(`partSubstituteDetailsService failed: ${error.message}`)
 }
 }
-export {partDescwithStockandQuality,reservedForVehicle,groupStock,jobCardByVehicleService,partsByJobCardService,partSubstituteDetailService}
+
+const userroleService = async(userid)=>{
+try {
+        const pool = await getPool1()
+        const query = `select rm.Role from adminmaster_gen amg 
+                        join Role_Master rm on rm.bigid = amg.Designation
+                        where bintId_Pk = ${userid}`
+        const result = await pool.request().query(query)
+        return result
+} catch (error) {
+    throw new Error(`userinfoService failed: ${error.message}`);
+}
+}
+
+const locationwisePPNIValueService = async(dealerid,jobcardstatus , nonstockable)=>{
+try {
+        const pool = await getPool2()
+        const query = ` USE [UAD_BI_PPNI]
+                        select Location ,sum(ppni_val)as PPNI_Value
+                        from ppni_report_${dealerid} 
+                        where All_Time_NonStck = '${nonstockable}' and JobCardStatus = '${jobcardstatus}'
+                        group by Location
+                        order by PPNI_Value DeSc `
+        const result = await pool.request().query(query)
+        return result
+} catch (error) {
+    throw new Error(`locationwisePPNIValueService failed: ${error.message}`);
+}
+}
+
+const advisorwisePPNIValueService = async(dealerid,locationid,jobcardstatus , nonstockable )=>{
+try {
+        const pool = await getPool2()
+        const query = ` USE [UAD_BI_PPNI]
+                        select Advisor ,sum(ppni_val)as PPNI_Value from PPNI_report_${dealerid}
+                        where All_Time_NonStck = '${nonstockable}' and JobCardStatus = '${jobcardstatus}' and locationid = ${locationid}
+                        group by Advisor
+                        order by PPNI_Value DeSc `
+        const result = await pool.request().query(query)
+        return result
+} catch (error) {
+    throw new Error(`locationwisePPNIValueService failed: ${error.message}`);
+}
+}
+
+const vehiclewisePPNIValueService = async(dealerid,locationid,jobcardstatus , nonstockable , advisor)=>{
+try {
+        const pool = await getPool2()
+        const query = ` USE [UAD_BI_PPNI]
+                        select Vehiclenumber , sum(ppni_val)as PPNI_Value from PPNI_report_${dealerid}
+                        where All_Time_NonStck = '${nonstockable}' and JobCardStatus = '${jobcardstatus}' and locationid = ${locationid} and advisor like '${advisor}' 
+                        group by Vehiclenumber having sum(ppni_val) > 0
+                        order by PPNI_Value DeSc `
+        const result = await pool.request().query(query)
+        return result
+} catch (error) {
+    throw new Error(`advisorwisePPNIValueService failed: ${error.message}`);
+}
+}
+
+const partwisePPNIValueService = async(dealerid,locationid,jobcardstatus , nonstockable , advisor , vehicleno)=>{
+try {
+        const pool = await getPool2()
+        const query = ` USE [UAD_BI_PPNI]
+                        select PartNumber , ppni_val from PPNI_report_${dealerid}
+                        where All_Time_NonStck = '${nonstockable}' and JobCardStatus = '${jobcardstatus}' and locationid = ${locationid} and advisor like '${advisor}' and Vehiclenumber = '${vehicleno}'
+                        order by PPNI_Val DeSc `
+        const result = await pool.request().query(query)
+        return result
+} catch (error) {
+    throw new Error(`advisorwisePPNIValueService failed: ${error.message}`);
+}
+}
+export {userroleService,partDescwithStockandQuality,reservedForVehicle,groupStock,jobCardByVehicleService,partsByJobCardService,partSubstituteDetailService,locationwisePPNIValueService,advisorwisePPNIValueService,vehiclewisePPNIValueService,partwisePPNIValueService}

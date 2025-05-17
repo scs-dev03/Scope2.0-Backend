@@ -1,6 +1,6 @@
 import { Router } from "express";
 const router = Router()
-import { orderDetailsByPartnumber, partDetails, partSale, partSearch, partStock, singlePartMaxByLocation, substituteParts, vehicleSearch } from "../controller/dealer-monitoring/user.dealermonitoring.js";
+import { advisorwisePPNIValue, locationwisePPNIValue, orderDetailsByPartnumber, partDetails, partSale, partSearch, partStock, partwisePPNIValue, singlePartMaxByLocation, substituteParts, userRole, vehicleSearch, vehiclewisePPNIValue } from "../controller/dealer-monitoring/user.dealermonitoring.js";
 
 
 
@@ -23,5 +23,14 @@ router.route('/jobcard').post(partSearch)
 
 //Substitution Search
 router.route('/subparts').post(substituteParts)
+
+//User Role
+router.route('/user-role').post(userRole)
+
+//PPNI Value
+router.route('/ppni-l').post(locationwisePPNIValue)
+router.route('/ppni-a').post(advisorwisePPNIValue)
+router.route('/ppni-v').post(vehiclewisePPNIValue)
+router.route('/ppni-p').post(partwisePPNIValue)
 
 export default router

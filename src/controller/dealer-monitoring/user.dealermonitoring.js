@@ -1,7 +1,7 @@
 import { partfamilySaleservice, singlePartMaxByLocationService } from "../../services/norms-management/utils.service.js";
 import { orderDetailsByPartnumberService } from "../../services/orderDetails/orderDetailsService.js";
 import { partDetailsservice } from "../../services/salesview/salesviewservices.js";
-import {groupStock, jobCardByVehicleService, partDescwithStockandQuality,  partsByJobCardService,  partSubstituteDetailService,  reservedForVehicle} from  "../../services/dealerMonitoring/dealerMonitoringService.js";
+import {advisorwisePPNIValueService, groupStock, jobCardByVehicleService, locationwisePPNIValueService, partDescwithStockandQuality,  partsByJobCardService,  partSubstituteDetailService,  partwisePPNIValueService,  reservedForVehicle, userroleService, vehiclewisePPNIValueService} from  "../../services/dealerMonitoring/dealerMonitoringService.js";
 
 
 const partSale = async (req,res)=>{
@@ -146,4 +146,100 @@ try {
 }
 }
 
-export {partSale,partDetails,singlePartMaxByLocation,orderDetailsByPartnumber,partStock,vehicleSearch,partSearch,substituteParts}
+const userRole = async(req,res)=>{
+try {
+        const {userId} = req.body
+        if(!userId){
+            return res.status(400).json({
+                message:`userId is required`
+            })
+        }
+        const data = await userroleService(userId)
+        // console.log(data.recordset[0].Role);
+        res.status(200).json({
+            message:data.recordset[0].Role
+        })
+        
+} catch (error) {
+    res.status(500).json({
+        Error:error.message
+    })
+}
+}
+
+const locationwisePPNIValue = async(req,res)=>{
+try {
+        const {dealerid , nonstockable , jobcardstatus} = req.body
+        if(!dealerid || !nonstockable || !jobcardstatus){
+            return res.status(400).json({
+                message:`dealerid , nonstockable and partstatus is required`
+            })
+        }
+       const data = await locationwisePPNIValueService(dealerid,jobcardstatus,nonstockable)
+       res.status(200).json({
+        Data: data.recordset
+       })
+} catch (error) {
+    res.status(500).json({
+        Error:error.message
+    })
+}
+}
+
+const advisorwisePPNIValue = async(req,res)=>{
+try {
+        const {dealerid , locationid, nonstockable , jobcardstatus} = req.body
+        if(!dealerid || !locationid || !nonstockable || !jobcardstatus){
+            return res.status(400).json({
+                message:`dealerid , nonstockable and partstatus is required`
+            })
+        }
+       const data = await advisorwisePPNIValueService(dealerid,locationid,jobcardstatus,nonstockable)
+       res.status(200).json({
+        Data: data.recordset
+       })
+} catch (error) {
+    res.status(500).json({
+        Error:error.message
+    })
+}
+}
+
+const vehiclewisePPNIValue = async(req,res)=>{
+try {
+        const {dealerid , locationid, nonstockable , jobcardstatus, advisor} = req.body
+        if(!dealerid || !locationid|| !nonstockable || !jobcardstatus){
+            return res.status(400).json({
+                message:`dealerid , nonstockable and partstatus is required`
+            })
+        }
+       const data = await vehiclewisePPNIValueService(dealerid,locationid,jobcardstatus,nonstockable,advisor)
+       res.status(200).json({
+        Data: data.recordset
+       })
+} catch (error) {
+    res.status(500).json({
+        Error:error.message
+    })
+}
+}
+
+const partwisePPNIValue = async(req,res)=>{
+try {
+        const {dealerid , locationid, nonstockable , jobcardstatus, advisor, vehicleno} = req.body
+        if(!dealerid || !locationid|| !nonstockable || !jobcardstatus || !vehicleno){
+            return res.status(400).json({
+                message:`dealerid , nonstockable and partstatus is required`
+            })
+        }
+       const data = await partwisePPNIValueService(dealerid,locationid,jobcardstatus , nonstockable , advisor , vehicleno)
+       res.status(200).json({
+        Data: data.recordset
+       })
+} catch (error) {
+    res.status(500).json({
+        Error:error.message
+    })
+}
+}
+export {partSale,partDetails,singlePartMaxByLocation,orderDetailsByPartnumber,partStock,vehicleSearch,partSearch,substituteParts,userRole,locationwisePPNIValue,advisorwisePPNIValue,vehiclewisePPNIValue,partwisePPNIValue}
