@@ -2,7 +2,7 @@
 
 // const { password } = require('../../dbConfig');
 import {login,refreshAccessToken,verify2FA,generate2FA,
-  updatePasswordWhileCreatingUser,getEmails} from '../../services/login/auth.service.js';
+  updatePasswordWhileCreatingUser,updatePasswordWhileCreatingDealerUser,getEmails} from '../../services/login/auth.service.js';
 // Login or Refresh Access Token
 const auth = async (req, res) => {
   const { email, userPassword } = req.body;
@@ -95,6 +95,16 @@ const updatePasswordWhileCreatingUserInController=async (req,res)=>{
   }
 }
 
+const updatePasswordWhileCreatingDealerUserInController=async(req,res)=>{
+
+   try{
+    const result=await updatePasswordWhileCreatingDealerUser(req.body);
+    res.status(200).json({message:'Successfully Updated',data:result})
+  }catch(error){
+    console.log("error ",error.message)
+    res.status(201).json({message:'Successfully Updated'})
+  }
+}
 const getEmailsInController=async (req,res)=>{
   try{
     const result= await getEmails(req);
@@ -108,4 +118,6 @@ const getEmailsInController=async (req,res)=>{
 }
 
 export  { auth,refreshTokenController ,protectedRouteController,verifyRouteController,generateQRCode
-  ,updatePasswordWhileCreatingUserInController,getEmailsInController}
+  ,updatePasswordWhileCreatingUserInController,
+  getEmailsInController,
+updatePasswordWhileCreatingDealerUserInController}

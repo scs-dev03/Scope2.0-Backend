@@ -195,6 +195,25 @@ const updatePasswordWhileCreatingUser=async(req)=>{
   }
 }
 
+const updatePasswordWhileCreatingDealerUser=async(req)=>{
+
+   try{
+    const pool=await getPool1();
+    let email=req.email;
+    let secret=req.secretKey;
+    let password=req.password;
+    let query=`use [z_scope] Update [UAD_user_master] set vcpassword=@password, isGoogleAuthentication=1 where vcEmail=@email`;
+    await pool.request()
+    .input('email',email)
+    .input('password',password).query(query);
+  }
+  catch(error){
+
+    console.log("error in auth service updatepassword while creating user ",error.message)
+    return error;
+  }
+}
+
 const getEmails=async(req)=>{
 //   const { email } = req;
   //console.log(req.email)
@@ -222,5 +241,6 @@ const getEmails=async(req)=>{
   generate2FA,
   verify2FA,
   getEmails,
-  updatePasswordWhileCreatingUser
+  updatePasswordWhileCreatingUser,
+  updatePasswordWhileCreatingDealerUser
 };

@@ -18,7 +18,7 @@ import { getPool1 } from "../../db/db.js";
       let IT = req.IT;
       let token = req.token;
       let modules = req.modules;
-
+      let roleType=req.roleType;
       const pool = await getPool1()
       const clientIp = getClientIp(req);
       const localIp = getLocalIp();
@@ -33,7 +33,7 @@ import { getPool1 } from "../../db/db.js";
             ,GAINER
             ,IT
             ,HR
-            ,OTHER) output inserted.id values(@roleName,@userId,1,getDate(),@SIMS,@AUDIT,@GAINER,@IT,@HR,@OTHER)`;
+            ,OTHER,roleType) output inserted.id values(@roleName,@userId,1,getDate(),@SIMS,@AUDIT,@GAINER,@IT,@HR,@OTHER,@roleType)`;
       const result = await pool
         .request()
         .input("roleName", roleName)
@@ -44,6 +44,7 @@ import { getPool1 } from "../../db/db.js";
         .input("IT", IT)
         .input("HR", HR)
         .input("OTHER", OTHER)
+        .input("roleType", roleType)
         .query(query);
       let insertedId = result.recordset[0].id;
       // console.log("insertedId ",insertedId)
@@ -231,7 +232,8 @@ import { getPool1 } from "../../db/db.js";
           const existingModuleIndex = resultQuery.findIndex(
             (module) => module.module_id === pageId
           );
-          console.log("existing index ",existingModuleIndex)
+
+       //   console.log("existing index ",existingModuleIndex)
           if (existingModuleIndex == -1) {
             query34 = `use [z_scope] Insert into role_module_mapping(role_id,module_id,view1,add1,delete1,edit1,moduleParentId) 
                         values(@roleId,@pageId,@view1,@add1,@delete1,@edit1,@parentId)`;
@@ -524,9 +526,9 @@ let   view1 = 0;
         .query(query4);
       let insertedId = result[0].id;
       // console.log("inserted id ",insertedId);
-      isWrongFile=false;
+      let isWrongFile=false;
       for (let item of excelData) {
-        
+         
         if(!item["module name"]){
             isWrongFile=true;
             return isWrongFile
@@ -657,6 +659,7 @@ let   view1 = 0;
       const pool = await getPool1();
       let vertical_ids = req.vertical_ids;
       let roleId = req.roleId;
+      let moduleType=req.moduleType;
       // console.log("verticalid ", typeof vertical_ids[0]);
 
       // Ensure vertical_ids is an array of integers
@@ -668,12 +671,12 @@ let   view1 = 0;
         const result1 = await pool.request().query(query);
         //console.log("resul1 ",result1);
         let query1 = `
-              use [z_scope]  select mm.module_name, mm.parentId, rmm.view1, rmm.edit1, rmm.add1, rmm.delete1
+              use [z_scope]  select mm.module_name, mm.parentId, rmm.view1, rmm.edit1, rmm.add1, rmm.delete1,mm.module_type
                 from role_module_master rm
                 join role_module_mapping rmm on rmm.role_id = rm.id
                 join module_master mm on mm.id = rmm.module_id
                 where mm.business_vertical_id in (${verticalIdsString})
-                and rm.id = @roleId;
+                and rm.id = @roleId ;
     `;
 
         const result = await pool
