@@ -526,9 +526,9 @@ let   view1 = 0;
         .query(query4);
       let insertedId = result[0].id;
       // console.log("inserted id ",insertedId);
-      isWrongFile=false;
+      let isWrongFile=false;
       for (let item of excelData) {
-        
+         
         if(!item["module name"]){
             isWrongFile=true;
             return isWrongFile

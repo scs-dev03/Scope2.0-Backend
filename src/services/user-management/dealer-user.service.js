@@ -13,10 +13,10 @@ const transporter = nodemailer.createTransport({
     },
   });
 
-   const getUsers=async function(){
+   const getDealerUsers=async function(){
         try{
             const pool=await getPool1();
-            let query=`use [z_scope] Select vcFirstName,vcLastName ,bintId_pk as userId from [adminmaster_gen]`;
+            let query=`use [z_scope] Select brandId,dealerId,locationId,vcFirstName,vcLastName ,bintId_pk as userId from [UAD_user_master]`;
             const result=await pool.request().query(query);
             // console.log("----------",result)
             return result.recordset;
@@ -27,7 +27,7 @@ const transporter = nodemailer.createTransport({
         }
     }
 
-    const createUser=async function(req){
+    const createDealerUser=async function(req){
         try{
             let firstName=req.name;
             let link=req?.link;
@@ -42,30 +42,32 @@ const transporter = nodemailer.createTransport({
             let businessVertical=req.associatedBusiness;
             let token=req.token;
             let status=req.status;
+            let brandId=req.brand;
+            let dealerId=req.dealer;
+            let locationId=req.location;
             let clientIp = getClientIp(req);
             let localIp = getLocalIp();
-            let userType=req.userType;
             let password = await generatePassword(9);
            // console.log("password generate in user service ",password)
             let publicIp = "Fetching public IP..."
             publicIp = await getPublicIp();
             let pool=await getPool1();
             status=1;
-            let query=`use [z_scope] Insert into adminmaster_gen (vcFirstName,vcLastName,designation,roleId,vcEmail,vcMobile,vcPassword,btstatus,addedby,business_vertical,vcUserName,type) 
-            OUTPUT INSERTED.bintID_pk values (@firstName,@lastName,@designationId,@roleId,@email,@mobileNo,@password,@status,@addedBy,@businessVertical,'SCS$2025',@userType)`;
+            let query=`use [z_scope] Insert into UAD_user_master (vcFirstName,vcLastName,designation,roleId,vcEmail,vcMobile,vcPassword,btstatus,addedby,business_vertical,vcUserName,brandId,dealerId,locationId) 
+            OUTPUT INSERTED.bintID_pk values (@firstName,@lastName,@designationId,@roleId,@email,@mobileNo,@password,@status,@addedBy,@businessVertical,'SCS$2025',@brandId,@dealerId,@locationId)`;
             
             let result=await pool.request().input('firstName',firstName).input('lastName',lastName)
             .input('designationId',designationId).input('roleId',roleId)
             .input('email',email).input('mobileNo',mobileNo).input('password',password)
-            .input('addedBy',addedBy).input('businessVertical',businessVertical)
-            .input('status',status).input('userType',userType)
+            .input('addedBy',addedBy).input('businessVertical',businessVertical).input('status',status).input('brandId',brandId)
+            .input('dealerId',dealerId).input('locationId',locationId)
             .query(query);
             //console.log("create user result ",result)
             let insertedId=result.recordset[0].bintID_pk;
             const newUserIdFormatted = `SCS$${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${insertedId}`;
            // console.log(newUserIdFormatted)
             let updateQuery = ` use [z_scope]
-            UPDATE [adminmaster_gen] SET vcUserName = @newUserIdFormatted WHERE bintId_Pk = @insertedId;
+            UPDATE [UAD_user_master] SET vcUserName = @newUserIdFormatted WHERE bintId_Pk = @insertedId;
         `;
             await pool.request()
             .input('newUserIdFormatted', newUserIdFormatted)
@@ -74,24 +76,26 @@ const transporter = nodemailer.createTransport({
             let query2='';
              if(status=='Active'){
                  query2=` Insert into  [UAD_BI_LEAD_TIME].[dbo].[Audit_log](userID,status,
-                IP,token,newUserID,operation,userCreatedId)  values(@addedBy,1,@publicIp,@token,
-                @newUserIdFormatted,'user creation',@insertedId)`;
+                IP,token,newUserID,operation,brandId,dealerId,locationId,userCreatedId)  values(@addedBy,1,@publicIp,@token,
+                @newUserIdFormatted,'user creation for dealer',@brandId,@dealerId,@locationId,@insertedId)`;
              }
              else{
                 query2=` Insert into  [UAD_BI_LEAD_TIME].[dbo].[Audit_log](userID,status,
-                IP,token,newUserID,operation,userCreatedId)  values(@addedBy,0,@publicIp,@token,
-                @newUserIdFormatted,'user creation',@insertedId)`;
+                IP,token,newUserID,operation,brandId,dealerId,locationId,userCreatedId)  values(@addedBy,0,@publicIp,@token,
+                @newUserIdFormatted,'user creation for dealer',@brandId,@dealerId,@locationId,@insertedId)`;
              }
             // console.log("----------",result)
             await pool.request().input('addedBy',addedBy)
-            .input('publicIp',publicIp).input('token',token).input('newUserIdFormatted',newUserIdFormatted)
-            .input('insertedId',insertedId)
+            .input('publicIp',publicIp).input('token',token)
+            .input('insertedId', insertedId)
+            .input('newUserIdFormatted',newUserIdFormatted)
+            .input('brandId',brandId).input('dealerId',dealerId).input('locationId',locationId)
             .query(query2)
 
            // console.log("link generated ",link)
             const expiryTime = Date.now() + (5 * 60 * 1000); // 15 minutes from now
             const encodedUserName = encodeURIComponent(userName);
-            const uniqueLink = `${link}?expiry=${expiryTime}?email=${email}?userName=${encodedUserName}?userType='user'?type=${userType}`;
+            const uniqueLink = `${link}?expiry=${expiryTime}?email=${email}?userName=${encodedUserName}?userType='dealer'`;
            // console.log("unique link ",uniqueLink)
             let mailOptions = {
                 from: process.env.EMAILID, // Sender address
@@ -117,11 +121,14 @@ const transporter = nodemailer.createTransport({
         }
     }
 
-   const allUsers=async function(req){
+   const allDealerUsers=async function(req){
         try{
+            // use [z_scope] Select um.brandId,um.dealerId,um.locationId,um.vcFirstName,um.vcLastName ,um.bintId_pk as userId ,l.brand,l.dealer,l.location from [UAD_user_master] um join [locationInfo] l on um.brandId=l.brandId and um.dealerId=l.dealerId and um.locationId=l.locationId
             const pool=await getPool1();
             let userType=req.userType;
-            let query=`Select bintId_pk as userId,vcFirstName,vcLastName,concat(vcFirstName,' ',vcLastName) as name, roleId,designation as designationId,business_vertical,vcEmail as emailId,vcMobile as mobileNo,btstatus as status,type from [z_scope].dbo.[adminmaster_gen] where type=@userType order by vcFirstName,vcLastName`;
+            let query=`Select um.bintId_pk as userId,um.vcFirstName,um.vcLastName,concat(vcFirstName,' ',vcLastName) as name, um.roleId,um.designation as designationId,um.business_vertical,um.vcEmail as emailId,um.vcMobile as mobileNo,
+            um.btstatus as status,um.brandId,um.dealerId,um.locationId,l.brand,l.dealer,l.location from [z_scope].dbo.[UAD_user_master] um join locationinfo l on um.brandId=l.brandId and um.dealerId=l.dealerId and um.locationId=l.locationId
+             order by vcFirstName,vcLastName`;
             const result=await pool.request().input('userType',userType).query(query);
             // console.log("----------",result)
             return result.recordset;
@@ -132,7 +139,7 @@ const transporter = nodemailer.createTransport({
         }
     }
 
-   const deleteUser=async function(req){
+   const deleteDealerUser=async function(req){
         try{
             let userId=req.loginUserId;
             let id=parseInt(req.userId,10);
@@ -155,7 +162,7 @@ const transporter = nodemailer.createTransport({
             //     btstatus=0;
             // }
             // if(status=='Inactive' || status=='inactive'){
-                query=`use [z_scope] Update [adminmaster_gen] set btstatus=@status where bintId_pk=@id`;
+                query=`use [z_scope] Update [UAD_user_master] set btstatus=@status where bintId_pk=@id`;
             // }
             // else{
                 // query=`Update [user] set status='Active' where userId=@id`
@@ -165,16 +172,18 @@ const transporter = nodemailer.createTransport({
 
             let query2='';
             // console.log("----------",result)
-            if(status=='Inactive' || status=='inactive'){
+            if(!status){
 
-                 query2=` Insert into [UAD_BI_LEAD_TIME].[dbo].[Audit_log](userID,operation,IP,status,newUserID) values(@userId,'delete user',@publicIp,0,@newUserId)`
+                 query2=` Insert into [UAD_BI_LEAD_TIME].[dbo].[Audit_log]
+                 (userID,operation,IP,status,newUserID,userCreatedId) values(@userId,'deactivate user fordealer',@publicIp,0,@newUserId,@id)`
             }
             else{
-                query2=` Insert into [UAD_BI_LEAD_TIME].[dbo].[Audit_log](userID,operation,IP,status,newUserID) values(@userId,'delete user',@publicIp,1,@newUserId)`
+                query2=` Insert into [UAD_BI_LEAD_TIME].[dbo].[Audit_log](userID,operation,IP,status,newUserID,userCreatedId) values(@userId,'activate user for dealer',@publicIp,1,@newUserId,@id)`
             }
 
             await pool.request().
             input('userId',userId).input('publicIp',publicIp)
+            .input('id',id)
             .input('newUserId',newUserId).query(query2);
             return ;
         }
@@ -183,7 +192,7 @@ const transporter = nodemailer.createTransport({
         }
     }
 
-   const editUser=async function(req) {
+   const editDealerUser=async function(req) {
         try {
             let userId = req.userId; // userId to identify which user to update
             let userName = req.name;
@@ -198,7 +207,9 @@ const transporter = nodemailer.createTransport({
             let token = req.token;
             let status=req.status;
             let btstatus;
-            let userType=req.userType;
+             let brandId=req.brand;
+            let dealerId=req.dealer;
+            let locationId=req.location;
             let clientIp = getClientIp(req);
             let localIp = getLocalIp();
             if(status=='Active' || status=='active'){
@@ -214,7 +225,7 @@ const transporter = nodemailer.createTransport({
             
             // Update the user details in the database
             let query = ` use [z_scope]
-                UPDATE [adminmaster_gen]
+                UPDATE [UAD_user_master]
                 SET 
                     vcFirstName = @firstName, 
                     vcLastName= @lastName,
@@ -224,8 +235,10 @@ const transporter = nodemailer.createTransport({
                     vcMobile = @mobileNo,
                     updatedBy=@updatedBy,
                     btstatus=@btstatus,
-                    type=@userType,
-                    business_vertical = @businessVertical
+                    business_vertical = @businessVertical,
+                    brandId=@brandId,
+                    dealerId=@dealerId,
+                    locationId=@locationId
                 WHERE bintId_pk = @userId;
             `;
             
@@ -240,7 +253,8 @@ const transporter = nodemailer.createTransport({
                 .input('updatedBy',updatedBy)
                 .input('mobileNo', mobileNo)
                 .input('businessVertical', businessVertical)
-                .input('userType',userType)
+                .input('brandId',brandId)
+            .input('dealerId',dealerId).input('locationId',locationId)
                 .query(query);
     
             //console.log("edit user result ", result);
@@ -249,22 +263,25 @@ const transporter = nodemailer.createTransport({
             let query2 ='';
             if(status=='Active'){
                 query2 = `
-                    INSERT INTO [UAD_BI_LEAD_TIME].[dbo].[Audit_log](userID, status, IP, operation,userCreatedId)
-                    VALUES(@updatedBy, 1, @publicIp, 'user edit',@userId);
+                    INSERT INTO [UAD_BI_LEAD_TIME].[dbo].[Audit_log](userID, status, IP, operation,brandId,dealerId,locationId,userCreatedId)
+                    VALUES(@updatedBy, 1, @publicIp, 'user edit for dealer',@brandId,@dealerId,@locationId,@userId);
                 `;
             }
             else{
                 query2 = ` use [UAD_BI_LEAD_TIME]
-                INSERT INTO [UAD_BI_LEAD_TIME].[dbo].[Audit_log](userID, status, IP, operation,userCreatedId)
-                VALUES(@updatedBy, 0, @publicIp, 'user edit',@userId);
+                INSERT INTO [UAD_BI_LEAD_TIME].[dbo].[Audit_log](userID, status, IP, operation,brandId,dealerId,locationId,userCreatedId)
+                VALUES(@updatedBy, 0, @publicIp, 'user edit for dealer',@brandId,@dealerId,@locationId,@userId);
             `;
             }
             
             await pool.request()
                 .input('updatedBy', updatedBy)
+                 .input('userId', userId)
                 .input('publicIp', publicIp)
                 .input('token', token)
-                .input('userId', userId)
+                 .input('brandId',brandId)
+                 .input('dealerId',dealerId)
+                 .input('locationId',locationId)
                 .query(query2);
     
             return result.recordset;
@@ -281,8 +298,6 @@ const transporter = nodemailer.createTransport({
             let userName=req.userName;
             let email=req.email;
             let link=req.link;
-            let userType=req.userType;
-            let type=req.type;
             // email='kirti.s@sparecare.in'
             // link='http://103.30.72.109/update-user-password'
             // userName='Kirti'
@@ -291,7 +306,7 @@ const transporter = nodemailer.createTransport({
             const expiryTime = Date.now() + (5 * 60 * 1000); // 15 minutes from now
             const encodedUserName = encodeURIComponent(userName);
             //console.log("user anme ",encodedUserName)
-            const uniqueLink = `${link}?expiry=${expiryTime}?email=${email}?userName=${encodedUserName}?userType=${userType}?type=${type}`;
+            const uniqueLink = `${link}?expiry=${expiryTime}?email=${email}?userName=${encodedUserName}`;
            // console.log("unique link ",uniqueLink)
             let mailOptions = {
                 from: process.env.EMAILID, // Sender address
@@ -316,12 +331,12 @@ const transporter = nodemailer.createTransport({
         }
     }
 
-    const getUserInfo=async function(req){
+    const getDealerUserInfo=async function(req){
 
         try{
             const pool = await getPool1()
             const token= req.token;
-            const query = `use z_scope SELECT bintId_pk as userId ,concat (vcFirstName,' ',vcLastName) ans userName from adminmaster_gen
+            const query = `use z_scope SELECT bintId_pk as userId from UAD_user_master
             where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `;
             const result=await pool.request().input('token',token).query(query);
             return result.recordset;
@@ -330,6 +345,7 @@ const transporter = nodemailer.createTransport({
             return error;
         }
     }
+
 async function generatePassword(length = 12) {
     const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_-+=<>?';
     let password = '';
@@ -343,5 +359,6 @@ async function generatePassword(length = 12) {
     return password;
 }
 
-export { createUser,editUser,deleteUser,requestNewMail,getUsers,allUsers,getUserInfo}
+export { createDealerUser,editDealerUser,deleteDealerUser,
+    requestNewMail,getDealerUsers,allDealerUsers,getDealerUserInfo}
 
