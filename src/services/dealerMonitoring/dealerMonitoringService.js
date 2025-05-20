@@ -302,10 +302,10 @@ const locationwisePPNIValueService = async(dealerid,jobcardstatus , nonstockable
 try {
         const pool = await getPool2()
         const query = ` USE [UAD_BI_PPNI]
-                        select Location ,sum(ppni_val)as PPNI_Value
+                        select Location, LocationId ,Advisor,sum(ppni_val)as PPNI_Value
                         from ppni_report_${dealerid} 
                         where All_Time_NonStck = '${nonstockable}' and JobCardStatus = '${jobcardstatus}'
-                        group by Location
+                        group by Location , Advisor , LocationId
                         order by PPNI_Value DeSc `
         const result = await pool.request().query(query)
         return result
