@@ -164,7 +164,7 @@ try {
 
 const userInfo = async(req,res)=>{
 try {
-      const pool = await getPool2()
+      const pool = await getPool1()
       const {token , usertype} = req.body
       
     //   console.log(token , usertypehj);
