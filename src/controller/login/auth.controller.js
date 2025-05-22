@@ -2,7 +2,7 @@
 
 // const { password } = require('../../dbConfig');
 import {login,refreshAccessToken,verify2FA,generate2FA,
-  updatePasswordWhileCreatingUser,updatePasswordWhileCreatingDealerUser,getEmails} from '../../services/login/auth.service.js';
+  updatePasswordWhileCreatingUser,updatePasswordWhileCreatingDealerUser,getEmails,getDealerEmails} from '../../services/login/auth.service.js';
 // Login or Refresh Access Token
 const auth = async (req, res) => {
   const { email, userPassword } = req.body;
@@ -117,7 +117,19 @@ const getEmailsInController=async (req,res)=>{
   }
 }
 
+const getDealerEmailsInController=async(req,res)=>{
+  try{
+    const result= await getDealerEmails(req);
+    return res.status(200).json({data:result});
+
+  }
+  catch(error){
+ console.log("error ",error.message)
+   return res.status(201).json({message:'Error ',error:error.message})
+  }
+}
+
 export  { auth,refreshTokenController ,protectedRouteController,verifyRouteController,generateQRCode
-  ,updatePasswordWhileCreatingUserInController,
+  ,updatePasswordWhileCreatingUserInController,getDealerEmailsInController,
   getEmailsInController,
 updatePasswordWhileCreatingDealerUserInController}

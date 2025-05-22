@@ -1,5 +1,5 @@
 import { getPool1 } from "../../db/db.js"
-import * as XLSX from "xlsx";
+import  XLSX from "xlsx";
 import fs from "fs";
 import he from 'he'
 export const getBrands = async () => {
@@ -328,8 +328,6 @@ const readExcelFileWithSubColumnsForBulk = async (filePath) => {
     console.error("Error processing Excel file:", error);
   }
 };
-
-
 
 
 const readExcelFile = async (filePath) => {

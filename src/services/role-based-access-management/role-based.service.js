@@ -472,7 +472,7 @@ let   view1 = 0;
       const excelData = await readExcelFile(filePath);
       const pool = await getPool1()
       // console.log("head row ",excelData);
-
+let isWrongFile=false;
       let userId = req["userId"];
       let roleName = req["rolename"];
       let GAINER = req["GAINER"];
@@ -506,6 +506,20 @@ let   view1 = 0;
 
       let publicIp = "Fetching public IP...";
       publicIp = await getPublicIp();
+
+      for(let item of excelData)
+      {
+if( ! ('business vertical' in item && 'module name' in item && 'sub module' in item && 'view' in item  && 'edit' in item
+          && 'delete' in item && 'add' in item)
+        ){
+            isWrongFile=true;
+            return isWrongFile
+        }
+        if (item["view"] == " " || item["delete"]=='' ||item["edit"]=='' || item["add"]=='' ) {
+            console.log("Not available")
+           return {empty:true}
+        }
+      }
       let query4 = `use [z_scope] Insert into role_module_master(role_name,createdby,status
           ,SIMS
           ,AUDIT
@@ -524,19 +538,12 @@ let   view1 = 0;
         .input("HR", HR)
         .input("OTHER", OTHER)
         .query(query4);
-      let insertedId = result[0].id;
+      let insertedId = result.recordset[0].id;
       // console.log("inserted id ",insertedId);
-      let isWrongFile=false;
+      
       for (let item of excelData) {
-         
-        if(!item["module name"]){
-            isWrongFile=true;
-            return isWrongFile
-        }
-        if (item["module name"] == "" ) {
-            console.log("Not avilable")
-          break;
-        }
+          // console.log("item",item)
+        
         let businessVertical = item["business vertical"];
         let moduleName = item["module name"];
         let subModule = item["sub module"];
@@ -569,7 +576,7 @@ let   view1 = 0;
           .request()
           .input("subModule", subModule)
           .query(getParentIdQuery);
-        let parentId = result[0].parentId;
+        let parentId = result.recordset[0].parentId;
         // console.log("parentId ",parentId);
 
         let query = `use [z_scope] select  bv.id as businessVerticalId ,mm.id as pageId  from module_master mm join business_vertical_master bv
@@ -580,10 +587,11 @@ let   view1 = 0;
           .input("businessVertical", businessVertical)
           .input("subModule", subModule)
           .query(query);
-        let businessVerticalId = res1[0].businessVerticalId;
-        let pageId = res1[0].pageId;
+          console.log(res1.recordset)
+        let businessVerticalId = res1.recordset[0].businessVerticalId;
+        let pageId = res1.recordset[0].pageId;
 
-        // console.log("business vertical id ",businessVerticalId);
+      //   console.log("business vertical id ",pageId);
 
         let query3 = `use [z_scope] Insert into role_module_mapping(role_id,module_id,view1,edit1,add1,delete1,moduleParentId) values(@insertedId,@pageId,
             @view1,@edit1,@add1,@delete1,@parentId)`;
@@ -605,7 +613,7 @@ let   view1 = 0;
                ,GAINER
                ,IT
                ,HR
-               ,OTHERS,IP,token,operation,moduleParentId,pageId,roleId) values(@roleName,@userId,1,@SIMS,@AUDIT,@GAINER,@IT,@HR,@OTHER, @publicIp,@token,
+               ,OTHERS,IP,operation,moduleParentId,pageId,roleId) values(@roleName,@userId,1,@SIMS,@AUDIT,@GAINER,@IT,@HR,@OTHER, @publicIp,
                'role creation through upload',@parentId,@pageId,@insertedId)`;
 
         await pool

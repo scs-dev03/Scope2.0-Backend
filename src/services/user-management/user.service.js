@@ -321,7 +321,7 @@ const transporter = nodemailer.createTransport({
         try{
             const pool = await getPool1()
             const token= req.token;
-            const query = `use z_scope SELECT bintId_pk as userId ,concat (vcFirstName,' ',vcLastName) ans userName from adminmaster_gen
+            const query = `use z_scope SELECT bintId_pk as userId ,concat (vcFirstName,' ',vcLastName) as username from adminmaster_gen
             where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `;
             const result=await pool.request().input('token',token).query(query);
             return result.recordset;

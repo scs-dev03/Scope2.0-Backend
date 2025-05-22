@@ -234,6 +234,26 @@ const getEmails=async(req)=>{
   }
 }
 
+const getDealerEmails=async(req)=>{
+//   const { email } = req;
+  //console.log(req.email)
+  try {
+    // Connect to the SQL Server
+    const pool=await getPool1();
+
+    // Query to check if the email exists
+    const result = await pool.request().query`
+     use z_scope SELECT vcEmail,vcFirstName,vcLastName FROM uad_user_master
+    `;
+
+    // Check if the email is already in the database
+    return result.recordset;
+  } catch (error) {
+    console.error('Error checking email:', error);
+    // return res.status(500).json({ message: 'Server error' });
+  }
+}
+
  export  {
   login,
   refreshAccessToken,
@@ -241,6 +261,7 @@ const getEmails=async(req)=>{
   generate2FA,
   verify2FA,
   getEmails,
+  getDealerEmails,
   updatePasswordWhileCreatingUser,
   updatePasswordWhileCreatingDealerUser
 };
