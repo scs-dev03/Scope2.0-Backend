@@ -8,7 +8,7 @@ import MasterApi from './routes/MasterApiRoute.js'
 import von from './routes/vonRoute.js'
 import appRoutes from './routes/index.js'
 import dm from './routes/dealermonitoringRoute.js'
-const app = express()
+const app = express() 
 app.use(cors())
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

@@ -5,7 +5,8 @@ import { auth,refreshTokenController,protectedRouteController,verifyRouteControl
     generateQRCode, 
     getEmailsInController,
     updatePasswordWhileCreatingUserInController,
-    updatePasswordWhileCreatingDealerUserInController} from "../../controller/login/auth.controller.js";
+    updatePasswordWhileCreatingDealerUserInController,
+    getDealerEmailsInController} from "../../controller/login/auth.controller.js";
 
 const router = express.Router();
 
@@ -21,4 +22,5 @@ router.get('/generate-qr',generateQRCode);
 router.post('/update-user',updatePasswordWhileCreatingUserInController);
 router.post('/update-dealer-user',updatePasswordWhileCreatingDealerUserInController)
 router.post('/check-email',getEmailsInController)
+router.post('/dealer-check-email',getDealerEmailsInController)
 export default router;
