@@ -350,7 +350,7 @@ const partDetails = async (req, res) => {
       }
 
       // Check if all parts are mapped to brand
-      const unmatchedParts = await partBrandMappingCheck(Brandid, Data);
+      const unmatchedParts = await partBrandMappingCheck(Brandid, Data.data);
       if (unmatchedParts.length > 0) {
         return res.status(400).json({
           message: 'Some parts are not mapped with the selected brand.',
@@ -358,7 +358,7 @@ const partDetails = async (req, res) => {
         });
       }
 
-      partnumberString = Data.map(item => `'${item.PartNumber}'`).join(",");
+      partnumberString = Data.data.map(item => `'${item.PartNumber}'`).join(",");
     }
 
     // Build and run SQL query
@@ -407,7 +407,7 @@ const getLedger = async (req, res) => {
       const Data = await readExcel(req.file.path);
       fs.unlinkSync(req.file.path); // Clean up
 
-      const unmatchedParts = await partBrandMappingCheck(Brandid, Data);
+      const unmatchedParts = await partBrandMappingCheck(Brandid, Data.data);
       if (unmatchedParts.length > 0) {
         return res.status(400).json({
           message: 'Some parts are not mapped with the selected brand.',
@@ -415,7 +415,7 @@ const getLedger = async (req, res) => {
         });
       }
 
-      partnumbers = Data.map(item => item.PartNumber?.toString().trim()).filter(Boolean);
+      partnumbers = Data.data.map(item => item.PartNumber?.toString().trim()).filter(Boolean);
     }
 
     // Option 2: Read from body
@@ -490,6 +490,8 @@ const getLedger = async (req, res) => {
  */
 const partBrandMappingCheck = async (Brandid, Data) => {
   try {
+    // console.log(Data);
+    
     const pool = await getPool1();
     const query = `
       USE z_scope;
