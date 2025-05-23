@@ -214,8 +214,41 @@ try {
             })
         }
        const data = await vehiclewisePPNIValueService(dealerid,locationid,jobcardstatus,nonstockable,advisor)
+       
+       // Transform the flat data into grouped vehicle-wise structure
+function transformVehiclePartsData(rawData) {
+  const groupedData = {};
+
+  rawData.forEach(item => {
+    const vehicle = item.Vehiclenumber;
+
+    if (!groupedData[vehicle]) {
+      groupedData[vehicle] = {
+        vehicleNumber: vehicle,
+        ppniValue: 0,
+        parts: []
+      };
+    }
+
+    groupedData[vehicle].ppniValue += item.PPNI_Value;
+
+    groupedData[vehicle].parts.push({
+      partNumber: item.PartNumber,
+      description: item.PartDesc,
+      category: item.part_category,
+      ndp: item.price,
+      qty: item.Qty,
+      value: item.PPNI_Value,
+    });
+  });
+
+  return Object.values(groupedData);
+}
+
+const transformedData = transformVehiclePartsData(data.recordset);
+
        res.status(200).json({
-        Data: data.recordset
+        Data: transformedData
        })
 } catch (error) {
     res.status(500).json({

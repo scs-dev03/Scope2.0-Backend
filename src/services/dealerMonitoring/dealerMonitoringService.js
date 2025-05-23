@@ -333,9 +333,9 @@ const vehiclewisePPNIValueService = async(dealerid,locationid,jobcardstatus , no
 try {
         const pool = await getPool2()
         const query = ` USE [UAD_BI_PPNI]
-                        select Vehiclenumber , sum(ppni_val)as PPNI_Value from PPNI_report_${dealerid}
+                        select Vehiclenumber ,PartNumber, PartDesc , part_category, price ,Qty, sum(ppni_val)as PPNI_Value from PPNI_report_${dealerid}
                         where All_Time_NonStck = '${nonstockable}' and JobCardStatus = '${jobcardstatus}' and locationid = ${locationid} and advisor like '${advisor}' 
-                        group by Vehiclenumber having sum(ppni_val) > 0
+                        group by PartNumber , Vehiclenumber, PartDesc , part_category ,price ,Qty having sum(ppni_val) > 0
                         order by PPNI_Value DeSc `
         const result = await pool.request().query(query)
         return result
