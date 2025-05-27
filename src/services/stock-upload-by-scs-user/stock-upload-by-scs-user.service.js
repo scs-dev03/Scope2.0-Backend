@@ -2436,6 +2436,7 @@ updatedFilteredRowData = Array.from(partCountMap.values());
     return { error: error };
   }
 };
+
 const getBulkRecordsInService = async (req, res) => {
   try {
     const pool = await getPool1();
@@ -2505,8 +2506,9 @@ const getBulkDataInService = async (req, res) => {
      //  console.log("tcode in bulk data service ", tcode);
       if (tcode != undefined || tcode != null) {
         try {
-          let getDataQuery = `use [stockupload] select partNumber,qty as Quantity from currentStock2 where stockCode=@tcode`;
-          const res78 = await pool
+            let getDataQuery = `use [stockupload] select partNumber, qty as Quantity from currentStock2
+             where stockCode=@tcode`;
+            const res78 = await pool
             .request()
             .input("tcode", tcode)
             .query(getDataQuery);

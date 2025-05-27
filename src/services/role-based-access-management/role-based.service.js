@@ -9,7 +9,7 @@ import { getPool1 } from "../../db/db.js";
  const createRole =async function (req) {
     try {
       let userId = req.userId;
-      let roleName = req.rolename;
+      let roleName = req.rolename.trim();
       let GAINER = req.GAINER;
       let SIMS = req.SIMS;
       let AUDIT = req.AUDIT;
@@ -49,6 +49,57 @@ import { getPool1 } from "../../db/db.js";
       let insertedId = result.recordset[0].id;
       // console.log("insertedId ",insertedId)
       for (let item of modules) {
+        if(item.submodules.length==0){
+          let pageId = item.id;
+          let parentId = item.parentId;
+          let view1 = item.view1;
+          let add1 = item.add1;
+          let edit1 = item.edit1;
+          let delete1 = item.delete1;
+let query3 = `use [z_scope] Insert into role_module_mapping(role_id,module_id,view1,edit1,add1,delete1,moduleParentId) values(@insertedId,@pageId,
+                    @view1,@edit1,@add1,@delete1,@parentId)`;
+
+          await pool
+            .request()
+            .input("insertedId", insertedId)
+            .input("pageId", pageId)
+            .input("view1", view1)
+            .input("edit1", edit1)
+            .input("add1", add1)
+            .input("delete1", delete1)
+            .input("parentId", parentId)
+            .query(query3);
+
+        //  console.log("inseerted id ",insertedId)
+
+          let query2 = ` Insert into [UAD_BI_LEAD_TIME].[dbo].[Audit_log](roleName,userID,status
+                    ,SIMS
+                    ,AUDIT
+                    ,GAINER
+                    ,IT
+                    ,HR
+                    ,OTHERS,IP,token,operation,moduleParentId,pageId,roleId) values(@roleName,@userId,1,@SIMS,@AUDIT,@GAINER,@IT,@HR,@OTHER, @publicIp,@token,
+                    'role creation',@parentId,@pageId,@insertedId)`;
+
+          await pool
+            .request()
+            .input("roleName", roleName)
+            .input("userId", userId)
+            .input("SIMS", SIMS)
+            .input("AUDIT", AUDIT)
+            .input("GAINER", GAINER)
+            .input("IT", IT)
+            .input("HR", HR)
+            .input("OTHER", OTHER)
+            .input("publicIp", publicIp)
+            .input("token", token)
+            .input("parentId", parentId)
+            .input("pageId", pageId)
+            .input("insertedId", insertedId)
+            .query(query2);
+
+        }
+        else{
         for (let submodule of item.submodules) {
           let pageId = submodule.id;
           let parentId = submodule.parentId;
@@ -101,6 +152,7 @@ import { getPool1 } from "../../db/db.js";
             .query(query2);
         }
       }
+      }
       // console.log(IT,SIMS,AUDIT,GAINER,OTHER,HR)
     } catch (error) {
       console.log("error in role service ", error.message);
@@ -129,7 +181,7 @@ import { getPool1 } from "../../db/db.js";
       let id = req.roleId;
       let userId = req.userId;
       let roleId = req.roleId;
-      let roleName = req.name;
+      let roleName = req.verticals.name.trim();
       let GAINER = req.verticals.gainer;
       let SIMS = req.verticals.sims;
       let AUDIT = req.verticals.audit;
@@ -507,19 +559,43 @@ let isWrongFile=false;
       let publicIp = "Fetching public IP...";
       publicIp = await getPublicIp();
 
-      for(let item of excelData)
-      {
-if( ! ('business vertical' in item && 'module name' in item && 'sub module' in item && 'view' in item  && 'edit' in item
-          && 'delete' in item && 'add' in item)
-        ){
-            isWrongFile=true;
-            return isWrongFile
-        }
-        if (item["view"] == " " || item["delete"]=='' ||item["edit"]=='' || item["add"]=='' ) {
-            console.log("Not available")
-           return {empty:true}
-        }
-      }
+     // console.log("excel data ",excelData)
+   for (let i = 0; i < excelData.length; i++) {
+  const item = excelData[i];
+
+  // Check for required fields
+  const requiredFields = [
+    'business vertical',
+    'module name',
+    'sub module',
+    'view',
+    'edit',
+    'delete',
+    'add'
+  ];
+
+  const hasAllFields = requiredFields.every(key => key in item);
+  if (!hasAllFields) {
+    return true; // isWrongFile
+  }
+
+  const isPermissionEmpty =
+    item["view"] === '' ||
+    item["delete"] === '' ||
+    item["edit"] === '' ||
+    item["add"] === '';
+
+  if (isPermissionEmpty) {
+    if (item["note"] !== ' ') {
+      // Remove the item and break the loop
+      excelData.splice(i, 1);
+      break;
+    }
+
+    return { empty: true };
+  }
+}
+
       let query4 = `use [z_scope] Insert into role_module_master(role_name,createdby,status
           ,SIMS
           ,AUDIT
@@ -542,7 +618,7 @@ if( ! ('business vertical' in item && 'module name' in item && 'sub module' in i
       // console.log("inserted id ",insertedId);
       
       for (let item of excelData) {
-          // console.log("item",item)
+         //  console.log("item",item)
         
         let businessVertical = item["business vertical"];
         let moduleName = item["module name"];
@@ -571,6 +647,9 @@ if( ! ('business vertical' in item && 'module name' in item && 'sub module' in i
         } else {
           add1 = false;
         }
+        if(subModule==''){
+          subModule=item["module name"]
+        }
         let getParentIdQuery = `use [z_scope] select parentId from module_master where module_name=@subModule`;
         let result = await pool
           .request()
@@ -587,11 +666,11 @@ if( ! ('business vertical' in item && 'module name' in item && 'sub module' in i
           .input("businessVertical", businessVertical)
           .input("subModule", subModule)
           .query(query);
-          console.log(res1.recordset)
+         // console.log(res1.recordset)
         let businessVerticalId = res1.recordset[0].businessVerticalId;
         let pageId = res1.recordset[0].pageId;
 
-      //   console.log("business vertical id ",pageId);
+        console.log("business vertical id ",parentId,item);
 
         let query3 = `use [z_scope] Insert into role_module_mapping(role_id,module_id,view1,edit1,add1,delete1,moduleParentId) values(@insertedId,@pageId,
             @view1,@edit1,@add1,@delete1,@parentId)`;
@@ -632,6 +711,7 @@ if( ! ('business vertical' in item && 'module name' in item && 'sub module' in i
           .input("pageId", pageId)
           .input("insertedId", insertedId)
           .query(query234);
+        //  console.log("----- ",parentId);
       }
     } catch (error) {
       console.log("error in create role thorugh uploading ", error.message);

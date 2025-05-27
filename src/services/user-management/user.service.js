@@ -29,13 +29,13 @@ const transporter = nodemailer.createTransport({
 
     const createUser=async function(req){
         try{
-            let firstName=req.name;
+            let firstName=req.name.trim();
             let link=req?.link;
             let designationId=req.designation;
             let roleId=req.role;
-            let email=req.email;
+            let email=req.email.trim();
             let mobileNo=req.mobileNo;
-            let lastName=req.lastName;
+            let lastName=req.lastName.trim();
             let userName=firstName +' '+ lastName;
            // let password=req.password;
             let addedBy=req.userId;
