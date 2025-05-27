@@ -288,7 +288,7 @@ try {
 const userroleService = async(userid)=>{
 try {
         const pool = await getPool1()
-        const query = `select rm.Role from adminmaster_gen amg 
+        const query = `select rm.Role,concat(amg.vcFirstName,' ',amg.vcLastName)as Name from adminmaster_gen amg 
                         join Role_Master rm on rm.bigid = amg.Designation
                         where bintId_Pk = ${userid}`
         const result = await pool.request().query(query)
