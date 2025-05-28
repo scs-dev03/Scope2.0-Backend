@@ -357,4 +357,40 @@ try {
     throw new Error(`advisorwisePPNIValueService failed: ${error.message}`);
 }
 }
-export {userroleService,partDescwithStockandQuality,reservedForVehicle,groupStock,jobCardByVehicleService,partsByJobCardService,partSubstituteDetailService,locationwisePPNIValueService,advisorwisePPNIValueService,vehiclewisePPNIValueService,partwisePPNIValueService}
+
+const PPNIVALUE12MonthsService = async (dealerid, locationid, nonstockable, jobcardstatus) => {
+  try {
+    const pool = await getPool2();
+    const tableName = `PPNI_report_${dealerid}`;
+
+    const query = `
+      USE uad_bi_ppni;
+      SELECT 
+        location,
+        CONCAT(MONTH(dateadded), '-', YEAR(dateadded)) AS Date,
+        --SUM(ppni_val) AS PPNI_val
+        ROUND(SUM( ppni_val)/ 100000.0, 2) as PPNI_Value
+      FROM ${tableName}
+      WHERE 
+        locationid = @locationid AND 
+        (@stkable IS NULL OR All_Time_NonStck = @stkable OR All_Time_NonStck IS NULL) AND 
+        (@jobcard IS NULL OR JobCardStatus = @jobcard OR JobCardStatus IS NULL)
+      GROUP BY 
+        location, CONCAT(MONTH(dateadded), '-', YEAR(dateadded))
+      ORDER BY 
+        CONCAT(MONTH(dateadded), '-', YEAR(dateadded)) DESC;
+    `;
+
+    const result = await pool.request()
+      .input('locationid', locationid)
+      .input('stkable', nonstockable)
+      .input('jobcard', jobcardstatus)
+      .query(query);
+
+    return result;
+  } catch (error) {
+    throw new Error(`PPNIVALUE12Months failed: ${error.message}`);
+  }
+};
+
+export {PPNIVALUE12MonthsService,userroleService,partDescwithStockandQuality,reservedForVehicle,groupStock,jobCardByVehicleService,partsByJobCardService,partSubstituteDetailService,locationwisePPNIValueService,advisorwisePPNIValueService,vehiclewisePPNIValueService,partwisePPNIValueService}

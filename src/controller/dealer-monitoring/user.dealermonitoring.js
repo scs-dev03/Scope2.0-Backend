@@ -1,7 +1,7 @@
 import { partfamilySaleservice, singlePartMaxByLocationService } from "../../services/norms-management/utils.service.js";
 import { orderDetailsByPartnumberService } from "../../services/orderDetails/orderDetailsService.js";
 import { partDetailsservice } from "../../services/salesview/salesviewservices.js";
-import {advisorwisePPNIValueService, groupStock, jobCardByVehicleService, locationwisePPNIValueService, partDescwithStockandQuality,  partsByJobCardService,  partSubstituteDetailService,  partwisePPNIValueService,  reservedForVehicle, userroleService, vehiclewisePPNIValueService} from  "../../services/dealerMonitoring/dealerMonitoringService.js";
+import {advisorwisePPNIValueService, groupStock, jobCardByVehicleService, locationwisePPNIValueService, partDescwithStockandQuality,  partsByJobCardService,  partSubstituteDetailService,  partwisePPNIValueService,  PPNIVALUE12MonthsService,  reservedForVehicle, userroleService, vehiclewisePPNIValueService} from  "../../services/dealerMonitoring/dealerMonitoringService.js";
 
 
 const partSale = async (req,res)=>{
@@ -275,4 +275,26 @@ try {
     })
 }
 }
-export {partSale,partDetails,singlePartMaxByLocation,orderDetailsByPartnumber,partStock,vehicleSearch,partSearch,substituteParts,userRole,locationwisePPNIValue,advisorwisePPNIValue,vehiclewisePPNIValue,partwisePPNIValue}
+const PPNIVALUE12Months = async(req,res)=>{
+try {
+        const {dealerid,locationid,nonstockable,jobcardstatus} = req.body
+        if(!dealerid || !locationid || !nonstockable == null || !jobcardstatus == null){
+            return res.status(400).json({
+                message:`All fields are required`
+            })
+        }
+        const data = await PPNIVALUE12MonthsService(dealerid,locationid,nonstockable,jobcardstatus)
+        res.status(200).json({
+            Data:data.recordset
+        })
+} catch (error) {
+    res.status(500).json({
+        Error:error.message
+    })
+}
+}
+
+
+
+
+export {partSale,partDetails,singlePartMaxByLocation,orderDetailsByPartnumber,partStock,vehicleSearch,partSearch,substituteParts,userRole,locationwisePPNIValue,advisorwisePPNIValue,vehiclewisePPNIValue,partwisePPNIValue,PPNIVALUE12Months}
