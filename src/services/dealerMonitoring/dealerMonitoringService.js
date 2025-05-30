@@ -365,10 +365,10 @@ const PPNIVALUE12MonthsService = async (dealerid, locationid, nonstockable, jobc
 
     const query = `
       USE uad_bi_ppni;
-      SELECT 
+      SELECT TOP 12
         location,
         CONCAT(MONTH(dateadded), '-', YEAR(dateadded)) AS Date,
-        --SUM(ppni_val) AS PPNI_val
+        SUM(ppni_val) AS PPNI_val,
         ROUND(SUM( ppni_val)/ 100000.0, 2) as PPNI_Value
       FROM ${tableName}
       WHERE 
@@ -376,9 +376,9 @@ const PPNIVALUE12MonthsService = async (dealerid, locationid, nonstockable, jobc
         (@stkable IS NULL OR All_Time_NonStck = @stkable OR All_Time_NonStck IS NULL) AND 
         (@jobcard IS NULL OR JobCardStatus = @jobcard OR JobCardStatus IS NULL)
       GROUP BY 
-        location, CONCAT(MONTH(dateadded), '-', YEAR(dateadded))
+        location,  YEAR(dateadded), MONTH(dateadded)
       ORDER BY 
-        CONCAT(MONTH(dateadded), '-', YEAR(dateadded)) DESC;
+       YEAR(dateadded) DESC, MONTH(dateadded) DESC;
     `;
 
     const result = await pool.request()
