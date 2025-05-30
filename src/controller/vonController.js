@@ -30,14 +30,16 @@ const newRemark = async (req, res) => {
             return res.status(400).json({ message: `All fields are required` })
         }
         try {
-            const query = `select * from UAD_VON..UAD_VON_RemarksMaster where remark = '${remark}' and brandid = ${brandid} and usertype = '${usertype}'`
+            const query = `select * from UAD_VON..UAD_VON_RemarksMaster where remark = '${remark}' and usertype = '${usertype}'`
             const result = await pool.request().query(query)
               // If remark already exists, return error
              if (result.recordset.length > 0) {
         return res.status(400).json({ message: "Remark already exists" });
       }
         } catch (error) {
-            
+            res.status(500).json({
+                Error:error.message
+            })
         }
         
         const query = ` use [UAD_VON]
@@ -93,7 +95,7 @@ const viewRemark = async (req, res) => {
 }
 const userView = async (req, res) => {
     try {
-        const pool = await getPool2()
+        const pool = await getPool1()
         const { brandid, dealerid, r1, r2, l1, l2, partnumber, locationid, flag, seasonalid, modelid, natureid, parttype } = req.body
         if (!dealerid && !brandid) {
             return res.status(400).json({ Error: `Dealerid and Brandid is a required Parameter` })
@@ -130,8 +132,8 @@ const userView = async (req, res) => {
 }
 const userFeedbacklog = async (req, res) => {
     try {
-        const pool = await getPool1()
-        const pool2 = getPool2()
+        // const pool = await getPool1()
+        const pool =await getPool1()
         const { brandid, dealerid, locationid, partid, max, remarkid, customrem, proposedqty } = req.body
         if (!brandid || !dealerid || !locationid || !partid || max == null || proposedqty == null || !remarkid) {
             return res.status(400).json({ Error: `All Fields are required` })
@@ -153,7 +155,7 @@ const userFeedbacklog = async (req, res) => {
                                 from z_scope.dbo.substitution_master sm
                                  join z_scope.dbo.part_master pm on pm.brandid = sm.brandid and pm.partnumber = sm.partnumber 
                                 where pm.partid = ${partid}`
-            const result = await pool2.request().query(LatestPartQuery)
+            const result = await pool.request().query(LatestPartQuery)
             LatestPartID = result.recordset.length > 0 ? result.recordset[0].LatestPartNumber : null;
             // console.log(LatestPartID);
 
@@ -286,7 +288,7 @@ const viewLog = async (req, res) => {
 }
 const adminView = async (req, res) => {
     try {
-        const pool = await getPool2()
+        const pool = await getPool1()
         const { brandid, dealerid, r1, r2, l1, l2, partnumber, locationid, flag, seasonalid, modelid, natureid, status, parttype } = req.body
         // console.log(brandid, dealerid, r1, r2 ,l1,l2, partnumber , locationid , flag, seasonalid, modelid, natureid, status,parttype);
 
@@ -391,7 +393,7 @@ const adminFeedbackLog = async (req, res) => {
 }
 const partFamily = async (req, res) => {
     try {
-        const pool = await getPool2()
+        const pool = await getPool1()
         const { partnumber, brandid } = req.body
         if (!partnumber || !brandid) {
             return res.status(400).json({ Error: `partnumber and brandid is required` })
@@ -402,89 +404,96 @@ const partFamily = async (req, res) => {
         //                 select pm.partnumber1, (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END)as LatestPartNumber , pm.partdesc, pm.category,pm.landedcost from [10.10.152.16].[z_scope].dbo.substitution_master sm 
         //                 join [10.10.152.16].[z_scope].dbo.part_master pm on pm.brandid = sm.brandid and pm.partnumber1 = sm.partnumber1
         //                 where sm.subpartnumber = (select distinct subpartnumber1 from [10.10.152.16].[z_scope].dbo.substitution_master where partnumber1 = @partnumber)`
-        const query = `use z_scope
-                        select pm.partnumber1, (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END)as LatestPartNumber , pm.partdesc, pm.category,pm.landedcost from z_scope.dbo.Substitution_Master sm
-                        join z_scope.dbo.part_master pm on pm.brandid = sm.brandid and sm.partnumber = pm.partnumber
-                        where sm.subpartnumber = '${partnumber}' and sm.brandid = ${brandid}`
-                    //     DECLARE 
-                    //     @InputPart    VARCHAR(40) = '0827099901L',   -- ← your input part
-                    //     @InputBrandID INT         = 14;               -- ← your input brand
+        // `use z_scope
+        //                 select pm.partnumber1, (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END)as LatestPartNumber , pm.partdesc, pm.category,pm.landedcost from z_scope.dbo.Substitution_Master sm
+        //                 join z_scope.dbo.part_master pm on pm.brandid = sm.brandid and sm.partnumber = pm.partnumber
+        //                 where sm.subpartnumber = '${partnumber}' and sm.brandid = ${brandid}`
+                  const query =     ` DECLARE 
+                        @InputPart    VARCHAR(40) = '${partnumber}',   -- ← your input part
+                        @InputBrandID INT         = ${brandid};               -- ← your input brand
                     
-                    // DECLARE @RowsInserted INT;
+                    DECLARE @RowsInserted INT;
                     
-                    // -- 0) Drop any old temp‐table
-                    // IF OBJECT_ID('tempdb..#PartFamily','U') IS NOT NULL
-                    //     DROP TABLE #PartFamily;
+                    -- 0) Drop any old temp‐table
+                    IF OBJECT_ID('tempdb..#PartFamily','U') IS NOT NULL
+                        DROP TABLE #PartFamily;
                     
-                    // -- 1) Create a holding table: one row per (Part, BrandID)
-                    // CREATE TABLE #PartFamily (
-                    //     Part    VARCHAR(40),
-                    //     BrandID INT,
-                    //     CONSTRAINT PK_PartFamily PRIMARY KEY (Part, BrandID)
-                    // );
+                    -- 1) Create a holding table: one row per (Part, BrandID)
+                    CREATE TABLE #PartFamily (
+                        Part    VARCHAR(40),
+                        BrandID INT,
+                        CONSTRAINT PK_PartFamily PRIMARY KEY (Part, BrandID)
+                    );
                     
-                    // -- 2) Seed it with exactly your input (part, brand)
-                    // INSERT INTO #PartFamily(Part, BrandID)
-                    // VALUES (@InputPart, @InputBrandID);
+                    -- 2) Seed it with exactly your input (part, brand)
+                    INSERT INTO #PartFamily(Part, BrandID)
+                    VALUES (@InputPart, @InputBrandID);
                     
-                    // -- 3) Iteratively grow the family within that brand
-                    // SET @RowsInserted = 1;
-                    // WHILE @RowsInserted > 0
-                    // BEGIN
-                    //     INSERT INTO #PartFamily(Part, BrandID)
-                    //     SELECT DISTINCT
-                    //         sm.SubPartNumber1,
-                    //         sm.BrandID
-                    //     FROM Substitution_Master AS sm
-                    //     JOIN #PartFamily AS f
-                    //       ON sm.PartNumber1 = f.Part
-                    //      AND sm.BrandID    = f.BrandID
-                    //     WHERE NOT EXISTS (
-                    //        SELECT 1
-                    //        FROM #PartFamily x
-                    //        WHERE x.Part    = sm.SubPartNumber1
-                    //          AND x.BrandID = sm.BrandID
-                    //     )
+                    -- 3) Iteratively grow the family within that brand
+                    SET @RowsInserted = 1;
+                    WHILE @RowsInserted > 0
+                    BEGIN
+                        INSERT INTO #PartFamily(Part, BrandID)
+                        SELECT DISTINCT
+                            sm.SubPartNumber1,
+                            sm.BrandID
+                        FROM Substitution_Master AS sm
+                        JOIN #PartFamily AS f
+                          ON sm.PartNumber1 = f.Part
+                         AND sm.BrandID    = f.BrandID
+                        WHERE NOT EXISTS (
+                           SELECT 1
+                           FROM #PartFamily x
+                           WHERE x.Part    = sm.SubPartNumber1
+                             AND x.BrandID = sm.BrandID
+                        )
                     
-                    //     UNION
+                        UNION
                     
-                    //     SELECT DISTINCT
-                    //         sm.PartNumber1,
-                    //         sm.BrandID
-                    //     FROM Substitution_Master AS sm
-                    //     JOIN #PartFamily AS f
-                    //       ON sm.SubPartNumber1 = f.Part
-                    //      AND sm.BrandID        = f.BrandID
-                    //     WHERE NOT EXISTS (
-                    //        SELECT 1
-                    //        FROM #PartFamily x
-                    //        WHERE x.Part    = sm.PartNumber1
-                    //          AND x.BrandID = sm.BrandID
-                    //     );
+                        SELECT DISTINCT
+                            sm.PartNumber1,
+                            sm.BrandID
+                        FROM Substitution_Master AS sm
+                        JOIN #PartFamily AS f
+                          ON sm.SubPartNumber1 = f.Part
+                         AND sm.BrandID        = f.BrandID
+                        WHERE NOT EXISTS (
+                           SELECT 1
+                           FROM #PartFamily x
+                           WHERE x.Part    = sm.PartNumber1
+                             AND x.BrandID = sm.BrandID
+                        );
                     
-                    //     SET @RowsInserted = @@ROWCOUNT;
-                    // END
+                        SET @RowsInserted = @@ROWCOUNT;
+                    END
                     
-                    // -- 4) Pull full details for every (Part, BrandID) found
-                    // SELECT  
-                    //     pm.PartNumber1,
-                    //     pm.PartDesc,
-                    //     pm.LandedCost,
-                    //     pm.MRP,
-                    //     pm.PartID,
-                    //     pm.Category,
-                    //     pm.MOQ,
-                    //     pm.BrandID
-                    // FROM Part_Master pm
-                    // JOIN #PartFamily pf
-                    //   ON pm.PartNumber1 = pf.Part
-                    //  AND pm.BrandID     = pf.BrandID
-                    // ORDER BY pm.PartNumber1, pm.BrandID;
+                    -- 4) Pull full details for every (Part, BrandID) found
+                     SELECT  
+                        pm.PartNumber1,
+						CASE when pf.part = sm.partnumber then sm.subpartnumber else pf.part end as LatestPartNumber,
+                        pm.PartDesc,
+                        pm.LandedCost,
+                        pm.MRP,
+                        pm.PartID,
+                        pm.Category,
+                        pm.MOQ,
+                        pm.BrandID
+                    FROM Part_Master pm
+                    JOIN #PartFamily pf
+                      ON pm.PartNumber1 = pf.Part
+                     AND pm.BrandID     = pf.BrandID
+					 JOIN Substitution_Master sm 
+					 on pf.BrandID = sm.brandid
+					 and pf.part = sm.partnumber1
+                    ORDER BY pm.PartNumber1, pm.BrandID;
                     
-                    // -- 5) Clean up
-                    // DROP TABLE #PartFamily;
+                    -- 5) Clean up
+                    DROP TABLE #PartFamily;`
                     
-        const result = await pool.request().input('partnumber', sql.VarChar, partnumber).query(query)
+        const result = await pool.request()
+        .input('partnumber', sql.VarChar, partnumber)
+        .input('brandid', sql.Int, brandid)
+        .query(query)
         // console.log(result.recordset);
 
         res.status(200).json({ Data: result.recordset })
@@ -502,7 +511,7 @@ DECLARE @sql NVARCHAR(MAX) = N'';
 SELECT @sql = @sql + 
     'SELECT li.Brand,li.brandid, li.dealer,li.dealerid, li.location,li.locationid, COUNT(*) AS Pending ' +
     'FROM ' + QUOTENAME(name) + ' a ' + 
-    'JOIN [10.10.152.16].z_scope.dbo.locationinfo li ON li.locationid = a.locationid ' + 
+    'JOIN z_scope.dbo.locationinfo li ON li.locationid = a.locationid ' + 
     'WHERE a.status = ''Pending'' ' +
     'GROUP BY li.Brand,li.brandid, li.dealer,li.dealerid,li.locationid, li.location UNION ALL ' 
 FROM sys.tables
@@ -526,7 +535,7 @@ EXEC sp_executesql @sql;`
 }
 const partFamilySale = async (req, res) => {
     try {
-        // const pool = await getPool2()
+        // const pool = await getPool1()
         const { partnumber, brandid, dealerid, locationid } = req.body
         if (!partnumber || !brandid || !dealerid || !locationid) {
             return res.status(400).json({ message: `All fields are required` })
@@ -705,12 +714,26 @@ const dealerUpload = async (req, res) => {
                 ProposedQty
             }));
 // 
-        // console.log(cleanedData);
+        // Fetch the brandid and dealerid for a given brand and dealer if needed
+        const brand = cleanedData[0].Brand;
+        const dealer = cleanedData[0].Dealer;
+        const location = cleanedData[0].Location;
+
+
+        const queryIds = `SELECT brandid, dealerid , locationid
+                    FROM z_scope..locationinfo 
+                    WHERE brand LIKE '${brand}' AND dealer LIKE '${dealer}' AND location LIKE '${location}'`;
+
+        const resultIds = await pool.request().query(queryIds);
+        const { brandid, dealerid , locationid } = resultIds.recordset[0];
+        // console.log(brandid, dealerid , locationid);
+        
         const partidpartnumbermapping = [];
 
-        const query = `select distinct  partid , partnumber from z_scope..Stockable_Nonstockable_TD001_8 where Locationid = 14 `;
+        const query = `select distinct  partid , partnumber from z_scope..Stockable_Nonstockable_TD001_${dealerid} where Locationid = ${locationid}`;
+        
         const partidpartnumberresult = await pool.request().query(query);
-
+        
         if (partidpartnumberresult.recordset.length > 0) {
             partidpartnumbermapping.push(...partidpartnumberresult.recordset);
         }
@@ -752,17 +775,7 @@ const dealerUpload = async (req, res) => {
         // console.log('Distinct Dealers:', distinctDealers);
         // console.log('Distinct PartID:', distinctPartid);
 
-        // Fetch the brandid and dealerid for a given brand and dealer if needed
-        const brand = data[0].Brand;
-        const dealer = data[0].Dealer;
 
-
-        const queryIds = `SELECT brandid, dealerid 
-                    FROM z_scope..locationinfo 
-                    WHERE brand LIKE '${brand}' AND dealer LIKE '${dealer}'`;
-
-        const resultIds = await pool.request().query(queryIds);
-        const { brandid, dealerid } = resultIds.recordset[0];
         // console.log('Brand & Dealer IDs:', { brandid, dealerid });
 
         // Now, similarly, fetch IDs for each distinct brand
@@ -1001,8 +1014,8 @@ const dealerUpload = async (req, res) => {
 };
 
 const adminUpload = async (req, res) => {
+    // const pool = await getPool1()
     const pool = await getPool1()
-    const pool2 = await getPool2()
     const {file} = req.body
     if (!req.file || req.file.length === 0) {
         return res.status(400).json({ message: "No files received" });
@@ -1065,8 +1078,8 @@ const adminUpload = async (req, res) => {
 
     const brand = data[0].brand;
     const queryIds = `SELECT top 1 brandid
-FROM z_scope..locationinfo 
-WHERE brand LIKE '${brand}'`;
+                        FROM z_scope..locationinfo 
+                        WHERE brand LIKE '${brand}'`;
 
     const resultIds = await pool.request().query(queryIds);
     // console.log(resultIds.recordset);
@@ -1112,7 +1125,7 @@ WHERE brand LIKE '${brand}'`;
       AND dealerid = '${dealerResults[0].dealerid}'
       AND location LIKE '${loc}'
   `;
-        const locResult = await pool2.request().query(queryLocation);
+        const locResult = await pool.request().query(queryLocation);
         if (locResult.recordset.length) {
             locationResults.push({
                 location: loc,

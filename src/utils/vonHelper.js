@@ -1,10 +1,10 @@
 import sql from 'mssql'
 import xlsx from 'xlsx'
-import { getPool1 } from '../db/db.js'
+import { getPool1, getPool2 } from '../db/db.js'
 
 const partBrandCheck = async(dealerid,locationid,partid)=>{
     try {
-        const pool = await getPool1()
+        const pool = await getPool2()
         // const partCheck = `use [z_scope]  SELECT CASE 
         //                   WHEN EXISTS (SELECT 1 FROM locationinfo WHERE brandid = (SELECT brandid FROM Part_Master WHERE partid = ${partid})
         //                   AND dealerid = ${dealerid} 
@@ -32,7 +32,9 @@ const partBrandCheck = async(dealerid,locationid,partid)=>{
             return false
         }
         } catch (error) {
-          console.log(error.message);
+          // console.log(error.message);
+          throw new Error(`partBrandCheck failed : ${error.message}`);
+          
           
         }
 }
@@ -315,7 +317,7 @@ function findLocationPartidDuplicatesAdmin(data) {
 const checkPendingFeedbackAndStatus = async (dealerid, tableName, formattedData, res) => {
   try {
       // Get database connection
-      const pool = await getPool1();
+      const pool = await getPool2();
 
       // Fetch pending feedback records for the given dealer
       const query = `SELECT partid, locationid FROM ${tableName} WHERE dealerid = ${dealerid} and status = 'Pending'`;
@@ -340,8 +342,10 @@ return pendingRecords.length > 0 ? pendingRecords : [];
       // return { message: "Success", pending: false };
 
   } catch (error) {
-      console.error("Error checking pending feedback:", error);
-      return res.status(500).json({ message: "Internal Server Error", error });
+      // console.error("Error checking pending feedback:", error);
+      // return res.status(500).json({ message: "Internal Server Error", error });
+      throw new Error(`checkPendingFeedbackAndStatus failed : ${error.message}`);
+      
   }
 };
 
@@ -350,7 +354,7 @@ const checkReviewedFeedbackByBrand = async (brandid, formattedData) => {
     // console.log(brandid,formattedData);
     
     // Get database connection
-    const pool = await getPool1();
+    const pool = await getPool2();
 
     // SQL query with parameterized Brandid
     const query = `
