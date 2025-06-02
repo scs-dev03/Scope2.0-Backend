@@ -445,6 +445,7 @@ try {
           co.jobcard_number,
           co.part_number1,
           pm.partdesc,
+          pm.category,
           co.Price,
           co.Qty,
           co.Stock AS StockQty,
