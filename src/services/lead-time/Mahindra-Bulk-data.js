@@ -6,10 +6,10 @@ import moment from "moment";
             let isNullFound=false;
             let part_number=data[0]["part no"];
             let brandId=9;
-            let query=`Select brandid from z_scope.dbo.part_master where partnumber=@part_number and brandid=@brandId`;
+            let query=`Select brandid from z_scope.dbo.VW_PartMaster where partno=@part_number and brandid=@brandId`;
             const result=await pool.request().input('part_number',part_number).input('brandId',brandId).query(query);
            // console.log("result in mahindra po",result)
-            if(result.length==0){
+            if(result.recordset.length==0){
                 // let tableNamePO='Mahindra_PO_file_Lead_Time_Latest_Data';
                 // let tableNameMRN='Mahindra_receipt_file_lead_Time_Latest_data'
                 // let query1=`TRUNCATE TABLE ${tableNamePO}`
@@ -90,10 +90,11 @@ import moment from "moment";
                 });
             
                 const request = pool.request();
+                await request.query('use UAD_BI_LEAD_TIME ')
                 await request.query('TRUNCATE TABLE Mahindra_PO_file_Lead_Time_Latest_Data');
                 // Execute the bulk insert
                 await request.bulk(table);
-                isColumnMatch=true;
+               let isColumnMatch=true;
                 // return { status: 200, message: 'Bulk insert successful!',columns:expectedColumns};
             }
         }
@@ -114,10 +115,10 @@ import moment from "moment";
         data=data.slice(1);
         let part_number=data[0]["part number"];
         let brandId=9;
-        let query=`Select brandid from z_scope.dbo.part_master where partnumber=@part_number and brandid=@brandId`;
+        let query=`Select brandid from z_scope.dbo.VW_PartMaster where partno=@part_number and brandid=@brandId`;
         const result=await pool.request().input('part_number',part_number).input('brandId',brandId).query(query);
       //  console.log("result in mahindra ",result)
-        if(result.length==0){
+        if(result.recordset.length==0){
             // let tableNamePO='Mahindra_PO_file_Lead_Time_Latest_Data';
             //     let tableNameMRN='Mahindra_receipt_file_lead_Time_Latest_data'
             //     let query1=`TRUNCATE TABLE ${tableNamePO}`
@@ -205,7 +206,8 @@ import moment from "moment";
         });
     
         const request = pool.request();
-        await request.query('TRUNCATE TABLE Mahindra_receipt_file_lead_Time_Latest_data');
+        await request.query('use UAD_BI_LEAD_TIME ')
+         await request.query('TRUNCATE TABLE Mahindra_receipt_file_lead_Time_Latest_data');
         // Execute the bulk insert
         await request.bulk(table);
     }

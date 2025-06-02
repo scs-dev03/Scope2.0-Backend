@@ -31,7 +31,7 @@ import sql from "mssql2";
             request.input('Location',item['location']);
             }
             // Define the SQL query to execute the MERGE statement
-            const result = await request.execute('dbo.upload_hero_data');
+            // const result = await request.execute('dbo.upload_hero_data');
             // console.log('Procedure executed successfully.1 ',result);
         }
         catch(error){

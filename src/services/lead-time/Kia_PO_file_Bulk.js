@@ -7,10 +7,10 @@ import moment from "moment";
 
     let part_number=data[0]["part no"];
     let brandId=33;
-    let query=`Select brandid from z_scope.dbo.part_master where partnumber=@part_number and brandid=@brandId`;
+    let query=`Select brandid from z_scope.dbo.VW_PartMaster where partno=@part_number and brandid=@brandId`;
     const result=await pool.request().input('part_number',part_number).input('brandId',brandId).query(query);
-    console.log("result in kia ",result)
-    if(result.length==0){
+    //console.log("result in kia ",result)
+    if(result.recordset.length==0){
     //  let tableNamePO='kia_bo_file_lead_time_latest_data';
     //  let tableNameMRN='kia_Pur_File_lead_time_latest_data'
     //  let query1=`TRUNCATE TABLE ${tableNamePO}`
@@ -73,7 +73,8 @@ import moment from "moment";
     });
 
     const request = pool.request();
-    await request.query('TRUNCATE TABLE kia_Pur_File_lead_time_latest_data');
+    await request.query('use UAD_BI_LEAD_TIME ')
+    await request.query(' TRUNCATE TABLE kia_Pur_File_lead_time_latest_data');
     // Execute the bulk insert
     await request.bulk(table);
     // await request.execute('usp_UpdateOrInsertHeroLeadTimeFile');
@@ -89,10 +90,10 @@ import moment from "moment";
     let part_number=data[0]["part no current"];
     //console.log("part number in kia ",part_number,data[0])
     let brandId=33;
-    let query=`Select brandid from z_scope.dbo.part_master where partnumber=@part_number and brandid=@brandId`;
+    let query=`Select brandid from z_scope.dbo.VW_PartMaster where partno=@part_number and brandid=@brandId`;
     const result=await pool.request().input('part_number',part_number).input('brandId',brandId).query(query);
     //console.log("result in kia ",result)
-    if(result.length==0){
+    if(result.recordset.length==0){
     //  let tableNamePO='kia_bo_file_lead_time_latest_data';
     //  let tableNameMRN='kia_Pur_File_lead_time_latest_data'
     //  let query1=`TRUNCATE TABLE ${tableNamePO}`
@@ -171,6 +172,7 @@ import moment from "moment";
 
     try {
         // Execute the bulk insert
+        await request.query('use UAD_BI_LEAD_TIME ')
         await request.query('TRUNCATE TABLE kia_bo_file_lead_time_latest_data');
         await request.bulk(table);
         

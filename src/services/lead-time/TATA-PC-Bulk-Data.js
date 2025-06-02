@@ -3,146 +3,268 @@ import sql from 'mssql'
 import moment from "moment";
 import momentTimeZone from "moment-timezone";
 
- const  bulkTATAPCInsertPOData= async function(data,pool, dealer, location,res) {
-        // console.log('----------------------it is executing');
-        let isNullFound=false;
-        let part_number=data[0]["part"];
-        let brandId=28;
+//  const  bulkTATAPCInsertPOData= async function(data,pool, dealer, location,res) {
+//         // console.log('----------------------it is executing');
+//         let isNullFound=false;
+//         let part_number=data[0]["part"];
+//         let brandId=28;
       
-        let query=`Select brandid from z_scope.dbo.part_master where partnumber=@part_number and brandid=@brandId`;
-        const result=await pool.request().input('part_number',part_number).input('brandId',brandId).query(query);
-       // console.log("result in tata pc mrn",result)
-        if(result.length==0){
-            // let tableNamePO='TATA_pc_Purchase_Line_Items_lead_time_Latest_Data'
-            // let query1=`TRUNCATE TABLE ${tableNamePO}`
-            // await pool.request().query(query1);
-            return {poFailed:true}
-        }
-        for(let item of data){
-            const Dealer = dealer || item["dealer"];  // Use provided dealer or item["dealer"]
-        const Location = location || item["location"];
-            if(!Dealer || !Location || !item["part"] || item["part"]==0){
+//         let query=`Select brandid from z_scope.dbo.VW_PartMaster where partno=@part_number and brandid=@brandId`;
+//         const result=await pool.request().input('part_number',part_number).input('brandId',brandId).query(query);
+//        // console.log("result in tata pc mrn",result)
+//         if(result.recordset.length==0){
+//             // let tableNamePO='TATA_pc_Purchase_Line_Items_lead_time_Latest_Data'
+//             // let query1=`TRUNCATE TABLE ${tableNamePO}`
+//             // await pool.request().query(query1);
+//             return {poFailed:true}
+//         }
+//         for(let item of data){
+//             const Dealer = dealer || item["dealer"];  // Use provided dealer or item["dealer"]
+//         const Location = location || item["location"];
+//             if(!Dealer || !Location || !item["part"] || item["part"]==0){
 
-                    isNullFound=true;
-                    return isNullFound;    
-            }
-        }
-        if(!isNullFound){
-        
-        const values = data.map(item => {
-            // console.log("item ",item)
-            const Dealer = dealer || item["dealer"];  // Use provided dealer or item["dealer"]
-            const Location = location || item["location"]; 
-            return [
-            item["order"], // [Order No]
+//                     isNullFound=true;
+//                     return isNullFound;    
+//             }
+//         }
+//         if(!isNullFound){
+//             // !== null && !isNaN(parseFloat(item["recd qty"])) 
+//             //     ? parseFloat(parseFloat(item["recd qty"]).toFixed(2)) // Convert to decimal with 2 decimal places
+//             //     : null, // [Recd Qty]
             
-            // [Part No]
-            item["part"], // [Part No]
+//       //  console.log("item ",data[0])
+//         const values = data.map(item => {
+//             // console.log("item ",item)
+//             const Dealer = dealer || item["dealer"];  // Use provided dealer or item["dealer"]
+//             const Location = location || item["location"]; 
+//             return [
+//             item["order"], // [Order No]
             
-            // [Recd Qty] - Ensure it's a valid decimal
-            item["recd qty"] !== null && !isNaN(parseFloat(item["recd qty"])) 
-                ? parseFloat(item["recd qty"]).toFixed(2) // Convert to decimal with 2 decimal places
-                : null, // [Recd Qty]
+//             // [Part No]
+//             item["part"], // [Part No]
             
-            // [Status]
-            item["status"], // [Status]
+//             // [Recd Qty] - Ensure it's a valid decimal
+//             item["recd qty"] ,
+//             // [Status]
+//             item["status"], // [Status]
             
-            // [Ware House Name]
-            item["ware house name"], // [Ware House Name]
+//             // [Ware House Name]
+//             item["ware house name"], // [Ware House Name]
             
-            // [Payer Code]
-            item["payer code"], // [Payer Code]
+//             // [Payer Code]
+//             item["payer code"], // [Payer Code]
             
-            // [Division Name]
-            item["division name"], // [Division Name]
+//             // [Division Name]
+//             item["division name"], // [Division Name]
             
-            // [Transaction Date] - Ensure it's a valid date
-            item["transaction date"] !== "0-00-00" && item["transaction date"] !== null 
-                ? (item['transaction date'])
-                : null, // [Transaction Date]
+//             // [Transaction Date] - Ensure it's a valid date
+//             item["transaction date"] !== "0-00-00" && item["transaction date"] !== null 
+//                 ? (item['transaction date'])
+//                 : null, // [Transaction Date]
             
-            // [purchase_order_date] - Ensure it's a valid date
-            item["purchaseorderdate"] !== "0-00-00" && item["purchaseorderdate"] !== null 
-                ? item["purchaseorderdate"]
-                : null, // [purchase_order_date]
+//             // [purchase_order_date] - Ensure it's a valid date
+//             item["purchaseorderdate"] !== "0-00-00" && item["purchaseorderdate"] !== null 
+//                 ? item["purchaseorderdate"]
+//                 : null, // [purchase_order_date]
             
-            // [Invoice_Date] - Ensure it's a valid date
-            item["invoicedate"] !== "0-00-00" && item["invoicedate"] !== null 
-                ? item["invoicedate"]
-                : null, // [Invoice_Date]
+//             // [Invoice_Date] - Ensure it's a valid date
+//             item["invoicedate"] !== "0-00-00" && item["invoicedate"] !== null 
+//                 ? item["invoicedate"]
+//                 : null, // [Invoice_Date]
             
-            // [Spares Order Type]
-            item["spares order type"], // [Spares Order Type]
+//             // [Spares Order Type]
+//             item["spares order type"], // [Spares Order Type]
             
-            // [SAP Order Num]
-            item["sap order num"], // [SAP Order Num]
+//             // [SAP Order Num]
+//             item["sap order num"], // [SAP Order Num]
             
-            // [Commit Flag]
-            item["commit flag"], // [Commit Flag]
+//             // [Commit Flag]
+//             item["commit flag"], // [Commit Flag]
             
-            // Dealer
-            Dealer, // [Dealer]
+//             // Dealer
+//             Dealer, // [Dealer]
             
-            // Location
-            Location // [Location]
-        ]
-        })
+//             // Location
+//             Location // [Location]
+//         ]
+//         })
     
-        await pool.request().query('use UAD_BI_LEAD_TIME')
-        const table = new sql.Table('TATA_pc_Purchase_Line_Items_lead_time_Latest_Data'); // Updated table name
-        table.create = false;
+//         await pool.request().query('use UAD_BI_LEAD_TIME')
+//         const table = new sql.Table('TATA_pc_Purchase_Line_Items_lead_time_Latest_Data'); // Updated table name
+//         table.create = false;
     
-        // Define columns based on your new schema
-        table.columns.add('Order No', sql.VarChar(355), { nullable: true }); // [Order No]
-        table.columns.add('Part No', sql.VarChar(100), { nullable: true }); // [Part No]
-        table.columns.add('Recd Qty', sql.Decimal(38, 2), { nullable: true }); // [Recd Qty]
-        table.columns.add('Status', sql.VarChar(100), { nullable: true }); // [Status]
-        table.columns.add('Ware House Name', sql.VarChar(355), { nullable: true }); // [Ware House Name]
-        table.columns.add('Payer Code', sql.VarChar(100), { nullable: true }); // [Payer Code]
-        table.columns.add('Division Name', sql.VarChar(355), { nullable: true }); // [Division Name]
-        table.columns.add('Transaction Date', sql.Date, { nullable: true }); // [Transaction Date]
-        table.columns.add('purchase_order_date', sql.Date, { nullable: true }); // [purchase_order_date]
-        table.columns.add('Invoice_Date', sql.Date, { nullable: true }); // [Invoice_Date]
-        table.columns.add('Spares Order Type', sql.VarChar(150), { nullable: true }); // [Spares Order Type]
-        table.columns.add('SAP Order Num', sql.VarChar(150), { nullable: true }); // [SAP Order Num]
-        table.columns.add('Commit Flag', sql.VarChar(10), { nullable: true }); // [Commit Flag]
-        table.columns.add('Dealer', sql.VarChar(100), { nullable: true }); // [Dealer]
-        table.columns.add('Location', sql.VarChar(255), { nullable: true }); // [Location]
+//         // Define columns based on your new schema
+//         table.columns.add('Order No', sql.VarChar(355), { nullable: true }); // [Order No]
+//         table.columns.add('Part No', sql.VarChar(100), { nullable: true }); // [Part No]
+//         table.columns.add('Recd Qty', sql.Decimal(38, 2), { nullable: true }); // [Recd Qty]
+//         table.columns.add('Status', sql.VarChar(100), { nullable: true }); // [Status]
+//         table.columns.add('Ware House Name', sql.VarChar(355), { nullable: true }); // [Ware House Name]
+//         table.columns.add('Payer Code', sql.VarChar(100), { nullable: true }); // [Payer Code]
+//         table.columns.add('Division Name', sql.VarChar(355), { nullable: true }); // [Division Name]
+//         table.columns.add('Transaction Date', sql.Date, { nullable: true }); // [Transaction Date]
+//         table.columns.add('purchase_order_date', sql.Date, { nullable: true }); // [purchase_order_date]
+//         table.columns.add('Invoice_Date', sql.Date, { nullable: true }); // [Invoice_Date]
+//         table.columns.add('Spares Order Type', sql.VarChar(150), { nullable: true }); // [Spares Order Type]
+//         table.columns.add('SAP Order Num', sql.VarChar(150), { nullable: true }); // [SAP Order Num]
+//         table.columns.add('Commit Flag', sql.VarChar(10), { nullable: true }); // [Commit Flag]
+//         table.columns.add('Dealer', sql.VarChar(100), { nullable: true }); // [Dealer]
+//         table.columns.add('Location', sql.VarChar(255), { nullable: true }); // [Location]
     
-        // Add rows to the table
-        values.forEach((row) => {
-            table.rows.add(
-                row[0],  // [Order No]
-                row[1],  // [Part No]
-                row[2],  // [Recd Qty]
-                row[3],  // [Status]
-                row[4],  // [Ware House Name]
-                row[5],  // [Payer Code]
-                row[6],  // [Division Name]
-                row[7],  // [Transaction Date]
-                row[8],  // [purchase_order_date]
-                row[9],  // [Invoice_Date]
-                row[10], // [Spares Order Type]
-                row[11], // [SAP Order Num]
-                row[12], // [Commit Flag]
-                row[13], // [Dealer]
-                row[14]  // [Location]
-            );
-        });
+//         // Add rows to the table
+//         values.forEach((row) => {
+//             table.rows.add(
+//                 row[0],  // [Order No]
+//                 row[1],  // [Part No]
+//                 toDecimal(row[2]),  // [Recd Qty]
+//                 row[3],  // [Status]
+//                 row[4],  // [Ware House Name]
+//                 row[5],  // [Payer Code]
+//                 row[6],  // [Division Name]
+//                 row[7],  // [Transaction Date]
+//                 row[8],  // [purchase_order_date]
+//                 row[9],  // [Invoice_Date]
+//                 row[10], // [Spares Order Type]
+//                 row[11], // [SAP Order Num]
+//                 row[12], // [Commit Flag]
+//                 row[13], // [Dealer]
+//                 row[14]  // [Location]
+//             );
+//         });
     
-        const request = await pool.request();
+//         const request = await pool.request();
     
-        // Execute the bulk insert
-        try {
-            await request.query('TRUNCATE TABLE TATA_pc_Purchase_Line_Items_lead_time_Latest_Data');
-            await request.bulk(table);
+//         // Execute the bulk insert
+//         try {
+//             console.log("table ",table.rows[0])
+//             await request.query('use UAD_BI_LEAD_TIME TRUNCATE TABLE TATA_pc_Purchase_Line_Items_lead_time_Latest_Data');
+//             await request.bulk(table);
            
-        } catch (error) {
-            console.error('Error during bulk insert:', error);
-            throw error; // Rethrow the error for further handling if necessary
+//         } catch (error) {
+//             console.error('Error during bulk insert:', error);
+//             throw error; // Rethrow the error for further handling if necessary
+//         }
+//     }
+//     }
+
+const bulkTATAPCInsertPOData = async function (data, pool, dealer, location, res) {
+    let isNullFound = false;
+    const part_number = data[0]["part"];
+    const brandId = 28;
+
+    const result = await pool.request()
+        .input('part_number', part_number)
+        .input('brandId', brandId)
+        .query(`SELECT brandid FROM z_scope.dbo.VW_PartMaster WHERE partno=@part_number AND brandid=@brandId`);
+
+    if (result.recordset.length === 0) {
+        return { poFailed: true };
+    }
+
+    // Validate mandatory fields
+    for (let item of data) {
+        const Dealer = dealer || item["dealer"];
+        const Location = location || item["location"];
+        if (!Dealer || !Location || !item["part"] || item["part"] === 0) {
+            return true;
         }
     }
+
+    const toDecimal = (value) => {
+        if (value === null || value === undefined || value === '') return null;
+        const num = Number(value);
+        return Number.isFinite(num) ? num : null;
+    };
+
+    const values = data.map(item => {
+        const Dealer = dealer || item["dealer"];
+        const Location = location || item["location"];
+        return [
+            item["order"],                        // Order No
+            item["part"],                         // Part No
+            item["recd qty"],                     // Recd Qty (will be converted below)
+            item["status"],                       // Status
+            item["ware house name"],              // Ware House Name
+            item["payer code"],                   // Payer Code
+            item["division name"],                // Division Name
+            item["transaction date"] || null,     // Transaction Date
+            item["purchaseorderdate"] || null,    // Purchase Order Date
+            item["invoicedate"] || null,          // Invoice Date
+            item["spares order type"],            // Spares Order Type
+            item["sap order num"],                // SAP Order Num
+            item["commit flag"],                  // Commit Flag
+            Dealer,                               // Dealer
+            Location                              // Location
+        ];
+    });
+
+    await pool.request().query('USE UAD_BI_LEAD_TIME');
+
+    const table = new sql.Table('TATA_pc_Purchase_Line_Items_lead_time_Latest_Data');
+    table.create = false;
+
+    // Define columns
+    table.columns.add('Order No', sql.VarChar(355), { nullable: true });
+    table.columns.add('Part No', sql.VarChar(100), { nullable: true });
+    table.columns.add('Recd Qty', sql.Decimal(38, 2), { nullable: true });
+    table.columns.add('Status', sql.VarChar(100), { nullable: true });
+    table.columns.add('Ware House Name', sql.VarChar(355), { nullable: true });
+    table.columns.add('Payer Code', sql.VarChar(100), { nullable: true });
+    table.columns.add('Division Name', sql.VarChar(355), { nullable: true });
+    table.columns.add('Transaction Date', sql.Date, { nullable: true });
+    table.columns.add('purchase_order_date', sql.Date, { nullable: true });
+    table.columns.add('Invoice_Date', sql.Date, { nullable: true });
+    table.columns.add('Spares Order Type', sql.VarChar(150), { nullable: true });
+    table.columns.add('SAP Order Num', sql.VarChar(150), { nullable: true });
+    table.columns.add('Commit Flag', sql.VarChar(10), { nullable: true });
+    table.columns.add('Dealer', sql.VarChar(100), { nullable: true });
+    table.columns.add('Location', sql.VarChar(255), { nullable: true });
+
+    // Add rows with validation and error tracing
+    values.forEach((row, i) => {
+        const recdQty = toDecimal(row[2]);
+        if (recdQty === null && row[2] !== null) {
+           // console.error(`❌ Invalid decimal in row ${i}:`, row[2]);
+        }
+
+        try {
+           table.rows.add(
+    String(row[0]),
+    String(row[1]),
+    toDecimal(row[2]),
+    String(row[3]),
+    String(row[4]),
+    String(row[5]), // 👈 may have been number
+    String(row[6]),
+    row[7] instanceof Date ? row[7] : new Date(row[7]),
+    row[8] instanceof Date ? row[8] : new Date(row[8]),
+    row[9] instanceof Date ? row[9] : new Date(row[9]),
+    String(row[10]),
+    String(row[11]), // 👈 may have been number
+    String(row[12]),
+    String(row[13]),
+    String(row[14])
+);
+
+        } catch (err) {
+            console.error(`❌ Error adding row ${i}`, row);
+            console.error(err.message);
+        }
+    });
+
+    const request = await pool.request();
+
+    try {
+        // console.log("✅ First row sample:", table.rows[0]);
+         await request.query('use UAD_BI_LEAD_TIME ')
+        await request.query('TRUNCATE TABLE TATA_pc_Purchase_Line_Items_lead_time_Latest_Data');
+        await request.bulk(table);
+       // console.log("✅ Bulk insert completed.");
+    } catch (error) {
+        console.error('❌ Error during bulk insert:', error);
+       // throw error;
     }
+};
+
 
 
 
@@ -203,4 +325,8 @@ function excelSerialToDate(serialNumber) {
 //     return formattedDate;
   }
 
+  const toDecimal = (val) => {
+  const num = parseFloat(val);
+  return isNaN(num) ? null : parseFloat(num.toFixed(2)); // returns number, e.g., 100 → 100.00
+};
 export default bulkTATAPCInsertPOData

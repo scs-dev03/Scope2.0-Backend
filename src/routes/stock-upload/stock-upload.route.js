@@ -5,7 +5,7 @@ import fs from 'fs';
 import {uploadDataSingleLocation,getPartNotInMasterSingleLocation,
     allRecordsSingleLocation,uploadedDataSingleLocation,uploadDataMultiLocation
     ,getMultiLocationUploadedData,getPartNotInMasterMultiLocation,
-    allRecordsMultiLocation} from '../../controller/stock-upload/stock-upload.controller.js'
+    allRecordsMultiLocation,getPartNotInMasterInController,bulkUploadDataInController} from '../../controller/stock-upload/stock-upload.controller.js'
 
 const uploadsDir='./mapping-uploads';
 if (!fs.existsSync(uploadsDir)) {
@@ -35,4 +35,9 @@ router.post('/multi-location',multiUpload,uploadDataMultiLocation)
 router.post('/multi-uploadedData',getMultiLocationUploadedData)
 router.post('/part-not-in-master-ml',getPartNotInMasterMultiLocation)
 router.post('/all-records-ml',allRecordsMultiLocation)
+
+//bulk upload
+
+router.post('/part-not-in-master-bulk',getPartNotInMasterInController);
+router.post('/bulk-upload',bulkUploadDataInController)
 export default router
