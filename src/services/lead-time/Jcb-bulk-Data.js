@@ -7,10 +7,10 @@ import moment from "moment";
          let part_number=data[0]["material no"];
         // console.log("part number in jcb ",part_number)
        let brandId=32;
-       let query=`Select brandid from z_scope.dbo.part_master where partnumber=@part_number and brandid=@brandId`;
+       let query=`Select brandid from z_scope.dbo.VW_PartMaster where partno=@part_number and brandid=@brandId`;
        const result=await pool.request().input('part_number',part_number).input('brandId',brandId).query(query);
       // console.log("result in jcb ",result)
-       if(result.length==0){
+       if(result.recordset.length==0){
         // let tableNamePO='JCB_PO_file_lead_time_latest_data';
         // let tableNameMRN='JCB_mrn_file_lead_time_latest_data'
         // let query1=`TRUNCATE TABLE ${tableNamePO}`
@@ -23,7 +23,7 @@ import moment from "moment";
             const Dealer = dealer || item["dealer"];  // Use provided dealer or item["dealer"]
         const Location = location || item["location"];
             if(!Dealer || !Location || !item["material no"] || item["material no"]==0){
-                console.log("item po ",item)
+              //  console.log("item po ",item)
                     isNullFound=true;
                     return isNullFound;    
             }
@@ -49,7 +49,7 @@ import moment from "moment";
             } 
     );
          await pool.request().query('use UAD_BI_LEAD_TIME')
-        const table = new sql.Table(`JCB_PO_file_lead_time_latest_data`); // Use exact table name
+        const table = new sql.Table('JCB_PO_file_lead_time_latest_data'); // Use exact table name
         table.create = false;
     
         // Define columns as per the CREATE TABLE statement exactly (case-sensitive in SQL)
@@ -80,6 +80,8 @@ import moment from "moment";
         });
     
         const request = pool.request();
+//         const checkPool = await pool.request().query('SELECT DB_NAME() AS CurrentDB');
+// console.log('❓ pool is connected to:', checkPool.recordset[0].CurrentDB);
         await request.query('TRUNCATE TABLE JCB_PO_file_lead_time_latest_data');
         // Execute the bulk insert
         await request.bulk(table);
@@ -96,10 +98,10 @@ import moment from "moment";
         let part_number=data[0]["part code"];
         //console.log("data in jcb bulk data 97 ",data)
         let brandId=32;
-        let query=`Select brandid from z_scope.dbo.part_master where partnumber=@part_number and brandid=@brandId`;
+        let query=`Select brandid from z_scope.dbo.VW_PartMaster where partno=@part_number and brandid=@brandId`;
         const result=await pool.request().input('part_number',part_number).input('brandId',brandId).query(query);
         // console.log("result in jcb ",result)
-        if(result.length==0){
+        if(result.recordset.length==0){
         //     let tableNamePO='JCB_PO_file_lead_time_latest_data';
         // let tableNameMRN='JCB_mrn_file_lead_time_latest_data'
         // let query1=`TRUNCATE TABLE ${tableNamePO}`
@@ -112,7 +114,7 @@ import moment from "moment";
             const Dealer = dealer || item["dealer"];  // Use provided dealer or item["dealer"]
         const Location = location || item["location"];
             if(!Dealer || !Location || !item["part code"] || item["part code"]==0){
-                console.log("item ",item)
+               // console.log("item ",item)
                     isNullFound=true;
                     return isNullFound;    
             }
@@ -134,8 +136,8 @@ import moment from "moment";
         ]
         }
     );
-    await pool.request().query('use UAD_BI_LEAD_TIME')
-        const table = new sql.Table(`JCB_mrn_file_lead_time_latest_data`); // Use exact table name
+    // await pool.request().query('use UAD_BI_LEAD_TIME')
+        const table = new sql.Table('JCB_mrn_file_lead_time_latest_data'); // Use exact table name
         table.create = false;
     
         // Define columns using the exact column names you provided
@@ -162,7 +164,23 @@ import moment from "moment";
             );
         });
     
-        const request = pool.request();
+        const request = pool.request()
+//         const checkPool = await pool.request().query('SELECT DB_NAME() AS CurrentDB');
+// console.log('❓ pool is connected to:', checkPool.recordset[0].CurrentDB);
+// const tableList = await pool.request().query(`
+//   SELECT s.name AS SchemaName, t.name AS TableName
+//   FROM sys.tables t
+//   JOIN sys.schemas s ON t.schema_id = s.schema_id
+//   WHERE t.name = 'JCB_mrn_file_lead_time_latest_data'
+// `);
+// console.log('Table info:', tableList.recordset); // confirm schema and existence
+
+// const perms = await pool.request().query(`
+//   SELECT * 
+//   FROM fn_my_permissions('dbo.JCB_mrn_file_lead_time_latest_data', 'OBJECT')
+// `);
+// console.log('Permissions:', perms.recordset.map(p => p.permission_name));
+
         await request.query('TRUNCATE TABLE JCB_mrn_file_lead_time_latest_data');
         // Execute the bulk insert
         await request.bulk(table);

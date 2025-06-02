@@ -1,6 +1,7 @@
 import {stockUploadSingleLocation,getPartNotInMasterSingleLocationInService,
     getAllRecordsSingleLocation,getUploadedDataSingleLocationInService
     ,stockUploadMultiLocation,getUploadedDataMultiLocationInService,
+    getPartNotInMasterBulkInService,uploadBulkData,
     getPartNotInMasterMultiLocationInService,getAllRecordsMultiLocation} from '../../services/stock-upload/stock-upload.service.js'
 const uploadDataSingleLocation=async (req,res)=>{
 
@@ -124,6 +125,30 @@ const allRecordsMultiLocation=async (req,res)=>{
         res.status(201).json({error:error.message});
     }
 }
+
+const getPartNotInMasterInController=async(req,res)=>{
+ try{
+
+        const result=await getPartNotInMasterBulkInService(req.body,res);
+        res.status(200).json({data:result});
+    }
+    catch(error){
+
+        res.status(201).json({error:error.message});
+    }
+}
+
+const bulkUploadDataInController=async(req,res)=>{
+ try{
+
+        const result=await uploadBulkData(req.body,res);
+        res.status(200).json({data:result});
+    }
+    catch(error){
+
+        res.status(201).json({error:error.message});
+    }
+}
 export  {uploadDataSingleLocation,allRecordsSingleLocation,getPartNotInMasterSingleLocation,
-    uploadedDataSingleLocation,uploadDataMultiLocation,
-    getMultiLocationUploadedData,getPartNotInMasterMultiLocation,allRecordsMultiLocation}
+    uploadedDataSingleLocation,uploadDataMultiLocation,bulkUploadDataInController,
+    getMultiLocationUploadedData,getPartNotInMasterMultiLocation,allRecordsMultiLocation,getPartNotInMasterInController}

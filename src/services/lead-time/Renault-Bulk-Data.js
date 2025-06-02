@@ -6,10 +6,10 @@ import moment  from 'moment';
         let isNullFound=false;
         let part_number=data[0]["part no"];
         let brandId=12;
-        let query=`Select brandid from z_scope.dbo.part_master where partnumber=@part_number and brandid=@brandId`;
+        let query=`Select brandid from z_scope.dbo.VW_PartMaster where partno=@part_number and brandid=@brandId`;
         const result=await pool.request().input('part_number',part_number).input('brandId',brandId).query(query);
-        console.log("result in renault mrn",result)
-        if(result.length==0){
+      //  console.log("result in renault mrn",result)
+        if(result.recordset.length==0){
             // let tableNameMRN='Renault_GRN_file_lead_time_latest_data';
             // let tableNamePO='Renault_POSBO_file_lead_time_latest_data'
             // let query1=`TRUNCATE TABLE ${tableNamePO}`
@@ -28,13 +28,15 @@ import moment  from 'moment';
             }
         }
         if(!isNullFound){
+            // console.log("data ",data[0])
         const values = data.map(item => {
 
-            const shippedQuantity = (item['shipped quantity'] !== null && !isNaN(parseFloat(item['shipped quantity']))) ? parseFloat(item['shipped quantity']) : null;
-        const receiptQuantity = (item['receipt quantity'] !== null && !isNaN(parseFloat(item['receipt quantity']))) ? parseFloat(item['receipt quantity']) : null;
+            let shippedQuantity = (item['shipped quantity'] !== null && !isNaN(parseFloat(item['shipped quantity']))) ? parseFloat(item['shipped quantity']) : null;
+        let receiptQuantity = (item['receipt quantity'] !== null && !isNaN(parseFloat(item['receipt quantity']))) ? parseFloat(item['receipt quantity']) : null;
         
-        if (shippedQuantity === null || isNaN(shippedQuantity)) {
-            console.error('Invalid Shipped Quantity:', item['shipped quantity']);
+        if (shippedQuantity == null || isNaN(shippedQuantity)) {
+
+           // console.error('Invalid Shipped Quantity:', item['shipped quantity'],item);
             shippedQuantity = null; // Force it to null
         } 
         const Dealer = dealer || item["dealer"];  // Use provided dealer or item["dealer"]
@@ -85,6 +87,7 @@ import moment  from 'moment';
 
     try {
         // Execute the bulk insert
+        await request.query('use UAD_BI_LEAD_TIME ')
         await request.query('TRUNCATE TABLE Renault_GRN_file_lead_time_latest_data');
         await request.bulk(table);
        
@@ -99,7 +102,7 @@ import moment  from 'moment';
         
         let part_number=data[0]["order part number"];
         let brandId=12;
-        let query=`Select brandid from z_scope.dbo.part_master where partnumber=@part_number and brandid=@brandId`;
+        let query=`Select brandid from z_scope.dbo.VW_PartMaster where partno=@part_number and brandid=@brandId`;
         const result=await pool.request().input('part_number',part_number).input('brandId',brandId).query(query);
        // console.log("result in renault po",result)
         if(result.length==0){
@@ -170,6 +173,7 @@ import moment  from 'moment';
     
         try {
             // Execute the bulk insert
+            await request.query('use UAD_BI_LEAD_TIME ')
             await request.query('TRUNCATE TABLE Renault_POSBO_file_lead_time_latest_data');
             await request.bulk(table);
             

@@ -729,7 +729,7 @@ if (missingFields.length > 0) {
   // 7. Get part master data
   const partMaster = await pool.request()
     .input("brandId", brandId)
-    .query(`USE [z_scope]; SELECT partnumber1, partID FROM part_master WHERE brandId = @brandId`);
+    .query(`USE [z_scope]; SELECT partno as partnumber1, partID FROM VW_PartMaster WHERE brandId = @brandId`);
   const partMap = new Map(partMaster.recordset.map(p => [p.partnumber1.toLowerCase(), p.partID]));
 
   // 8. Get previous unrecognized parts
@@ -1920,7 +1920,7 @@ if (missingFields.length > 0) {
     
 const partMasterQuery = `
   USE z_scope;
-  SELECT partnumber1, partID FROM part_master WHERE brandId = @brandId
+  SELECT partNo as partnumber1, partID FROM VW_PartMaster WHERE brandId = @brandId
 `;
 
 const getPartNumberQuery = `
@@ -2477,13 +2477,16 @@ const getBulkDataInService = async (req, res) => {
     const pool = await getPool1();
     let dealerId = req.dealer_id;
     let userId = req.added_by;
-    let getLocationQuery = `use [z_scope] Select locationId,dealer from locationInfo where status=1 and dealerId=@dealerId`;
+    let brand;
+    let getLocationQuery = `use [z_scope] Select locationId,dealer,brand from locationInfo where status=1 and dealerId=@dealerId`;
     const result13 = await pool
       .request()
       .input("dealerId", dealerId)
       .query(getLocationQuery);
     const locations = result13.recordset;
+  //  console.log("result ",result13.recordset)
     let dealerName = result13.recordset[0].dealer;
+    brand=result13.recordset[0].brand;
     let bulkUploadedData = [];
     let tcode;
     let locationIds = locations.map((row) => row.locationId); // Extract locationIds from locations
@@ -2506,11 +2509,22 @@ const getBulkDataInService = async (req, res) => {
      //  console.log("tcode in bulk data service ", tcode);
       if (tcode != undefined || tcode != null) {
         try {
-            let getDataQuery = `use [stockupload] select partNumber, qty as Quantity from currentStock2
-             where stockCode=@tcode`;
-            const res78 = await pool
+            // let getDataQuery = `use [stockupload] select partNumber, qty as Quantity from currentStock2
+            //  where stockCode=@tcode`;
+            // const res78 = await pool
+            // .request()
+            // .input("tcode", tcode)
+            // .query(getDataQuery);
+            let getDataQuery=`use [StockUpload] select c1.stockDate, c.partNumber, c.qty as Quantity, vw.partDesc,vw.PartType,vw.LandedCost as rate,vw.mrp,vw.moq,
+vw.partNature,
+case when vw.partNo=s.partnumber then s.subpartnumber else vw.partNo end as LatestPartNumber from [stockupload].dbo.currentStock2 c 
+join [stockUpload].dbo.currentStock1 c1 on c1.tcode=c.StockCode and c1.LocationID=@locationId
+join  [z_scope].dbo.VW_PartMaster vw on c.PartNumber=vw.partNo 
+join  [z_scope].dbo.Substitution_Master s on s.brandid=vw.BrandID and vw.PartNo=s.partnumber `;
+const res78 = await pool
             .request()
             .input("tcode", tcode)
+            .input('locationId',locationId)
             .query(getDataQuery);
             let locationName='';
 
@@ -2518,8 +2532,20 @@ const getBulkDataInService = async (req, res) => {
             let result1=await pool.request().input('locationId',locationId).query(getLocationQuery)
             locationName=result1.recordset[0]?.location;
             const recordsWithLocation = res78.recordset.map(record => ({
-              ...record,
+              Brand:brand,
+              Dealer:dealerName,
               Location: locationName,
+               ['Part Number']: record.partNumber , 
+               ['Latest Part Number']:record.LatestPartNumber,
+               Description:record.partDesc,
+               Category:record.PartType,
+               Rate:record.rate,
+               MRP:record.mrp,
+               MOQ:record.moq,
+               ['Part Nature']:record.partNature,
+                Quantity:record.Quantity,
+                  Date:(record.stockDate)
+             
             }));
           
             bulkUploadedData.push(...recordsWithLocation);

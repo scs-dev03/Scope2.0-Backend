@@ -1,8 +1,9 @@
 import sql from "mssql";
 import moment from "moment";
 
- const bulkHondaInsertData=async function(data,pool,brand,dealer,location,brandId,dealerId,locationId,res) {
+ export const bulkHondaInsertData=async function(data,pool,brand,dealer,location,brandId,dealerId,locationId,res) {
    
+  try{
   await pool.request().query('use UAD_BI_LEAD_TIME')
     const table = new sql.Table('Honda_2W_purchase_register_File_Lead_Time_latest_data');
       table.create = false;
@@ -29,10 +30,10 @@ import moment from "moment";
   
     let isNullFound=false;
     let part_number=data[0]["part number"]
-       let query=`Select brandid from z_scope.dbo.part_master where partnumber=@part_number`;
+       let query=`Select brandid from z_scope.dbo.VW_PartMaster where partno=@part_number`;
        let result=await pool.request().input('part_number',part_number).query(query);
-       console.log("result in honda ",result)
-       if(result.length==0){
+    //   console.log("result in honda ",result)
+       if(result.recordset.length==0){
       //   let tableNamePO='Honda_2W_purchase_register_File_Lead_Time_latest_data'
       // let query1=`TRUNCATE TABLE ${tableNamePO}`
       // await pool.request().query(query1);
@@ -41,6 +42,7 @@ import moment from "moment";
        let query56=`Select dealerId,dealer,location,locationId from z_scope.dbo.locationInfo where brandId=22`;
             let result56=await pool.request().query(query56);
             
+           // console.log("data ",data)
         for(let item of data){
           // let dealerIdAsRow=dealerId;
           // let locationIdAsRow=locationId;
@@ -58,10 +60,10 @@ import moment from "moment";
             
             // console.log("result in honda ",result56)        
             
-              let resultDealer = result56.find(item1 =>{
+              let resultDealer = result56.recordset.find(item1 =>{
                 return item1.dealer.toLowerCase()==(item["dealer"].toLowerCase());
               } );
-               let resultLocation = result56.find(item1 => {return item1.location.toLowerCase()==(item["location"].toLowerCase())});
+               let resultLocation = result56.recordset.find(item1 => {return item1.location.toLowerCase()==(item["location"].toLowerCase())});
                dealerId = resultDealer ? resultDealer.dealerId : null;
                locationId = resultLocation ? resultLocation.locationId : null;
 
@@ -84,22 +86,37 @@ import moment from "moment";
               brand,
               Dealer,
               Location,
-              brandId,
+              String(brandId),
               dealerId,
               locationId
           );
+
+          
       }
-  
+
+      //console.log(data)
+ // console.log("isNullFound ",isNullFound)
       // If no null values were found, perform the bulk insert
       if (!isNullFound) {
+       // console.log("table",table)
           const request = pool.request();
-  
+ // console.log("First row to be inserted:", table.rows[0]);
           // Clean up the target table before bulk insert
-          await request.query('TRUNCATE TABLE Honda_2W_purchase_register_File_Lead_Time_latest_data');
-  
-          // Perform the bulk insert
-          await request.bulk(table);
+          try{
+
+            await request.query('use UAD_BI_LEAD_TIME')
+            await request.query('TRUNCATE TABLE Honda_2W_purchase_register_File_Lead_Time_latest_data');
+    
+            // Perform the bulk insert
+            await request.bulk(table);
+          }
+          catch(error ){
+          //  console.log("errorr ",error)
+          }
       }
+    }catch(error){
+      console.log("error ,",error)
+    }
 
   }
 
@@ -149,4 +166,64 @@ function excelSerialToDate(serialNumber) {
     return formatDate;
   }
 
-export default {bulkHondaInsertData}
+
+
+
+
+
+  // if(!isNullFound){
+  //     const values = data.map(item => {
+  //       const Dealer = dealer || item["dealer"];  // Use provided dealer or item["dealer"]
+  //     const Location = location || item["location"]; 
+  //     return [  
+  //       item["purchase order number"],
+  //       item['order status'],
+  //       item['order date'],
+  //       item['invoice date'] !== "0-00-00" ? item['invoice date'] : null,
+  //       item['grn invoice date'] !== "0-00-00" ? item['grn invoice date'] : null,
+  //       item['order subtype'],
+  //       item['part number'],
+  //       // Check if 'order quantity' is a valid number or is null
+  //       item['order quantity'] !== null && !isNaN(parseFloat(item['order quantity'])) ? parseFloat(item['order quantity']) : null,
+  //       // Check if 'invoice quantity' is a valid number or is null
+  //       item['invoice quantity'] !== null && !isNaN(parseFloat(item['invoice quantity'])) ?  parseFloat(item['invoice quantity']) : null,
+  //       Dealer,
+  //       Location
+  //     ]});
+  //       //  console.log("values ",values);
+  //       await pool.request().query(`use UAD_BI_LEAD_TIME`)
+  //     const table = new sql.Table('Hero_Lead_Time_File_latest_data');
+  //     table.create = false;   
+      
+  
+  //     table.columns.add('Purchase Order Number', sql.VarChar(255),{nullable:true});  // VarChar(255)
+  //   table.columns.add('Order Status', sql.VarChar(100),{nullable:true});           // VarChar(100)
+  //   table.columns.add('Order Date', sql.Date,{nullable:true});                     // Date
+  //   table.columns.add('Invoice Date', sql.Date,{nullable:true});                   // Date
+  //   table.columns.add('GRN Invoice Date', sql.Date,{nullable:true});               // Date
+  //   table.columns.add('Order Subtype', sql.VarChar(255),{nullable:true});          // VarChar(255)
+  //   table.columns.add('Part Number', sql.VarChar(150),{nullable:true});            // VarChar(150)
+  //   table.columns.add('Order Quantity', sql.Decimal(38, 2),{nullable:true});       // Decimal(38,2)
+  //   table.columns.add('Invoice Quantity', sql.Decimal(38, 2),{nullable:true});     // Decimal(38,2)
+  //   table.columns.add('Dealer', sql.VarChar(100),{nullable:true});                 // VarChar(100)
+  //   table.columns.add('Location', sql.VarChar(100),{nullable:true});   
+  //     // Add rows to the table
+  //     values.forEach((row) => {
+  //       table.rows.add(
+  //         row[0], // purchase order number
+  //         row[1], // order status
+  //         row[2], // order date
+  //         row[3], // invoice date
+  //         row[4], // grn invoice date
+  //         row[5], // order subtype
+  //         row[6], // part number
+  //         row[7], // order quantity
+  //         row[8], // invoice quantity
+  //         row[9], // dealer
+  //         row[10] // location
+  //       );
+  //     });
+  
+     
+    
+  //   }

@@ -4,15 +4,15 @@ import moment from "moment";
 
   const  bulkHyundaiInsertPOData= async function(data,pool, dealer, location,res) {
       let isNullFound=false;
-       data=data.slice(1);
+     data=data.slice(1);
       
        let part_number=data[0]["part no current"];
       //  console.log("part_number in hyundai ",part_number,data[0])
        let brandId=11;
-       let query=`Select brandid from z_scope.dbo.part_master where partnumber=@part_number and brandid=@brandId`;
+       let query=`Select brandid from z_scope.dbo.VW_PartMaster where partno=@part_number and brandid=@brandId`;
        const result=await pool.request().input('part_number',part_number).input('brandId',brandId).query(query);
       //  console.log("result in hyundai ",result)
-       if(result.length==0){
+       if(result.recordset.length==0){
         // let tableNamePO='Hyundai_bo_file_lead_time_latest_data';
         // let tableNameMRN='Hyundai_Pur_File_lead_time_latest_data'
         // let query1=`TRUNCATE TABLE ${tableNamePO}`
@@ -84,6 +84,7 @@ import moment from "moment";
         });
     
         const request = pool.request();
+        await request.query('use UAD_BI_LEAD_TIME ')
         await request.query('TRUNCATE TABLE Hyundai_bo_file_lead_time_latest_data');
         // Execute the bulk insert
         await request.bulk(table);
@@ -94,10 +95,10 @@ import moment from "moment";
       let isNullFound=false;
       let part_number=data[0]["part no"];
       let brandId=11;
-      let query=`Select brandid from z_scope.dbo.part_master where partnumber=@part_number and brandid=@brandId`;
+      let query=`Select brandid from z_scope.dbo.VW_PartMaster where partno=@part_number and brandid=@brandId`;
       const result=await pool.request().input('part_number',part_number).input('brandId',brandId).query(query);
      // console.log("result in hyundai ",result)
-      if(result.length==0){
+      if(result.recordset.length==0){
       //  let tableNamePO='Hyundai_bo_file_lead_time_latest_data';
       //  let tableNameMRN='Hyundai_Pur_File_lead_time_latest_data'
       //  let query1=`TRUNCATE TABLE ${tableNamePO}`
@@ -161,7 +162,7 @@ import moment from "moment";
     
         // Create a request object for the database operation
         const request = pool.request();
-    
+    await request.query('use UAD_BI_LEAD_TIME ')
         await request.query('TRUNCATE TABLE Hyundai_Pur_File_lead_time_latest_data');
         // Execute the bulk insert operation
         await request.bulk(table);

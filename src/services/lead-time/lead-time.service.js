@@ -11,8 +11,8 @@ import moment from "moment";
 import XLSX from "xlsx";
 import { fileURLToPath } from 'url';
 import {bulkKIAInsertMRNData,bulkKIAInsertPOData} from './Kia_PO_file_Bulk.js';
-import bulkHondaInsertData from './Honda2W-Bulk-Data.js';
-import bulkHeroInsertData from './hero-bulk-data.js'
+import {bulkHondaInsertData} from './Honda2W-Bulk-Data.js';
+import {bulkHeroInsertData} from './hero-bulk-data.js'
 import {bulkRenaultInsertPOData,bulkRenaultInsertMRNData} from './Renault-Bulk-Data.js';
 import {bulkHyundaiInsertMRNData,bulkHyundaiInsertPOData} from './hyundai-bulk-data.js';
 import {bulkJCBInsertMRNData,bulkJCBInsertPOData} from './Jcb-bulk-Data.js';
@@ -21,13 +21,13 @@ import {bulkMahindraInsertMRNData,bulkMahindraInsertPOData} from './Mahindra-Bul
 import bulkTATAPCInsertPOData from './TATA-PC-Bulk-Data.js'
 import bulkTATACVPOInsertData from './TATA-CV-Bulk-Data.js'
 import archiver from 'archiver';
-import { getPool1 } from "../../db/db.js"
+import { getLeadTimePool, getPool1 } from "../../db/db.js"
 
  const getLocationMaster= async function (req) {
   try {
    let brandId=req;
    // console.log(brandId)
-   const pool=await getPool1()
+   const pool=await getLeadTimePool()
 //     const query = `
    
 // select b.brand,c.dealer_name,a.location_name
@@ -70,7 +70,7 @@ import { getPool1 } from "../../db/db.js"
         console.log(error, "error in lead time");
         publicIp = "Error fetching public IP";
       }
-      const pool = await getPool1();
+      const pool = await getLeadTimePool();
       brand = req.brand;
       jsonData = JSON.stringify(req.brandColumns);
       // console.log("jsonData ", jsonData);
@@ -133,7 +133,7 @@ import { getPool1 } from "../../db/db.js"
 
   const updateColumns=async function (req) {
     try {
-      const pool = await getPool1();
+      const pool = await getLeadTimePool();
     } catch (error) {}
   }
 
@@ -143,7 +143,7 @@ import { getPool1 } from "../../db/db.js"
       brand_id = req.brand_id;
       fileTypeId=req.fileTypeId
       
-      const pool = await getPool1();
+      const pool = await getLeadTimePool();
 
       let query = `  SELECT  ft.file_name, ft.file_type ,mm.sequence,ft.brand_id, mm.brandColumns,mm.columnName
             FROM mappingmaster mm
@@ -184,7 +184,7 @@ import { getPool1 } from "../../db/db.js"
         // console.log("req ",req)
         brand_id = req.brand;
         fileTypeId=req.fileType;
-        const pool = await getPool1();
+        const pool = await getLeadTimePool();
 
         let query = `  SELECT  ft.file_name, ft.file_type ,mm.sequence,ft.brand_id, mm.brandColumns,mm.columnName
                 FROM mappingmaster mm
@@ -334,7 +334,7 @@ import { getPool1 } from "../../db/db.js"
     let  userId=req.userId;
     let  fileType = req.fileType;
       //console.log("--------",fileType)
-      let pool = await getPool1();
+      let pool = await getLeadTimePool();
       let dealer,location;
       let rowCount=req.rowCount;
       let insertResponse;
@@ -343,6 +343,7 @@ import { getPool1 } from "../../db/db.js"
       let tableNamePO=''
     let poFailed = false;
     let dealerId,locationId;
+    let data1;
       // console.log("updload data ",brandId,fileType,rowCount)
 
         brandId = req.brand_id;
@@ -434,6 +435,7 @@ import { getPool1 } from "../../db/db.js"
           insertResponse=false;
         }
         }
+        // console.log("insert response 437 ",insertResponse)
       }
 
       if(brandId===12  ){
@@ -468,6 +470,7 @@ import { getPool1 } from "../../db/db.js"
 
         }
         if(req.fileType==='PO'){
+     
           if(dealer && location){
             insertResponse=  await bulkRenaultInsertPOData(excelData.data,pool,dealer,location,res)
             // console.log("insert response in po ",insertResponse)
@@ -501,6 +504,7 @@ import { getPool1 } from "../../db/db.js"
           rowCount=result.data.length-1;
           // console.log("rowCount ",rowCount)
           data1 = result.data;
+         // console.log("data 1",data1)
            insertResponse=  await bulkHyundaiInsertPOData(data1,pool,dealer,location,res)
            if(!insertResponse){
             insertResponse=false;
@@ -512,7 +516,7 @@ import { getPool1 } from "../../db/db.js"
           //  console.log(result.headers);
           rowCount=result.data.length-1;
           // console.log("rowCount ",rowCount)
-          data = result.data;
+         let data = result.data;
           insertResponse=  await bulkHyundaiInsertPOData(data,pool,null,null,res)
           if(!insertResponse){
             insertResponse=false;
@@ -536,7 +540,7 @@ import { getPool1 } from "../../db/db.js"
       }
 
       if(brandId==32 && req.fileType=='PO'){
-        pool=await getPool1();
+        pool=await getLeadTimePool();
         if(dealer && location){
         insertResponse=  await bulkJCBInsertPOData(excelData.data,pool,dealer,location,res)
         if(!insertResponse){
@@ -605,7 +609,7 @@ import { getPool1 } from "../../db/db.js"
         
       }
     if (brandId === 20) {
-      // pool=await getPool1();
+      // pool=await getLeadTimePool();
       if(dealer && location){
         insertResponse= await bulkHeroInsertData(excelData.data,pool,dealer,location,res);
         if(!insertResponse){
@@ -673,6 +677,7 @@ import { getPool1 } from "../../db/db.js"
     let lastinsertedId=[];
     let id;
     let insertedId;
+  //  console.log("insert resonse ",insertResponse)
     if(insertResponse?.poFailed){
      // console.log("res po ",insertResponse)
       id=await insertInAuditLogs(pool,req.userId,req.dealer_id,req.location,req.brand_id,publicIp,rowCount,req.fileTypeId,'Part no cannot be found ',operation);
@@ -751,7 +756,7 @@ import { getPool1 } from "../../db/db.js"
 
         
     }
-    pool=await getPool1();
+   let pool=await getLeadTimePool();
     
       let query1=` TRUNCATE TABLE ${tableNamePO}`
       let query2=` TRUNCATE TABLE ${tableNameMRN}`
@@ -795,7 +800,7 @@ import { getPool1 } from "../../db/db.js"
     //  const results = await requests.query(query3);
      
     //  console.log("inserted id",req.insertedId)
-     insertedId=req.insertedId;
+    let insertedId=req.insertedId;
         // if(results.length>0){
           // const lastInsertedId = results[0].id;
           const deleteQuery = `
@@ -848,7 +853,7 @@ import { getPool1 } from "../../db/db.js"
  const getExportFileTypeData= async function (req,res) {
     try {
       // Connect to the database
-      const pool = await getPool1();
+      const pool = await getLeadTimePool();
     
       // Extract values from the request object
       const {
@@ -1023,7 +1028,7 @@ import { getPool1 } from "../../db/db.js"
 
   const getFileTypeBasedOnBrand= async function(req){
     try{
-      let pool=await getPool1();
+      let pool=await getLeadTimePool();
      let brandId=parseInt(req.brand_id,10);
      // console.log(brandId)
       let query=` use [uad_bi_lead_time] Select * from FileType_Master where brandID=@brandId`;
@@ -1233,7 +1238,7 @@ const __dirname = path.dirname(__filename);
   const getUploadLogs = async function(req){
     try{
 
-      const pool=await getPool1();
+      const pool=await getLeadTimePool();
       let brandId = req.brand;
       let dealerId = req?.dealer;
       let locationId = req?.location;
@@ -1314,7 +1319,7 @@ const __dirname = path.dirname(__filename);
       const combineHeaders = (headerRow, subHeaders) => {
         const combinedHeaders = [];
         let i = 0;
-  
+  let headerItemPrev;
         while (i < headerRow.length) {
           const headerItem = headerRow[i];
           const subHeaderItem = subHeaders[i];
@@ -1368,8 +1373,8 @@ const __dirname = path.dirname(__filename);
       }
       // console.log("cleaned rows ", cleanedRows);
       function cleanColumnesText(str) {
-        convertedStr = String(str);
-        str2 = convertedStr
+       let convertedStr = String(str);
+      let  str2 = convertedStr
           .replace(/[\?#&_\-+=}{[\]!@`~$%^'()\/\r\n?]+/g, "")
           .trim(); // Remove spaces, ?, and #,-,...etc
         return str2;
@@ -1396,7 +1401,7 @@ const __dirname = path.dirname(__filename);
           }
         }
      
-        convertedStr = String(str).replace(/'/g, "");
+      let  convertedStr = String(str).replace(/'/g, "");
         // console.log("converted str ",str)
         convertedStr = String(str)
         if (header == "location" || header=='dealer') {
@@ -1423,7 +1428,7 @@ const __dirname = path.dirname(__filename);
   }
 
   const mappingExist=async function(req){
-    const pool = await getPool1();
+    const pool = await getLeadTimePool();
     brand = req.brand;
     fileTypeId = req.id;
     let query = ` Select brand_id,file_type where brand_id=@brand and file_type=@fileTypeId`;
@@ -1470,8 +1475,8 @@ WHERE userID = @userId
 ORDER BY dateTime DESC;  
 `
     const result=await pool.request().input('userId',userId).query(query);
-    console.log("result in get last inserted record",result)
-    id=result[0].id;
+   // console.log("result in get last inserted record",result)
+   let  id=result.recordset[0].id;
     return id;
   }
   catch(error){
@@ -1645,7 +1650,7 @@ const createZipAndDownload = async (filePaths, res) => {
 async function insertInAuditLogs(pool,userId,dealer_id,location,brand_id,publicIp,rowCount,fileTypeId,error_status,operation){
   // console.log(rowCount)
   try{
-    pool=await getPool1();
+    pool=await getLeadTimePool();
     const utcDate = new Date();
     const indiaOffset = 5.5 * 60; // IST is UTC+5:30
     const indiaTime = new Date(utcDate.getTime() + indiaOffset * 60000);
@@ -1686,7 +1691,7 @@ async function insertInAuditLogs(pool,userId,dealer_id,location,brand_id,publicI
 }
 
 async function heroLeadTimeSPOperations(pool){
-  // const pool=await getPool1();
+  // const pool=await getLeadTimePool();
   const request=await pool.request();
   const res = await request.execute('sp_HeroLeadTimeOperations');
   //  console.log("Stored procedure executed successfully.",res);
@@ -1774,7 +1779,7 @@ async function readExcelFile1(dealer,location,filePath) {
     const combineHeaders = (headerRow, subHeaders) => {
       const combinedHeaders = [];
       let i = 0;
-
+let headerItemPrev;
       while (i < headerRow.length) {
         const headerItem = headerRow[i];
         const subHeaderItem = subHeaders[i];
@@ -1828,8 +1833,8 @@ async function readExcelFile1(dealer,location,filePath) {
     }
     // console.log("cleaned rows ", cleanedRows);
     function cleanColumnesText(str) {
-      convertedStr = String(str);
-      str2 = convertedStr
+     let  convertedStr = String(str);
+     let str2 = convertedStr
         .replace(/[\?#&_\-+=}{[\]!@`~$%^'()\/\r\n?]+/g, "")
         .trim(); // Remove spaces, ?, and #,-,...etc
       return str2;
@@ -1857,7 +1862,7 @@ async function readExcelFile1(dealer,location,filePath) {
     
      
      // convertedStr = String(str).replace(/'/g, "");
-      convertedStr = String(str)
+    let  convertedStr = String(str)
     if (header == "location" || header=='dealer') {
       // console.log(convertedStr)
       return convertedStr.trim();  // Return the string as is for 'dealer location'

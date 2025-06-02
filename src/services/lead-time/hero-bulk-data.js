@@ -1,14 +1,14 @@
 import moment from "moment";
 import sql from "mssql";
- const bulkHeroInsertData= async function(data,pool,dealer,location,res) {
+ export const bulkHeroInsertData= async function(data,pool,dealer,location,res) {
 
     let isNullFound=false;
     let part_number=data[0]["part number"];
     let brandId=20;
-    let query=`Select brandid from z_scope.dbo.part_master where partnumber=@part_number and brandid=@brandId`;
+    let query=`Select brandid from z_scope.dbo.VW_PartMaster where partno=@part_number and brandid=@brandId`;
     const result=await pool.request().input('part_number',part_number).input('brandId',brandId).query(query);
    // console.log("result in hero ",result)
-    if(result.length==0){
+    if(result.recordset.length==0){
       // let tableNamePO='Hero_Lead_Time_File_latest_data'
       // let query1=`TRUNCATE TABLE ${tableNamePO}`
       // await pool.request().query(query1);
@@ -78,6 +78,7 @@ import sql from "mssql";
 
     
     const request =  pool.request();
+    await request.query('use UAD_BI_LEAD_TIME ')
     await request.query('TRUNCATE TABLE Hero_Lead_Time_File_latest_data');
     // Execute the bulk insert
     await request.bulk(table);
@@ -129,4 +130,4 @@ function excelSerialToDate(serialNumber) {
 
     return formatDate;
   }
- export default {bulkHeroInsertData}
+ 

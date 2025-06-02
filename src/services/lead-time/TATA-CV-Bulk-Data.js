@@ -8,10 +8,10 @@ const   bulkTATACVPOInsertData= async function(data,pool, dealer, location,res) 
         let part_number=data[0]["part"];
        // console.log("part number ",part_number)
         let brandId=17;
-        let query=`Select brandid from z_scope.dbo.part_master where partnumber=@part_number and brandid=@brandId`;
+        let query=`Select brandid from z_scope.dbo.VW_PartMaster where partno=@part_number and brandid=@brandId`;
         const result=await pool.request().input('part_number',part_number).input('brandId',brandId).query(query);
         //console.log("result in tata cv mrn",result)
-        if(result.length==0){
+        if(result.recordset.length==0){
             return {poFailed:true}
         }
         for(let item of data){
@@ -128,6 +128,7 @@ const   bulkTATACVPOInsertData= async function(data,pool, dealer, location,res) 
     
         // Execute the bulk insert
         try {
+             await request.query('use UAD_BI_LEAD_TIME ')
             await request.query('TRUNCATE TABLE TATA_CV_Purchase_Line_Items_lead_time_latest_data');
             await request.bulk(table);
 

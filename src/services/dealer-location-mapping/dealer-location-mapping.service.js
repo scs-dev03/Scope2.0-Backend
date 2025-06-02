@@ -278,345 +278,6 @@ async function validateInventoryLocations(data) {
     };
   }
   
-  
-
-
-// const editDealerLocationMappingInService=async(req,res)=>{
-
-//     try{
-//         let brandId=req.body.brand_id;
-//         const pool=await getPool1();
-//         let getMappingQuery=`use [StockUpload]  Select dealerId,locationId,inventory_location as 'inventory location',location,id from dealer_location_mapping where brandId=@brandId `;
-//         const res1=await pool.request().input('brandId',brandId).query(getMappingQuery);
-//         let mappedData=res1.recordset;
-//         let fileData;
-//         let rowData;
-//         let rowCount;
-//         let headers;
-//         let userId=parseInt(req.body.added_by,10);
-//         let filePath=req.file.path;
-//        let  isDealerAndLocationExist=true;        
-//         fileData=await readExcelFile(filePath)
-      
-//         const dealerLocationNotInMaster = [];
-//         headers=fileData.headers;
-//         rowData=fileData.data;
-       
-//         const  lowerCaseHeaders=headers.map((header)=> header.trim().toLowerCase());
-//         // console.log("lowercase headers ",lowerCaseHeaders)
-//         if(!(lowerCaseHeaders.includes('dealer') && lowerCaseHeaders.includes('location') && lowerCaseHeaders.includes('inventory location'))){
-//             isDealerAndLocationExist=false
-//             // console.log("is dealer location exist in file ",isDealerAndLocationExist)
-//             return {isDealerAndLocationPresent:isDealerAndLocationExist};
-//         }
-
-//          // console.log("headers ",headers,rowData)
-        
-//          let isDealerAndLocationNull=await checkFields(rowData);
-//         //   console.log("is dealer location null in file ",isDealerAndLocationNull)
-//       //  console.log("row data ",rowData)
-//          if(isDealerAndLocationNull){
-//             return {isDealerAndLocationNull:isDealerAndLocationNull}
-//          }
-
-//          let getDealerAndLocationQuery='use z_scope Select dealer,location,dealerId,locationId from locationInfo where status=1 and dealerStatus=1 and brandId=@brandId';
-//          const res=await pool.request().input('brandId',brandId).query(getDealerAndLocationQuery);
-//          let dealerAndLocationResult=res.recordset;
-//         //  console.log("dealer location result",dealerAndLocationResult)
-//         //  let dealerLocationNotInMaster=[];
-
-//         // console.log("row data ",rowData)
-//         // Create a Map for fast lookup
-//         rowData = Array.from(new Set(rowData.map(item => JSON.stringify(item))))
-//         .map(item => JSON.parse(item));
-//        // console.log("row data after removing duplicate",rowData)
-//         function normalizeText(value) {
-//             return String(value || "") // Ensure it's a string
-//                 .trim() // Remove leading/trailing spaces // Replace multiple spaces with a single space
-//                 .replace(/\u00A0/g, " ") // Replace non-breaking spaces
-//                 .toLowerCase(); // Convert to lowercase
-//         }
-
-// // Create a Map for fast lookup
-// const dealerLocationMap = new Map();
-
-//         // Normalize and store in the Map
-//         dealerAndLocationResult.forEach(obj => {
-//             const dealerKey = normalizeText(obj.dealer);
-//             const locationKey = normalizeText(obj.location);
-//             const key = `${dealerKey}|${locationKey}`;
-
-//             dealerLocationMap.set(key, obj); // Store full object for retrieval
-//         });
-
-// //console.log("row data ",rowData)
-// rowData.forEach((row, index) => {
-//     // Normalize row keys and values
-//     const normalizedItem = Object.keys(row).reduce((acc, key) => {
-//         acc[key.trim().toLowerCase()] = (row[key]); // Ensure all values are strings
-//         return acc;
-//     }, {});
-
-//     // Ensure `isMatch` is always a boolean (default `false`)
-//     if (normalizedItem.isMatch === undefined) {
-//         normalizedItem.isMatch = false; // Initialize `isMatch` if not set
-//     }
-
-//     rowData[index] = normalizedItem;
-
-//     // Generate lookup key
-//     const dealerKey = normalizeText(normalizedItem.dealer);
-//     const locationKey = normalizeText(normalizedItem.location);
-//     const lookupKey = `${dealerKey}|${locationKey}`;
-
-//     // console.log(`🔎 Checking Dealer: '${dealerKey}', Location: '${locationKey}'`);
-
-//     if (dealerLocationMap.has(lookupKey)) {
-//         // Match found, update dealerId, locationId, and isMatch
-//         const matchingItem = dealerLocationMap.get(lookupKey);
-//         // console.log(`🔎 Checking Dealer: '${lookupKey}'`);
-//         // ✅ Only update `isMatch` if it's still false
-//         if (!normalizedItem.isMatch) {
-//             normalizedItem.isMatch = true;
-//             normalizedItem.dealerId = parseInt(matchingItem.dealerId,10);
-//             normalizedItem.locationId = parseInt(matchingItem.locationId,10);
-//         }
-
-//         // console.log("✅ Match Found:", { dealerKey, locationKey, matchingItem });
-//     } else {
-//         // console.log("❌ No Match Found, keeping isMatch as:", normalizedItem.isMatch);
-//     }
-// });
-
-// //console.log("rowDta",rowData)
-// // ✅ After traversal, insert only unmatched rows into dealerLocationNotInMaster
-//         rowData.forEach(item => {
-//             if (!item.isMatch) {
-//                 dealerLocationNotInMaster.push(item);
-//                 // console.log("📌 Adding unmatched row to dealerLocationNotInMaster:", item);
-//             }
-//         });
-
-//         //   console.log("dealer location not in master ",dealerLocationNotInMaster,rowData)
-//         //   console.log("rowData ",dealerLocationNotInMaster)
-//         if(dealerLocationNotInMaster.length!=0){
-//             return {dealerLocationNotInMasterPresent:true,dealerLocationNotInMaster:dealerLocationNotInMaster}
-//         }
-
-//        // console.log("row data ",rowData)
-//         let rowData1= await validateInventoryLocations(rowData);
-//         //  console.log("rowdata 1",rowData1);
-//           if(rowData1.data.length!=0){
-//             return {multipleInventoryLocationsData:rowData1.data,multipleInventoryLocations:true}
-//           }
-
-//         await pool.request().query('use [StockUpload]') 
-//         let operation="update dealer location mapping";
-//          let normalizedRowData=[];
-//        let updatedMappedData= mappedData.map((item)=>({
-//             ...item,
-//             isTraversed:false
-//         }))
-
-//         let mappedData1 = [...updatedMappedData];
-//      //    console.log("updated mapped data ",mappedData1)
-//         // rowData.forEach((item,index)=>{
-//         //      //  console.log(item)
-
-//         //     const isExist=mappedData1.some((element)=>{
-//         //        // console.log("element ",element)
-//         //         element.dealerId==parseInt(item.dealerId) && element.locationId==parseInt(item.locationId)});
-
-//         //   //  console.log("isExist ",isExist,item)
-//         //     if(!isExist){
-//         //         normalizedRowData.push({
-//         //             dealerId:parseInt(item?.dealerId),
-//         //             locationId:parseInt(item?.locationId),
-//         //             dealer:item?.dealer,
-//         //             location:item?.location,
-//         //             ["inventory location"]:item["inventory location"]
-//         //         })  
-//         //       //  console.log("normalidex data ",normalizedRowData)
-//         //     }
-//         //     else{
-               
-//         //         mappedData1 = mappedData1.map((element) => {
-//         //             if (element.dealerId == parseInt(item.dealerId,10) && element.locationId == parseInt(item.locationId,10)) {
-//         //                // console.log("element",element,item)
-//         //                 return {
-//         //                     id:element.id,
-//         //                     dealerId:parseInt(item?.dealerId),
-//         //                     locationId:parseInt(item?.locationId),
-//         //                     dealer:item?.dealer,
-//         //                     location:item?.location,
-//         //                     ["inventory location"]:item["inventory location"],
-//         //                     isTraversed: true
-//         //                 };
-//         //             }
-//         //         //    return element;
-//         //         });
-//         //     }
-            
-//         // })
-//       //  console.log("row data ",rowData)
-      
-
-//       const inventoryLocationMismatch = [];
-
-// rowData.forEach((item) => {
-//     const dealerId = parseInt(item.dealerId, 10);
-//     const locationId = parseInt(item.locationId, 10);
-//     const rowInventory=item["inventory location"].trim().toLowerCase()
-//     const matchedEntry = mappedData1.find(
-//         (element) =>
-//             parseInt(element.dealerId, 10) == dealerId
-//     );
-
-//     if (matchedEntry) {
-          
-//         if(matchedEntry.dealerId==item.dealerId && matchedEntry.locationId==item.locationId && matchedEntry["inventory location"]==item["inventory location"]){
-//             mappedData1 = mappedData1.map((element) => {
-//                 if (matchedEntry.id==element.id) {
-//                     return {
-//                         ...element,
-//                         dealerId,
-//                         locationId,
-//                         dealer: item.dealer,
-//                         location: item.location,
-//                         ["inventory location"]: item["inventory location"],
-//                         isTraversed: true
-//                     };
-//                 }
-//                 return element;
-//             });
-
-//         }
-          
-//         }
-//      else {
-       
-//     }
-// });
-
-// if (inventoryLocationMismatch.length !== 0) {
-//     return {
-//         multipleInventoryLocationsData: inventoryLocationMismatch,
-//         multipleInventoryLocations: true
-//     };
-// }
-
-    
-//         // console.log("mapped data",rowData,mappedData1)
-//      // console.log("normalidex data ",normalizedRowData)
-//      let  filteredNormalizedData=0;
-//   //   console.log("filtered data ",normalizedRowData,mappedData1)
-//      if(normalizedRowData.length >0){
-//          filteredNormalizedData = normalizedRowData.filter(normItem => {
-//            // console.log("nrom item ",normItem)
-//             return !mappedData1.some(mappedItem =>
-
-//             // console.log("mappeditem ",mappedItem)
-//               mappedItem.dealerId == normItem.dealerId &&
-//               mappedItem.locationId == normItem.locationId && mappedItem["inventory location"].trim().toLowerCase()==normItem["inventory location"].trim().toLowerCase()
-        
-//             );
-//           });
-//      }
-//      else{
-//         filteredNormalizedData=normalizedRowData
-//      }
-   
-//     //  console.log("filtered normalized data ",filteredNormalizedData)
-//         if(filteredNormalizedData.length!=0){
-//             operation="create dealer location mapping"
-//             const values = filteredNormalizedData.map(item => {
-               
-//                 return [
-//                     parseInt(brandId, 10),  // Ensure brandId is an integer
-//                     parseInt(item["dealerId"], 10), // Ensure dealerId is an integer
-//                     item["inventory location"].toString(),  // Ensure inventory_location is a string
-//                     parseInt(item["locationId"], 10), // Ensure locationId is an integer
-//                     parseInt(userId, 10), // Ensure userId is an integer
-//                    operation,
-//                    item["dealer"],
-//                    item["location"]
-    
-//             ]
-//             })
-//             try {
-//                 const table = new sql.Table('Dealer_Location_Mapping'); // Updated table name
-//                 table.create = false;
-            
-//                 table.columns.add('brandId', sql.Int, { nullable: true }); 
-//                 table.columns.add('dealerId', sql.Int, { nullable: true }); 
-//                 table.columns.add('inventory_location', sql.VarChar(100), { nullable: true }); 
-//                 table.columns.add('locationID', sql.Int, { nullable: true });
-//                 table.columns.add('added_by', sql.Int, { nullable: true }); 
-//                 //  table.columns.add('added_on', sql.DateTime, { nullable: true, default: sql`GETDATE()` }); 
-//                 table.columns.add('operation', sql.VarChar(100), { nullable: true }); 
-//                 table.columns.add('dealer', sql.VarChar(200), { nullable: true }); 
-//                 table.columns.add('location', sql.VarChar(200), { nullable: true }); 
-            
-//                 // Add rows to the table
-//                 values.forEach((row) => {
-//                     table.rows.add(
-//                         row[0],  // brandid
-//                         row[1],  // dealerid
-//                         row[2],  // inventory_location
-//                         row[3],  // locationid
-//                         row[4],  // added_by
-//                         row[5],
-//                         row[6],   // operation
-//                         row[7],                     
-//                     );
-//                 });
-//                 await pool.request().bulk(table);
-                
-               
-//             } catch (error) {
-//                 console.error('Error during bulk insert:', error);
-//                 return error; // Rethrow the error for further handling if necessary
-//             }
-
-           
-//         }
-        
-//            //  console.log(mappedData1)
-//             mappedData1.map(async (item)=>{
-//               //  console.log(item)
-//               if(item!==undefined){
-//                 if(item?.isTraversed){
-//                     operation="update dealer location mapping"
-//                     let updateQuery=`use [stockUpload]  Update dealer_location_mapping set added_on=Getdate(),operation=@operation,inventory_location=@inventoryLocation,location=@location,locationId=@locationId,dealer=@dealer,dealerId=@dealerId where id=@id`;
-//                     await pool.request().input('id',item.id)
-//                     .input('inventoryLocation',item["inventory location"])
-//                     .input('dealer',item.dealer)
-//                     .input('operation',operation)
-//                     .input('location',item.location)
-//                     .input('locationId',item.locationId).input('dealerId',item.dealerId).query(updateQuery);
-//                    // console.log("updatd succesfully")
-//                 }
-//               }
-               
-//             })
-//             rowCount=rowData.length;
-
-//             let logQuery=`use [stockUpload] Insert into Stock_Upload_Logs(brand_id,added_by,operation_type,dealerLocationMappingRowCount) 
-//             values(@brandId,@userId,'update dealer location mapping',@rowCount)`;
-    
-//             await pool.request().input('brandId',brandId)
-//             .input('userId',userId)
-//             .input('rowCount',rowCount).query(logQuery)
-    
-//             return {insertedSuccessfully:true}
-        
-
-//     }
-//     catch(error){
-//         console.log("error in edit dealer location mapping in service ",error.message);
-//         return error;
-//     }
-// }
 const editDealerLocationMappingInService=async(req,res)=>{
 
     try{
@@ -1053,7 +714,7 @@ rowData.forEach((row, index) => {
               }
                
             })
-            rowCount=rowData.length;
+            rowCount=rowData?.length;
 
             let logQuery=`use [stockUpload] Insert into Stock_Upload_Logs(brand_id,added_by,operation_type,dealerLocationMappingRowCount) 
             values(@brandId,@userId,'update dealer location mapping',@rowCount)`;
@@ -1128,7 +789,7 @@ const viewDealerLocationMappingInService=async(req)=>{
         let brandId=req.brand_id;
         let added_by=req.user_id;
         
-        let getDealerQuery=`use [stockUpload] Select dealer,location,added_on,inventory_location,status,id ,added_by from dealer_location_mapping 
+        let getDealerQuery=`use [stockUpload] Select dealer,location,dealerId,locationId as location_id,added_on,inventory_location,status,id ,added_by,remark from dealer_location_mapping 
         where brandId=@brandId `;
         const res= await pool.request().input('brandId',brandId)
         .query(getDealerQuery);
@@ -1164,5 +825,45 @@ const deleteDealerLocationMappingInService=async(req,res)=>{
     }
 }
 
-export   {addDealerLocationMappingInService,exportUploadedData,
+const editLocationInService=async(req,res)=>{
+
+  try{
+    let pool=await getPool1();
+    let locationId=req.location_id;
+    let location=req.location;
+    let inventoryLocation=req.inventory_location;
+    let addedBy=req.added_by;
+    let id=req.id;
+    let remark=req.remark;
+    let rowCount;
+    let updateQuery=`use [stockupload]
+    update dealer_location_mapping
+    set locationId=@locationId,
+    inventory_location=@inventoryLocation,
+    added_on=getDate(),
+    operation='update dealer location and inventory location',
+    location=@location,
+    remark=@remark,
+    added_by=@addedBy where id=@id`
+
+    const result= await pool.request().input('locationId',locationId)
+    .input('inventoryLocation',inventoryLocation).input('addedBy',addedBy)
+    .input('location',location)
+    .input('remark',remark)
+    .input('id',id).query(updateQuery);
+
+     let logQuery=`use [stockUpload] Insert into Stock_Upload_Logs(location_id,added_by,operation_type) 
+            values(@locationid,@addedBy,'update dealer location mapping through table')`;
+    
+            await pool.request().input('locationId',locationId)
+            .input('addedBy',addedBy)
+            .input('rowCount',rowCount).query(logQuery)
+
+  }
+  catch(error){
+    console.log("error in dealer location edit location in service method ",error.message);
+    return error;
+  }
+}
+export   {addDealerLocationMappingInService,exportUploadedData,editLocationInService,
     editDealerLocationMappingInService,viewDealerLocationMappingInService,deleteDealerLocationMappingInService}

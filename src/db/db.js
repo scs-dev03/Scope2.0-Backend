@@ -89,7 +89,23 @@ const config3 = {
     connectionTimeout: 30000,
 };
 
-let pool1, pool2 , pool3;
+
+const config4 = {
+    server: process.env.SERVER1,
+    database: process.env.DATABASE4,
+    user: process.env.USER1,
+    password: process.env.PASSWORD1,
+    // port: Number(process.env.DB_PORT3),
+    options: {
+        encrypt: false,
+        enableArithAbort: true,
+        trustServerCertificate: true,
+    },
+    requestTimeout: 6000000,
+    connectionTimeout: 30000,
+};
+
+let pool1, pool2 , pool3,leadTimePool;
 
 const connectDB = async () => {
     try {
@@ -101,6 +117,9 @@ const connectDB = async () => {
 
         // pool3 = await new sql.ConnectionPool(config3).connect();
         // console.log(`Connected to DB3: ${process.env.SERVER3} using ${process.env.USER3}`);
+
+        leadTimePool=await new sql.ConnectionPool(config4).connect();
+         console.log(`Connected to ${process.env.DATABASE4}: ${process.env.SERVER1} using ${process.env.USER1}`);
     } catch (err) {
         console.error("Database connection failed!", err);
         throw err;
@@ -121,8 +140,16 @@ const getPool3 = () => {
     if (!pool3) throw new Error("DB3 not connected");
     return pool3;
 };
+
+const getLeadTimePool=()=>{
+
+    if(!leadTimePool)
+        throw new Error("DB3 not connected");
+    return leadTimePool
+
+}
 // getPool1 -> for UAT Connection 
 // getPool2 -> for Live Connection
 // getPool3 -> for OGS Server Connection
 
-export { connectDB, getPool1, getPool2  };
+export { connectDB, getPool1, getPool2 ,getLeadTimePool };
