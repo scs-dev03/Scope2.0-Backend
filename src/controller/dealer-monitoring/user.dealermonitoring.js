@@ -1,7 +1,7 @@
 import { partfamilySaleservice, singlePartMaxByLocationService } from "../../services/norms-management/utils.service.js";
 import { orderDetailsByPartnumberService } from "../../services/orderDetails/orderDetailsService.js";
 import { partDetailsservice } from "../../services/salesview/salesviewservices.js";
-import {advisorwisePPNIValueService, groupStock, jobCardByVehicleService, locationwisePPNIValueService, partDescwithStockandQuality,  partsByJobCardService,  partSubstituteDetailService,  partwisePPNIValueService,  PPNIVALUE12MonthsService,  reservedForVehicle, userroleService, vehiclewisePPNIValueService} from  "../../services/dealerMonitoring/dealerMonitoringService.js";
+import {advisorwisePPNIValueService, groupStock, jobCardByVehicleService, locationwisePPNIValueService, partDescwithStockandQuality,  partsByJobCardService,  partSubstituteDetailService,  partwisePPNIValueService,  PPNIVALUE12MonthsService,  reservedForVehicle, userroleService, vehicleSearchService, vehiclewisePPNIValueService} from  "../../services/dealerMonitoring/dealerMonitoringService.js";
 
 
 const partSale = async (req,res)=>{
@@ -108,8 +108,8 @@ try {
 }
 
 const vehicleSearch = async (req,res)=>{
-    const {dealerid,vehicleno , filter} = req.body
-    const data = await jobCardByVehicleService(filter,vehicleno,dealerid)
+    const {dealerid,vehicleno ,alltimestk, filter , issued} = req.body
+    const data = await vehicleSearchService(dealerid,vehicleno,alltimestk,filter,issued)
     // const data2 = await partsByJobCard(dealerid,jobcardo)
 
     res.status(200).json({

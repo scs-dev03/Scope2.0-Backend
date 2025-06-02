@@ -146,10 +146,11 @@ try {
 
 const jobCardByVehicleService = async (filter,vehicleno,dealerid)=>{
 try {
-        const pool= await getPool2()
+        const pool= await getPool2()        
         const query = 
         `
-        DECLARE @StatusFilter VARCHAR(20) = '${filter}'; -- Change to 'Approve', 'Close', 'Decline' as needed
+        DECLARE @StatusFilter VARCHAR(20) 
+        SET @StatusFilter = CASE WHEN '${filter}' = 'null' THEN NULL ELSE '${filter}' END; -- Change to 'Approve', 'Close', 'Decline' as needed
         SELECT DISTINCT 
         jobcard_number, 
         SUM(OrderValue) AS Value, 
@@ -393,4 +394,100 @@ const PPNIVALUE12MonthsService = async (dealerid, locationid, nonstockable, jobc
   }
 };
 
-export {PPNIVALUE12MonthsService,userroleService,partDescwithStockandQuality,reservedForVehicle,groupStock,jobCardByVehicleService,partsByJobCardService,partSubstituteDetailService,locationwisePPNIValueService,advisorwisePPNIValueService,vehiclewisePPNIValueService,partwisePPNIValueService}
+
+const vehicleSearchService = async(dealerid,vehicleno,alltimenonstk,filter,issued)=>{
+try {
+        const pool = await getPool2()
+    //     const query = `
+    //     --DECLARE @StatusFilter VARCHAR(20) = @filter;
+    //     --DECLARE @Alltime_nonstck VARCHAR(1) = @alltimenonstk;
+    //     --DECLARE @VehicleNo VARCHAR(50) = @vehicleno;
+    //     --DECLARE @issued VARCHAR(1) = @issued;
+    
+    //     SELECT DISTINCT
+    //         co.jobcard_number,
+    //         co.part_number1,
+    //         pm.partdesc,
+    //         co.Price,
+    //         co.Qty,
+    //         co.Stock AS StockQty,
+    //         co.current_status,
+    //         co.Price * co.Qty AS Value,
+    //         pr.All_Time_NonStck 
+    //     FROM Create_Order_Request_TD001_${dealerid} co
+    //     JOIN LocationInfo li 
+    //         ON li.LocationID = co.LocationID
+    //     JOIN Part_Master pm 
+    //         ON li.brandid = pm.brandid 
+    //         AND pm.partnumber = co.Part_Number1
+    //     LEFT JOIN CurrentStock1 cs1 
+    //         ON co.LocationID = cs1.locationid
+    //     LEFT JOIN CurrentStock2 cs2 
+    //         ON cs2.StockCode = cs1.tCode  
+    //         AND cs2.PartNumber = co.part_number1
+    //     LEFT JOIN Stockable_Nonstockable_TD001_${dealerid} sn 
+    //         ON sn.locationid = co.locationid 
+    //         AND sn.partnumber1 = co.part_number
+    //     LEFT JOIN [UAD_BI_PPNI].dbo.ppni_report_${dealerid} pr
+    //        ON pr.Jobcard_Number = co.Jobcard_number
+    //        AND pr.PartNumber = co.Part_Number1
+    //     WHERE co.vehiclenumber = @VehicleNo
+    //       AND (@StatusFilter IS NULL OR co.current_status = @StatusFilter)
+    //       AND (@Alltime_nonstck IS NULL OR pr.All_Time_NonStck = @Alltime_nonstck)
+    //       AND (
+    //         @issued IS NULL OR
+    //         (@issued = '0' AND co.JobLineCloseDate IS NULL) OR
+    //         (@issued = '1' AND co.JobLineCloseDate IS NOT NULL)
+    //       );
+    //   `;
+       const query = `
+      SELECT DISTINCT
+          co.jobcard_number,
+          co.part_number1,
+          pm.partdesc,
+          co.Price,
+          co.Qty,
+          co.Stock AS StockQty,
+          co.current_status,
+          co.Price * co.Qty AS Value,
+          pr.All_Time_NonStck 
+      FROM Create_Order_Request_TD001_${dealerid} co
+      JOIN LocationInfo li 
+          ON li.LocationID = co.LocationID
+      JOIN Part_Master pm 
+          ON li.brandid = pm.brandid 
+          AND pm.partnumber = co.Part_Number1
+      LEFT JOIN CurrentStock1 cs1 
+          ON co.LocationID = cs1.locationid
+      LEFT JOIN CurrentStock2 cs2 
+          ON cs2.StockCode = cs1.tCode  
+          AND cs2.PartNumber = co.part_number1
+      LEFT JOIN Stockable_Nonstockable_TD001_${dealerid} sn 
+          ON sn.locationid = co.locationid 
+          AND sn.partnumber1 = co.part_number
+      LEFT JOIN [UAD_BI_PPNI].dbo.ppni_report_${dealerid} pr
+         ON pr.Jobcard_Number = co.Jobcard_number
+         AND pr.PartNumber = co.Part_Number1
+      WHERE co.vehiclenumber = @vehicleno
+        AND (@filter IS NULL OR co.current_status = @filter)
+        AND (@alltimenonstk IS NULL OR pr.All_Time_NonStck = @alltimenonstk)
+        AND (
+          @issued IS NULL OR
+          (@issued = '0' AND co.JobLineCloseDate IS NULL) OR
+          (@issued = '1' AND co.JobLineCloseDate IS NOT NULL)
+        );
+    `;
+      const result = await pool.request()
+        .input('vehicleno', vehicleno)
+        .input('filter', filter)
+        .input('alltimenonstk', alltimenonstk)
+        .input('issued', issued)
+        .query(query);
+        
+      return result;
+} catch (error) {
+    throw new Error(`vehiclesearchService failed: ${error.message}`);
+    
+}
+}
+export {PPNIVALUE12MonthsService,userroleService,partDescwithStockandQuality,reservedForVehicle,groupStock,jobCardByVehicleService,partsByJobCardService,partSubstituteDetailService,locationwisePPNIValueService,advisorwisePPNIValueService,vehiclewisePPNIValueService,partwisePPNIValueService,vehicleSearchService}
