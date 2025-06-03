@@ -373,7 +373,7 @@ const partDetails = async (req, res) => {
         pm.partdesc, pm.moq, pm.category, 
         pm.landedcost, pm.mrp, pm.dateadded, pm.lastupdated 
       FROM z_scope.dbo.part_master pm
-      LEFT JOIN z_scope.dbo.substitution_master sm ON pm.partnumber = sm.partnumber
+      LEFT JOIN z_scope.dbo.substitution_master sm ON pm.brandid = sm.brandid and pm.partnumber = sm.partnumber
       WHERE pm.partnumber IN (${partnumberString}) AND pm.brandid = ${Brandid}
     `;
 
