@@ -15,10 +15,10 @@ const getBrandByUser = async (req, res) => {
     }
     const result = await pool.request()
       .input('userid', sql.Int, userid) 
-      .query(`
+      .query(` use [z_scope]
         SELECT DISTINCT Brand, BrandID
         FROM LocationInfo
-        WHERE bdmcode = @userid
+        WHERE bdmcode = @userid and status = 1 
       `);
         // console.log(result);
         
@@ -36,7 +36,8 @@ if(!userid || !brandid){
     message:`userid and brandid are required`
   })
 }
-const query = `select distinct dealer , dealerid from LocationInfo where  brandid = ${brandid} and bdmcode = ${userid}`
+const query = `use [z_scope]
+    select distinct dealer , dealerid from LocationInfo where  brandid = ${brandid} and bdmcode = ${userid} and status = 1`
 // console.log(query);
 
 const result = await pool.request().query(query)
@@ -48,7 +49,8 @@ const getDashboardbyDealer = async(req,res)=>{
   const pool = await getPool2();
   const {dealerid} = req.body
 try {  
-    const query = `select dm.tCode , dm.Dashboard  from z_scope.dbo.DB_DashboardURL du
+    const query = ` use [z_scope]
+                    select dm.tCode , dm.Dashboard  from z_scope.dbo.DB_DashboardURL du
                     join z_scope.dbo.DB_DashboardMaster dm on dm.tcode = du.DashboardCode
                     where du.status = 1 and dm.Status = 1 and  dealerid  = @dealerid`
     const result = await pool.request().input('dealerid',sql.Int,dealerid).query(query)
