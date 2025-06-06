@@ -2478,7 +2478,7 @@ const getBulkDataInService = async (req, res) => {
     let dealerId = req.dealer_id;
     let userId = req.added_by;
     let brand;
-    let getLocationQuery = `use [z_scope] Select locationId,dealer,brand from locationInfo where status=1 and dealerId=@dealerId`;
+    let getLocationQuery = `use [z_scope] Select locationId,dealer,brand,brandId from locationInfo where status=1 and dealerId=@dealerId`;
     const result13 = await pool
       .request()
       .input("dealerId", dealerId)
@@ -2487,6 +2487,7 @@ const getBulkDataInService = async (req, res) => {
   //  console.log("result ",result13.recordset)
     let dealerName = result13.recordset[0].dealer;
     brand=result13.recordset[0].brand;
+    let brandId=result13.recordset[0]?.brandId;
     let bulkUploadedData = [];
     let tcode;
     let locationIds = locations.map((row) => row.locationId); // Extract locationIds from locations
@@ -2519,12 +2520,13 @@ const getBulkDataInService = async (req, res) => {
 vw.partNature,
 case when vw.partNo=s.partnumber then s.subpartnumber else vw.partNo end as LatestPartNumber from [stockupload].dbo.currentStock2 c 
 join [stockUpload].dbo.currentStock1 c1 on c1.tcode=c.StockCode and c1.LocationID=@locationId
-join  [z_scope].dbo.VW_PartMaster vw on c.PartNumber=vw.partNo 
-join  [z_scope].dbo.Substitution_Master s on s.brandid=vw.BrandID and vw.PartNo=s.partnumber `;
+left join  [z_scope].dbo.VW_PartMaster vw on c.PartNumber=vw.partNo and vw.BrandID=@brandId
+left join  [z_scope].dbo.Substitution_Master s on s.brandid=vw.BrandID and vw.PartNo=s.partnumber `;
 const res78 = await pool
             .request()
             .input("tcode", tcode)
             .input('locationId',locationId)
+            .input('brandId',brandId)
             .query(getDataQuery);
             let locationName='';
 
@@ -2543,7 +2545,7 @@ const res78 = await pool
                MRP:record.mrp,
                MOQ:record.moq,
                ['Part Nature']:record.partNature,
-                Quantity:record.Quantity,
+                Stock:record.Quantity,
                   Date:(record.stockDate)
              
             }));
