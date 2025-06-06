@@ -141,8 +141,9 @@ const getPartNotInMasterInController=async(req,res)=>{
 const bulkUploadDataInController=async(req,res)=>{
  try{
 
-        const result=await uploadBulkData(req.body,res);
-        res.status(200).json({data:result});
+       // console.log("req ",req.file)
+        const result=await uploadBulkData(req,res);
+        res.status(200).json(result);
     }
     catch(error){
 

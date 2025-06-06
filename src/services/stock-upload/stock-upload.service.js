@@ -2,6 +2,7 @@ import { getPool1 } from "../../db/db.js"
 import {
   readExcelFile,
   readExcelFileWithSubColumns,
+  readExcelFileWithSubColumnsForBulk,
 } from "../utilities/utilities.service.js";
 import sql from "mssql";
 import yazl from 'yazl';
@@ -368,11 +369,12 @@ const getUploadedDataSingleLocationInService = async (req, res) => {
     let location;
     // let getQuery = `use [StockUpload] select ck2.partnumber,ck2.qty from currentStock2 ck2 join 
     //     currentStock1 ck1 on ck1.tcode=ck2.StockCode where locationId=@locationId`;
-let getNameQuery=`use [z_scope] SELECT location,brand,dealer FROM locationInfo WHERE locationId = @locationId`;
+let getNameQuery=`use [z_scope] SELECT location,brand,dealer,brandId FROM locationInfo WHERE locationId = @locationId`;
     const result1=await pool.request().input('locationId',locationId).query(getNameQuery);
     brand=result1.recordset[0].brand;
     dealer=result1.recordset[0].dealer;
     location=result1.recordset[0].location;
+    let brandId=result1.recordset[0].brandId
    
 // if partno belongs in part master and substituionmaster then take subpartnumber
 //  else partno of partmaster is considered as latest part number
@@ -380,11 +382,12 @@ let getNameQuery=`use [z_scope] SELECT location,brand,dealer FROM locationInfo W
 vw.partNature,
 case when vw.partNo=s.partnumber then s.subpartnumber else vw.partNo end as LatestPartNumber from [stockupload].dbo.currentStock2 c 
 join [stockUpload].dbo.currentStock1 c1 on c1.tcode=c.StockCode and c1.LocationID=@locationId
-join  [z_scope].dbo.VW_PartMaster vw on c.PartNumber=vw.partNo 
-join  [z_scope].dbo.Substitution_Master s on s.brandid=vw.BrandID and vw.PartNo=s.partnumber `;
+left join  [z_scope].dbo.VW_PartMaster vw on c.PartNumber=vw.partNo and vw.BrandID=@brandId
+left join  [z_scope].dbo.Substitution_Master s on s.brandid=vw.BrandID and vw.PartNo=s.partnumber `;
  const result = await pool
       .request()
       .input("locationId", locationId)
+      .input("brandId", brandId)
       .query(getQuery);
 
       const enrichedData = result.recordset.map(record => ({
@@ -1148,20 +1151,23 @@ const getUploadedDataMultiLocationInService = async (req, res) => {
   const archive = new yazl.ZipFile();
   const brandId=req.brand_id;
   const dealerId=req.dealer_id;
+  let firstLocationId=locations[0].location
    let brand,dealer;
   try {
 
-    let getNameQuery=`use [z_scope] SELECT location,brand,dealer FROM locationInfo WHERE locationId = @locationId`;
-    const result1=await pool.request().input('locationId',locationId).query(getNameQuery);
+    let getNameQuery=`use [z_scope] SELECT location,brand,dealer,brandId FROM locationInfo WHERE locationId = @locationId`;
+    const result1=await pool.request().input('locationId',firstLocationId).query(getNameQuery);
     brand=result1.recordset[0].brand;
     dealer=result1.recordset[0].dealer;
+    let brandId=result1.recordset[0]?.brandId
       for (let i = 0; i < locations.length; i++) {
-          const locationId = locations[i].location;
+          let locationId = locations[i].location;
+        //  console.log("locationId ",locationId)
           try {
               const getBrandQuery = `use [z_scope] SELECT location FROM locationInfo WHERE locationId = @locationId`;
               const result = await pool.request().input('locationId', locationId).query(getBrandQuery);
               let locationName = result.recordset[0]?.location; 
-
+              
               // let getQuery = `use [StockUpload] select ck2.partnumber,ck2.qty from currentStock2 ck2 join 
               //     currentStock1 ck1 on ck1.tcode=ck2.StockCode where locationId=@locationId`;
 
@@ -1169,10 +1175,10 @@ const getUploadedDataMultiLocationInService = async (req, res) => {
 vw.partNature,
 case when vw.partNo=s.partnumber then s.subpartnumber else vw.partNo end as LatestPartNumber from [stockupload].dbo.currentStock2 c 
 join [stockUpload].dbo.currentStock1 c1 on c1.tcode=c.StockCode and c1.LocationID=@locationId
-join  [z_scope].dbo.VW_PartMaster vw on c.PartNumber=vw.partNo 
-join  [z_scope].dbo.Substitution_Master s on s.brandid=vw.BrandID and vw.PartNo=s.partnumber `;
+left join  [z_scope].dbo.VW_PartMaster vw on c.PartNumber=vw.partNo and vw.BrandID=@brandId
+left join  [z_scope].dbo.Substitution_Master s on s.brandid=vw.BrandID and vw.PartNo=s.partnumber `;
               
-              let result1 = await pool.request().input('locationId', locationId).query(getQuery);   
+              let result1 = await pool.request().input('locationId', locationId).input('brandId',brandId).query(getQuery);   
           //    console.log("result1 in stock upload service 2184",result1.recordset)
               let locationData = result1.recordset.length > 0 ? result1.recordset.map(record => ({
                  Brand:brand,
@@ -1186,7 +1192,7 @@ join  [z_scope].dbo.Substitution_Master s on s.brandid=vw.BrandID and vw.PartNo=
                   MRP:record.mrp,
                   MOQ:record.moq,
                   ['Part Nature']:record.partNature,
-                  Quantity: record.Quantity,
+                  Stock: record.Quantity,
                   Date:record.stockDate
 
               })) : [];
@@ -1297,20 +1303,26 @@ const getPartNotInMasterBulkInService=async(req,res)=>{
     const pool = await getPool1();
 
     let dealerId = req.dealer_id;
-    let getBrandQuery = `use [z_scope] Select brandId from locationInfo where dealerId=@dealerId`;
+    let brandId=req.brand_id;
+    let getBrandQuery = `use [z_scope] Select brand from locationInfo where brandId=@brandId`;
     const result = await pool
       .request()
-      .input("dealerId", dealerId)
+      .input("brandId", brandId)
       .query(getBrandQuery);
-    let brandId = result.recordset[0].brandId;
-    // console.log(brandId);
+    let brand= result.recordset[0].brand;
+   // console.log("brand id ",result)
+    //console.log(brandId);
     let getQuery = `use [StockUpload] Select partnumber from part_not_in_master where brand_id=@brandId`;
     const result1 = await pool
       .request()
       .input("brandId", brandId)
       .query(getQuery);
     // console.log(result1.recordset)
-    return result1.recordset;
+    let combinedResult=result1.recordset.map((item)=>({
+      Brand:brand,
+      ['Part Number']:item.partnumber
+    }))
+    return combinedResult;
   } catch (error) {
     console.log("error in service ", error.message);
     return {error:error};
@@ -1320,13 +1332,13 @@ const getPartNotInMasterBulkInService=async(req,res)=>{
 const uploadBulkData=async(req,res)=>{
    try {
     const pool = await getPool1();
-    let addedBy = req.user_id;
+    let addedBy = parseInt(req.body.user_id,10);
     let rowData;
-    let brandId = parseInt(req.brand_id,10);
-    let dealerId = req.dealer_id;
+    let brandId = parseInt(req.body.brand_id,10);
+    let dealerId = parseInt(req.body.dealer_id,10);
     let StockCodes;
     let wrongDealerLocationInFile = [];
-   // console.log("brandid ",brandId)
+  //  console.log("brandid ",brandId,dealerId,req.body)
     // const date1= new Date(currentDate);
     // let date = req.body.date;
     // const date1 = new Date(date);
@@ -1339,7 +1351,7 @@ const uploadBulkData=async(req,res)=>{
       .request()
       .input("dealerId", dealerId)
       .query(getLocationsQuery);
-      console.log("locations ",res56)
+    //  console.log("locations ",res56)
     let locations = res56.recordset;
     let isOlderUploadForHyundai=false;
     // console.log("locations ", locations);
@@ -1357,7 +1369,7 @@ const uploadBulkData=async(req,res)=>{
            .request()
            .input("brandId", brandId)
            .query(getMappingQuery);
-    console.log("mapping result ",mappingResult.recordset)
+   // console.log("mapping result ",mappingResult.recordset)
     if (mappingResult.recordset.length == 0) {
       return { mappingNotPresent: true };
     }
@@ -1371,7 +1383,7 @@ const uploadBulkData=async(req,res)=>{
     if (resDealerAndLoc.recordset.length == 0) {
       return { dealerLocationMappingNotPresent: true };
     }
-
+ //console.log("dealer location mapping ",resDealerAndLoc.recordset)
     let dealerLocationMappedData = resDealerAndLoc.recordset;
 
     let mappedData = mappingResult.recordset[0];
@@ -1380,8 +1392,7 @@ const uploadBulkData=async(req,res)=>{
     let rowDataArray;
     let filteredRowData;
     let combinedExistedData = [];
-   
-
+  
     
       fileData = [11, 33].includes(brandId)
      ? await readExcelFileWithSubColumnsForBulk(req.file.path)
@@ -1450,7 +1461,8 @@ if (missingFields.length > 0) {
       const getVal = (key) => {
         const match = Object.keys(row).find(k => k.toLowerCase() === key.toLowerCase());
         const value = match ? row[match] : "";
-        return value != null ? value.toString().trim() : "";
+        // return value != null ? value.toString().trim() : "";
+        return (value != null && value !== undefined) ? value.toString().trim() : "";
       };
     
       const computeQty = () => {
@@ -1465,34 +1477,45 @@ if (missingFields.length > 0) {
           keys.forEach(key => {
             // Escape special characters in key (like dash)
             const escapedKey = key.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
-            const regex = new RegExp(`\\b${escapedKey}\\b`, 'gi');
-            const val = parseFloat(row[key]);
-            formulaWithValues = formulaWithValues.replace(regex, isNaN(val) ? "0" : val.toString());
+             const regex = new RegExp(`\\b${escapedKey}\\b`, 'gi');
+            //const regex = new RegExp(escapedKey, 'gi');
+            // const val = parseFloat(row[key]);
+            // formulaWithValues = formulaWithValues.replace(regex, isNaN(val) ? "0" : val.toString());
+
+            const rawVal = row[key];
+      const val = parseFloat(rawVal);
+      const safeVal = (rawVal === undefined || rawVal === null || rawVal === "" || isNaN(val)) ? "0" : val.toString();
+      formulaWithValues = formulaWithValues.replace(regex, safeVal);
           });
-      
+       //  console.log("keys in evalutaing formula ",formulaWithValues)
           try {
-           // console.log("Evaluating:", formulaWithValues);
+       //     console.log("Evaluating:", formulaWithValues,eval(formulaWithValues));
             return eval(formulaWithValues);
           } catch (err) {
-            console.error("Error evaluating formula:", formulaWithValues, err);
+       //     console.error("Error evaluating formula: in bulk upload st service", formulaWithValues, err);
             return 0;
           }
         } else {
-          const val = parseFloat(row[mappedData.stock_qty]);
-          return isNaN(val) ? 0 : val;
+          // const val = parseFloat(row[mappedData.stock_qty]);
+          // return isNaN(val) ? 0 : val;
+          const rawVal = row[mappedData.stock_qty];
+    const val = parseFloat(rawVal);
+    return (rawVal === undefined || rawVal === null || rawVal === "" || isNaN(val)) ? 0 : val;
         }
       };
     
+
       return {
             part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),
             qty: computeQty(),
             availability: getVal("availability"),
             status: getVal("status"),
-            location: getVal(mappedData.loc) != null ? getVal(mappedData.loc) : "",
+            // location: getVal(mappedData.loc) != null ? getVal(mappedData.loc) : "",
+            location: getVal(mappedData.loc)?.trim() || "",
           };
     });
   
-    console.log("normalized data ",normalizedData)
+ //  console.log("normalized data ",normalizedData)
     filteredRowData = normalizedData.filter((row) => {
       let stockQty = parseFloat(row.qty);
       let hasPartNumber = row.part_number && row.part_number.trim() !== "";
@@ -1511,6 +1534,7 @@ if (missingFields.length > 0) {
       return hasPartNumber && stockQty > 0 && hasLocation;
     });
   
+   // console.log("filtered data in st service bulk upload ",filteredRowData)
 const partMasterQuery = `
   USE z_scope;
   SELECT partNo as partnumber1, partID FROM VW_PartMaster WHERE brandId = @brandId
@@ -1799,7 +1823,7 @@ updatedFilteredRowData = Array.from(partCountMap.values());
     rowCount = updatedFilteredRowData?.length;
     let combinedLogsLocationWise = [];
     let currentStockCode;
-   //  console.log("unique ids ",uniqueLocationIds)
+    //  console.log("unique ids ",uniqueLocationIds,updatedFilteredRowData[0])
    
     for (let i = 0; i < uniqueLocationIds.length; i++) {
       let locId = uniqueLocationIds[i];
@@ -1810,8 +1834,8 @@ updatedFilteredRowData = Array.from(partCountMap.values());
       let filteredData = updatedFilteredRowData.filter(
         (item) => item.locationId == locId
       );
-
-    //  console.log("filtered data ",filteredData);
+     
+     // console.log("filtered data ",filteredData);
       if (insertedDataResult.length != 0) {
         // console.log("countRecords inserted ",countPrevRecords)
         // StockCode = insertedDataResult[0].StockCode;
@@ -1853,12 +1877,11 @@ updatedFilteredRowData = Array.from(partCountMap.values());
       }
       // console.log("updated filtered row after getting unique location id ",updatedFilteredRowData)
       // console.log("current stock1 ",locId,formattedDate,addedBy)
-      let insertQueryForCurrentStock1 = `use [StockUpload] insert into currentStock1(locationID,stockdate,addedby) output inserted.tcode values(@locId,@formattedDate,@addedBy)`;
+      let insertQueryForCurrentStock1 = `use [StockUpload] insert into currentStock1(locationID,stockdate,addedby) output inserted.tcode values(@locId,getDate(),@addedBy)`;
 
       const result1 = await pool
         .request()
         .input("locId", locId)
-        .input("formattedDate", formattedDate)
         .input("addedBy", addedBy)
         .query(insertQueryForCurrentStock1);
       currentStockCode = result1?.recordset[0]?.tcode;

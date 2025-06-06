@@ -39,5 +39,5 @@ router.post('/all-records-ml',allRecordsMultiLocation)
 //bulk upload
 
 router.post('/part-not-in-master-bulk',getPartNotInMasterInController);
-router.post('/bulk-upload',bulkUploadDataInController)
+router.post('/bulk-upload',upload.single('excelFile'),bulkUploadDataInController)
 export default router

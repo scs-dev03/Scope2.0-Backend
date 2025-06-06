@@ -349,7 +349,7 @@ const readExcelFile = async (filePath) => {
     // Extract headers (first row in the sheet)
     const headers = data[0]; // The first row will be the headers
 
-    // console.log('Headers:', headers);
+   // console.log('Headers:', headers);
     // console.log('Data:', data.slice(1)); // Data excluding headers
 
     // return { headers, data: data.slice(1) };
@@ -397,7 +397,7 @@ const readExcelFile = async (filePath) => {
        //console.log("header ",headers)
     return { headers: headers, data: resultData };
   } catch (error) {
-    console.log("error in reading the excel file ", error.message);
+    console.log("error in reading the excel file in utitlies service", error.message);
     return error;
   }
 };
