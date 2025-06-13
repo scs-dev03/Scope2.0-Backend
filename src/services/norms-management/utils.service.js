@@ -16,7 +16,7 @@ const partfamilySaleservice = async (brandid,dealerid,locationid,partnumber) => 
 const singlePartMaxByLocationService = async (dealerid,partnumber)=>{
 try {
         const pool = getPool2()
-        const query = `select distinct li.location , li.locationid, sn.maxvalue 
+        const query = `use [z_scope] select distinct li.location , li.locationid, sn.maxvalue 
                         from stockable_nonstockable_td001_${dealerid} sn
                         join locationinfo li on li.LocationID = sn.locationid
                         where sn.partnumber = '${partnumber}' and sn.stockdate = (select max(stockdate) from stockable_nonstockable_td001_${dealerid}) 

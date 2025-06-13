@@ -402,33 +402,147 @@ try {
   res.status(500).json({details:error.message})
 }
 }
+
+// const fetchRequests = async (userid) => {
+//   try {
+//     const pool = await getPool2();
+//     let usertype
+
+//      const usertypeQuery  = `select isBDM , Designation from z_scope..adminmaster_gen where bintid_pk = ${userid}`
+//      const result2 = await pool.request().query(usertypeQuery)
+//      const isBDM = result2.recordset[0].isBDM
+//      const admin = result2.recordset[0].Designation
+     
+//     if (isBDM === 'Y') {
+//       usertype = '0';  // BDM or BDM+Admin
+//     } else if (admin == 5) {
+//       usertype = '1';  // Only Admin
+//     }
+
+//   console.log(usertype);
+  
+//     let query
+//    if (usertype == 0){
+//       query = `
+//      use [UAD_BI] select 
+//      sd.reqid, dm.Dashboard , sd.Brand, sd.Dealer, sd.ScheduledOn ,sm.StatusName , 
+//      CONCAT(amg1.vcFirstName, ' ', amg1.vcLastName) AS Addedby , sd.Addedon ,
+//      CASE WHEN sd.Editedby = amg2.bintId_Pk THEN CONCAT(amg2.vcFirstName, ' ', amg2.vcLastName) END AS Editedby, sd.Editedon , 
+//      CASE WHEN sd.Deletedby = amg3.bintId_Pk THEN CONCAT(amg3.vcFirstName, ' ', amg3.vcLastName) END AS Deletedby, sd.Deletedon,
+//      CASE WHEN d.BDMCode = amg4.bintId_Pk THEN CONCAT(amg4.vcFirstName, ' ', amg4.vcLastName) END AS BDM
+//      from SBS_DBS_ScheduledDashboard sd
+//      join z_scope.dbo.DB_DashboardMaster dm ON sd.DashboardCode = dm.tCode
+//      join UAD_BI..SBS_DBS_STATUS_MASTER sm on sd.status = sm.status
+//      join z_scope.dbo.Dealer_Master d on d.bigid = sd.Dealerid
+//      LEFT JOIN z_scope.dbo.AdminMaster_GEN amg1 ON sd.Addedby = amg1.bintId_Pk
+//      LEFT JOIN z_scope.dbo.AdminMaster_GEN amg2 ON sd.Editedby = amg2.bintId_Pk
+//      LEFT JOIN z_scope.dbo.AdminMaster_GEN amg3 ON sd.Editedby = amg3.bintId_Pk
+//      LEFT JOIN z_scope.dbo.AdminMaster_GEN amg4 ON d.BDMCode = amg4.bintId_Pk
+//      where sd.Addedby = ${userid}
+//      order by reqid desc`;
+//     }
+//     if (usertype == 1) {
+//        query = `
+//      use [UAD_BI] select 
+//      sd.reqid, dm.Dashboard , sd.Brand, sd.Dealer, sd.ScheduledOn ,sm.StatusName , 
+//      CONCAT(amg1.vcFirstName, ' ', amg1.vcLastName) AS Addedby , sd.Addedon ,
+//      CASE WHEN sd.Editedby = amg2.bintId_Pk THEN CONCAT(amg2.vcFirstName, ' ', amg2.vcLastName) END AS Editedby, sd.Editedon , 
+//      CASE WHEN sd.Deletedby = amg3.bintId_Pk THEN CONCAT(amg3.vcFirstName, ' ', amg3.vcLastName) END AS Deletedby, sd.Deletedon,
+//      CASE WHEN d.BDMCode = amg4.bintId_Pk THEN CONCAT(amg4.vcFirstName, ' ', amg4.vcLastName) END AS BDM
+//      from SBS_DBS_ScheduledDashboard sd
+//      join z_scope.dbo.DB_DashboardMaster dm ON sd.DashboardCode = dm.tCode
+//      join UAD_BI..SBS_DBS_STATUS_MASTER sm on sd.status = sm.status
+//      join z_scope.dbo.Dealer_Master d on d.bigid = sd.Dealerid
+//      LEFT JOIN z_scope.dbo.AdminMaster_GEN amg1 ON sd.Addedby = amg1.bintId_Pk
+//      LEFT JOIN z_scope.dbo.AdminMaster_GEN amg2 ON sd.Editedby = amg2.bintId_Pk
+//      LEFT JOIN z_scope.dbo.AdminMaster_GEN amg3 ON sd.Editedby = amg3.bintId_Pk
+//      LEFT JOIN z_scope.dbo.AdminMaster_GEN amg4 ON d.BDMCode = amg4.bintId_Pk
+//      order by reqid desc`;
+//     }
+//     // console.log(query);
+    
+//      const result = await pool.request().query(query);
+//     return result.recordset;
+//   } catch (error) {
+//     console.error('Error fetching requests:', error.message);
+//     throw new Error('Failed to fetch requests.');
+//   }
+// };
+
+
 const fetchRequests = async (userid) => {
-  const pool = await getPool2();
   try {
-    const query = `
-      use [UAD_BI] select 
-      sd.reqid, dm.Dashboard , sd.Brand, sd.Dealer, sd.ScheduledOn ,sm.StatusName , 
-      CONCAT(amg1.vcFirstName, ' ', amg1.vcLastName) AS Addedby , sd.Addedon ,
-      CASE WHEN sd.Editedby = amg2.bintId_Pk THEN CONCAT(amg2.vcFirstName, ' ', amg2.vcLastName) END AS Editedby, sd.Editedon , 
-      CASE WHEN sd.Deletedby = amg3.bintId_Pk THEN CONCAT(amg3.vcFirstName, ' ', amg3.vcLastName) END AS Deletedby, sd.Deletedon,
-      CASE WHEN d.BDMCode = amg4.bintId_Pk THEN CONCAT(amg4.vcFirstName, ' ', amg4.vcLastName) END AS BDM
-      from SBS_DBS_ScheduledDashboard sd
-      join z_scope.dbo.DB_DashboardMaster dm ON sd.DashboardCode = dm.tCode
-      join UAD_BI..SBS_DBS_STATUS_MASTER sm on sd.status = sm.status
-      join z_scope.dbo.Dealer_Master d on d.bigid = sd.Dealerid
+    const pool = await getPool2();
+    let usertype;
+
+    // 🔍 Step 1: Determine user type (BDM or Admin)
+    const usertypeQuery = `
+      SELECT isBDM, Designation 
+      FROM z_scope..adminmaster_gen 
+      WHERE bintid_pk = ${userid}
+    `;
+    const result2 = await pool.request().query(usertypeQuery);
+    const isBDM = result2.recordset[0].isBDM;
+    const admin = result2.recordset[0].Designation;
+
+    if (isBDM === 'Y') {
+      usertype = '0'; // ✅ BDM or BDM + Admin
+    } else if (admin == 5) {
+      usertype = '1'; // ✅ Only Admin
+    }
+
+    // console.log("Usertype:", usertype);
+
+    // 📄 Step 2: Prepare SQL query based on user type
+    let query = `
+      USE [UAD_BI];
+      SELECT 
+        sd.reqid, 
+        dm.Dashboard, 
+        sd.Brand, 
+        sd.Dealer, 
+        sd.ScheduledOn,
+        sm.StatusName,
+        CONCAT(amg1.vcFirstName, ' ', amg1.vcLastName) AS Addedby,
+        sd.Addedon,
+        CASE 
+          WHEN sd.Editedby = amg2.bintId_Pk THEN CONCAT(amg2.vcFirstName, ' ', amg2.vcLastName)
+        END AS Editedby,
+        sd.Editedon,
+        CASE 
+          WHEN sd.Deletedby = amg3.bintId_Pk THEN CONCAT(amg3.vcFirstName, ' ', amg3.vcLastName)
+        END AS Deletedby,
+        sd.Deletedon,
+        CASE 
+          WHEN d.BDMCode = amg4.bintId_Pk THEN CONCAT(amg4.vcFirstName, ' ', amg4.vcLastName)
+        END AS BDM
+      FROM SBS_DBS_ScheduledDashboard sd
+      JOIN z_scope.dbo.DB_DashboardMaster dm ON sd.DashboardCode = dm.tCode
+      JOIN UAD_BI..SBS_DBS_STATUS_MASTER sm ON sd.status = sm.status
+      JOIN z_scope.dbo.Dealer_Master d ON d.bigid = sd.Dealerid
       LEFT JOIN z_scope.dbo.AdminMaster_GEN amg1 ON sd.Addedby = amg1.bintId_Pk
       LEFT JOIN z_scope.dbo.AdminMaster_GEN amg2 ON sd.Editedby = amg2.bintId_Pk
-      LEFT JOIN z_scope.dbo.AdminMaster_GEN amg3 ON sd.Editedby = amg3.bintId_Pk
+      LEFT JOIN z_scope.dbo.AdminMaster_GEN amg3 ON sd.Deletedby = amg3.bintId_Pk
       LEFT JOIN z_scope.dbo.AdminMaster_GEN amg4 ON d.BDMCode = amg4.bintId_Pk
-      where sd.Addedby = ${userid}
-      order by reqid desc`;
+    `;
+
+    // 🧠 Filter for BDM (only show their own requests)
+    if (usertype == '0') {
+      query += ` WHERE sd.Addedby = ${userid}`;
+    }
+
+    query += ` ORDER BY reqid DESC;`;
+
+    // 📥 Step 3: Execute query and return result
     const result = await pool.request().query(query);
     return result.recordset;
+
   } catch (error) {
     console.error('Error fetching requests:', error.message);
     throw new Error('Failed to fetch requests.');
   }
 };
+
 const changeLog = async(req,res)=>{
 try {
     const pool = await getPool2()
@@ -646,7 +760,7 @@ function scheduleTask() {
       const query = `use [UAD_BI]
                      SELECT TOP 5  reqid, dashboardcode, brand, brandid, dealer, dealerid, scheduledon
                      FROM SBS_DBS_ScheduledDashboard 
-                     WHERE status = 0 and dateadd(hour,-10,ScheduledOn) < = GETDATE() order by ScheduledOn`
+                     WHERE status = 0 and dateadd(hour,-10,ScheduledOn) <= GETDATE() order by ScheduledOn`
       const result = await pool.request().query(query)
       const tasks = result.recordset
 
@@ -676,7 +790,8 @@ function scheduleTask() {
             case 15: return refreshCID(task.dealerid, task.reqid)
             case 17: return refreshGainerMini(task.reqid)
             default:
-              console.error(`Invalid dashboardCode: ${task.dashboardcode} for reqid: ${task.reqid}`)
+            console.error(`Invalid dashboardCode: ${task.dashboardcode} for reqid: ${task.reqid}`)
+            return null;
           }
         } catch (error) {
           console.error(`Error processing dashboardCode ${task.dashboardcode} for reqid: ${task.reqid}:`, error.message)
