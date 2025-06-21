@@ -1,8 +1,8 @@
 import { partfamilySaleservice, singlePartMaxByLocationService } from "../../services/norms-management/utils.service.js";
-import { orderDetailsByPartnumberService } from "../../services/orderDetails/orderDetailsService.js";
+import { orderDetailsByPartnumberService, transformOrderData } from "../../services/orderDetails/orderDetailsService.js";
 import { partDetailsservice } from "../../services/salesview/salesviewservices.js";
 import {advisorwisePPNIValueService, groupStock, jobCardByVehicleService, locationwisePPNIValueService, partDescwithStockandQuality,  partsByJobCardService,  partSubstituteDetailService,  partwisePPNIValueService,  PPNIVALUE12MonthsService,  reservedForVehicle, userroleService, vehicleSearchService, vehiclewisePPNIValueService} from  "../../services/dealerMonitoring/dealerMonitoringService.js";
-
+// import { transformOrderData } from "../../services/orderDetails/orderDetailsService.js";
 
 const partSale = async (req,res)=>{
     try {
@@ -68,9 +68,12 @@ try {
                 return res.status(400).json({message:`dealerid , locationid , partnumber , Udate , Ldate are required`})
             }
             const data = await orderDetailsByPartnumberService(dealerid,locationid,partnumber,Udate,Ldate);
+            // const flatData = await formatOrderData(data.recordset)
+            const flatData = await transformOrderData(data.recordset)
             res.status(200).json({
-                Data:data.recordset
+                Data:flatData
             })
+
 } catch (error) {
     res.status(500).json({
         Error:error.message

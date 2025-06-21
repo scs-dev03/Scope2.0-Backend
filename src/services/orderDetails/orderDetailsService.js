@@ -18,20 +18,33 @@ const orderDetailsByPartnumberService = async(dealerid,locationid,partnumber,Uda
        
     //     const result = await pool.request().query(query)
 
-    const query = `
-    SELECT DISTINCT 
-    pm.partnumber1, pm.partdesc, pm.mrp, ogs.scsOrderno, ogs.openingStock, ooq, ogs.addeddate, sn.Maxvalue 
-    FROM [10.10.152.17].[z_scope].dbo.OGS_OrderData_TD001_${dealerid} ogs
-    LEFT JOIN Stockable_Nonstockable_TD001_${dealerid} sn 
-    ON sn.Locationid = ogs.locationid AND sn.partnumber = ogs.partnumber
-    LEFT JOIN LocationInfo li ON li.LocationID = ogs.locationid 
-    LEFT JOIN Part_Master pm ON pm.brandid = ogs.brandid AND pm.partnumber1 = ogs.partnumber
-    WHERE ogs.partnumber = @partnumber 
-    AND ogs.locationid = @locationid
-    AND sn.Stockdate = (SELECT MAX(stockdate) FROM Stockable_Nonstockable_TD001_${dealerid})
-    AND ogs.addeddate >= @Udate AND ogs.addeddate <= @Ldate
-    ORDER BY addeddate DESC
-`;
+//     const query = `
+//     SELECT DISTINCT 
+//     pm.partnumber1, pm.partdesc, pm.mrp, ogs.scsOrderno, ogs.openingStock, ooq, ogs.addeddate, sn.Maxvalue , ogs.FinalOrderQty, ito.transferfrombranch
+//     FROM [10.10.152.17].[z_scope].dbo.OGS_OrderData_TD001_${dealerid} ogs
+//     left join [10.10.152.17].[z_scope].dbo.OGS_SOTD_IndentTransferOrder_TD001_8 ito on ogs.partnumber = ito.partnumber and ogs.locationid = ito.locationid
+//     LEFT JOIN Stockable_Nonstockable_TD001_${dealerid} sn 
+//     ON sn.Locationid = ogs.locationid AND sn.partnumber = ogs.partnumber
+//     LEFT JOIN LocationInfo li ON li.LocationID = ogs.locationid 
+//     LEFT JOIN Part_Master pm ON pm.brandid = ogs.brandid AND pm.partnumber1 = ogs.partnumber
+//     WHERE ogs.partnumber = @partnumber 
+//     AND ogs.locationid = @locationid
+//     AND sn.Stockdate = (SELECT MAX(stockdate) FROM Stockable_Nonstockable_TD001_${dealerid})
+//     AND ogs.addeddate >= @Udate AND ogs.addeddate <= @Ldate
+//     ORDER BY addeddate DESC
+// `;\
+
+const query = `
+SELECT DISTINCT 
+pm.partnumber1, pm.partdesc,pm.Category, pm.mrp,pm.landedcost,ooq, ogs.scsOrderno, ogs.openingStock, ogs.OrderQtyPlaced,ogs.DealerRemarks, ogs.addeddate, ito.transferfrombranch , ogs.FinalOrderQty
+FROM [10.10.152.17].[z_scope].dbo.OGS_OrderData_TD001_${dealerid} ogs
+left join [10.10.152.17].[z_scope].dbo.OGS_SOTD_IndentTransferOrder_TD001_${dealerid} ito on ogs.partnumber = ito.partnumber and ogs.locationid = ito.locationid
+LEFT JOIN LocationInfo li ON li.LocationID = ogs.locationid 
+LEFT JOIN Part_Master pm ON pm.brandid = ogs.brandid AND pm.partnumber1 = ogs.partnumber
+WHERE ogs.partnumber = @partnumber AND ogs.locationid = @locationid
+AND ogs.addeddate >=  @Udate AND ogs.addeddate <= @Ldate
+ORDER BY addeddate DESC
+`
 
 const result = await pool.request()
   .input('partnumber', partnumber)
@@ -46,4 +59,69 @@ const result = await pool.request()
     }
 }
 
-export {orderDetailsByPartnumberService}
+// function formatOrderData(input) {
+//     const grouped = {};
+//     // console.log(input);
+
+//     input.forEach(entry => {
+//         const key = entry.scsOrderno;
+
+//         if (!grouped[key]) {
+//         grouped[key] = {
+
+//             partnumber1: entry.partnumber1,
+//             partdesc: entry.partdesc,
+//             Category: entry.Category,
+//             mrp: entry.mrp,
+//             landedcost: entry.landedcost,
+//             transferDetails: []
+//         };
+//         }
+
+//         grouped[key].transferDetails.push({
+//             scsOrderno:entry.scsOrderno ,
+//             addeddate: entry.addeddate,
+//             transferfrombranch: entry.transferfrombranch || 0,
+//             openingStock: entry.openingStock || 0,
+//             ooq: entry.ooq ,
+//             OrderQtyPlaced: entry.OrderQtyPlaced || 0,
+//             DealerRemarks: entry.DealerRemarks || 'N/A',
+//             FinalOrderQty: entry.FinalOrderQty || 0
+//         });
+//     });
+
+//   return Object.values(grouped);
+// }
+function transformOrderData(response) {
+    // console.log(response);
+    
+  if (!response || response.length === 0) return {};
+
+  const sample = response[0]; // Assuming all rows share same static values
+  const result = {
+    partnumber1: sample.partnumber1,
+    partdesc: sample.partdesc,
+    Category: sample.Category,
+    mrp: sample.mrp,
+    landedcost: sample.landedcost,
+    Data: []
+  };
+
+  response.forEach(entry => {
+    result.Data.push({
+      scsOrderno: entry.scsOrderno,
+      addeddate: entry.addeddate,
+      transferfrombranch: entry.transferfrombranch || 0,
+      openingStock: entry.openingStock || 0,
+      ooq: entry.ooq,
+      OrderQtyPlaced: entry.OrderQtyPlaced || 0,
+      DealerRemarks: entry.DealerRemarks || "N/A",
+      FinalOrderQty: entry.FinalOrderQty || 0
+    });
+  });
+
+  return result;
+}
+
+
+export {orderDetailsByPartnumberService , transformOrderData }
