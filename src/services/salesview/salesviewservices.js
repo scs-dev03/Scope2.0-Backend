@@ -15,13 +15,13 @@ const partDetailsservice = async (brandid,dealerid,locationid,partnumber,res)=>{
                 pm.partdesc, pm.moq, pm.category, 
                 pm.landedcost, pm.mrp, pm.dateadded, pm.lastupdated ,
         		CASE
-                WHEN os.greenflag = 'N' OR os.yellowflag = 'N' OR su.redflag = 'N' 
+                WHEN os.greenflag = 'Y' OR os.yellowflag = 'Y' OR su.redflag = 'Y' 
                 THEN 'Non-Moving' 
                 WHEN sn.Maxvalue = 0 THEN 'Non-Stockable'
         		WHEN sn.Maxvalue > 0 THEN 'Stockable'
             END AS Partstatus
               FROM part_master pm
-              LEFT JOIN substitution_master sm ON pm.partnumber = sm.partnumber
+            LEFT JOIN substitution_master sm ON pm.partnumber = sm.partnumber
         	  LEFT JOIN  Stockable_Nonstockable_TD001_${dealerid} sn on sn.locationid = ${locationid} and sn.partnumber1 = pm.partnumber1
         	  LEFT JOIN  Opening_Stock_Upload_TD001_${dealerid} os on os.Locationid = ${locationid} and pm.PartNumber = os.Partnumber1
         	  LEFT JOIN stock_upload_spm_td001_${dealerid} su ON su.locationid = ${locationid} AND pm.PartNumber1 = su.Partnumber1
