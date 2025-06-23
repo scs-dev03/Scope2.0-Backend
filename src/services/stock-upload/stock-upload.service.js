@@ -196,14 +196,28 @@ const stockUploadSingleLocation = async (req, res) => {
   const knownParts = [];
   const unknownParts = [];
 
+  // for (const item of filteredData) {
+  //   const id = partMap.get(item.part_number.toLowerCase());
+  //   if (id) {
+  //     knownParts.push({ ...item, partId: id });
+  //   } else if (!existingUnmatchedParts.has(item.part_number)) {
+  //     unknownParts.push({ partnumber: item.part_number });
+  //   }
+  // }
+
   for (const item of filteredData) {
-    const id = partMap.get(item.part_number.toLowerCase());
-    if (id) {
-      knownParts.push({ ...item, partId: id });
-    } else if (!existingUnmatchedParts.has(item.part_number)) {
-      unknownParts.push({ partnumber: item.part_number });
-    }
+  const partNumber = item.part_number.toLowerCase();
+  const id = partMap.get(partNumber);
+
+  if (id) {
+    knownParts.push({ ...item, partId: id });
+  } else if (
+    !existingUnmatchedParts.has(item.part_number) &&
+    !unknownParts.some(p => p.partnumber.toLowerCase() === partNumber)
+  ) {
+    unknownParts.push({ partnumber: item.part_number });
   }
+}
 
   // 10. Merge duplicates by part_number
   const merged = new Map();

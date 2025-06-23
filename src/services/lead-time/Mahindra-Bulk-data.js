@@ -110,14 +110,20 @@ import moment from "moment";
   const  bulkMahindraInsertMRNData=async function(data,pool, dealer, location,res,headers) {
         // console.log('----------------------it is executing');
         let isNullFound=false;
-        // console.log(data[2])
+      //  console.log(data.length)
        
-        data=data.slice(1);
+        // data=data.slice(1);
+        if(data[0]["part number"]==null || data[0]["part number"]==''){
+            data=data.slice(1);
+        }
+        
+     //   console.log("data length ",data.length)
         let part_number=data[0]["part number"];
+    //   console.log("mahindra part number ",part_number)
         let brandId=9;
         let query=`Select brandid from z_scope.dbo.VW_PartMaster where partno=@part_number and brandid=@brandId`;
         const result=await pool.request().input('part_number',part_number).input('brandId',brandId).query(query);
-      //  console.log("result in mahindra ",result)
+      //   console.log("result in mahindra ",result)
         if(result.recordset.length==0){
             // let tableNamePO='Mahindra_PO_file_Lead_Time_Latest_Data';
             //     let tableNameMRN='Mahindra_receipt_file_lead_Time_Latest_data'
@@ -132,7 +138,7 @@ import moment from "moment";
             const Location = location || item["location"];
             
             if(!Dealer || !Location || !item["part number"] || item["part number"]==0){
-                console.log(item,Dealer,Location)
+              //  console.log(item,Dealer,Location)
                     isNullFound=true;
                     
                     return isNullFound;    
@@ -175,41 +181,49 @@ import moment from "moment";
             Location // [Location]
         ]});
     
-        await pool.request().query('use UAD_BI_LEAD_TIME')
-        const table = new sql.Table('Mahindra_receipt_file_lead_Time_Latest_data'); // Updated table name
-        table.create = false;
-    
-        // Define columns using the exact column names from your new schema
-        table.columns.add('receipt date', sql.Date, { nullable: true }); // [receipt date]
-        table.columns.add('Invoice Date', sql.Date, { nullable: true }); // [Invoice Date]
-        table.columns.add('PO Number', sql.VarChar(155), { nullable: true }); // [PO Number]
-        table.columns.add('party type', sql.VarChar(255), { nullable: true }); // [party type]
-        table.columns.add('Part Number', sql.VarChar(100), { nullable: true }); // [Part Number]
-        table.columns.add('received qty', sql.Float, { nullable: true }); // [received qty]
-        table.columns.add('Invoice Qty', sql.Float, { nullable: true }); // [Invoice Qty]
-        table.columns.add('Dealer', sql.VarChar(355), { nullable: true }); // [Dealer]
-        table.columns.add('Location', sql.VarChar(355), { nullable: true }); // [Location]
-    
-        // Add rows to the table, matching the column order in `table.columns.add()`
-        values.forEach((row) => {
-            table.rows.add(
-                row[0],  // [receipt date]
-                row[1],  // [Invoice Date]
-                row[2],  // [PO Number]
-                row[3],  // [party type]
-                row[4],  // [Part Number]
-                row[5],  // [received qty]
-                row[6],  // [Invoice Qty]
-                row[7],  // [Dealer]
-                row[8]   // [Location]
-            );
-        });
-    
-        const request = pool.request();
+        try{
+
+            await pool.request().query('use UAD_BI_LEAD_TIME')
+            const table = new sql.Table('Mahindra_receipt_file_lead_Time_Latest_data'); // Updated table name
+            table.create = false;
+        
+            // Define columns using the exact column names from your new schema
+            table.columns.add('receipt date', sql.Date, { nullable: true }); // [receipt date]
+            table.columns.add('Invoice Date', sql.Date, { nullable: true }); // [Invoice Date]
+            table.columns.add('PO Number', sql.VarChar(155), { nullable: true }); // [PO Number]
+            table.columns.add('party type', sql.VarChar(255), { nullable: true }); // [party type]
+            table.columns.add('Part Number', sql.VarChar(100), { nullable: true }); // [Part Number]
+            table.columns.add('received qty', sql.Float, { nullable: true }); // [received qty]
+            table.columns.add('Invoice Qty', sql.Float, { nullable: true }); // [Invoice Qty]
+            table.columns.add('Dealer', sql.VarChar(355), { nullable: true }); // [Dealer]
+            table.columns.add('Location', sql.VarChar(355), { nullable: true }); // [Location]
+        
+            // Add rows to the table, matching the column order in `table.columns.add()`
+            values.forEach((row) => {
+                table.rows.add(
+                    row[0],  // [receipt date]
+                    row[1],  // [Invoice Date]
+                    row[2],  // [PO Number]
+                    row[3],  // [party type]
+                    row[4],  // [Part Number]
+                    row[5],  // [received qty]
+                    row[6],  // [Invoice Qty]
+                    row[7],  // [Dealer]
+                    row[8]   // [Location]
+                );
+            });
+          //  console.log("value ",values[0])
+            const request = pool.request();
         await request.query('use UAD_BI_LEAD_TIME ')
          await request.query('TRUNCATE TABLE Mahindra_receipt_file_lead_Time_Latest_data');
         // Execute the bulk insert
         await request.bulk(table);
+        }
+        catch(error){
+            console.log("error in mahindra mrn ",error.message)
+        }
+    
+        
     }
     }
     

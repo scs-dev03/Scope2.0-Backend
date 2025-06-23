@@ -591,7 +591,13 @@ import { getLeadTimePool, getPool1 } from "../../db/db.js"
 
       if(brandId==9 && req.fileType=='MRN'){
         // rowCount=rowCount-2;
-        rowCount=excelData.data.length-1;
+        if(excelData.data[0]["part number"]==null ||  excelData.data[0]["part number"]==''){
+           rowCount=excelData.data.length-1;
+        }
+        else{
+          rowCount=excelData.data.length
+         // console.log("row count ",rowCount)
+        }
         if(dealer && location){
           // console.log(excelData.data)
           insertResponse=await bulkMahindraInsertMRNData(excelData.data,pool,dealer,location,res)
@@ -1379,42 +1385,84 @@ const __dirname = path.dirname(__filename);
           .trim(); // Remove spaces, ?, and #,-,...etc
         return str2;
       }
-      function cleanRowData(str) {
-        if (str === undefined || str === null) {
-          return null; // Replace undefined or null with a database-friendly null
-        }
-        if (str < 0) {
-          str = 0;
-        }
-        if (typeof str === "number" && !isNaN(str)) {
-          // Excel serial numbers typically start from 25569 (January 1, 1900)
-          const excelEpoch = 25569;  // Excel date system starts on January 1, 1900
-          const validExcelSerialRange = (str >= excelEpoch && str <= 999999);  // A reasonable upper limit for dates
+      // function cleanRowData(str) {
+      //   if (str === undefined || str === null) {
+      //     return null; // Replace undefined or null with a database-friendly null
+      //   }
+      //   if (str < 0) {
+      //     str = 0;
+      //   }
+      //   if (typeof str === "number" && !isNaN(str)) {
+      //     // Excel serial numbers typically start from 25569 (January 1, 1900)
+      //     const excelEpoch = 25569;  // Excel date system starts on January 1, 1900
+      //     const validExcelSerialRange = (str >= excelEpoch && str <= 999999);  // A reasonable upper limit for dates
       
-          if (validExcelSerialRange) {
-            const excelDate = new Date((str - excelEpoch) * 86400 * 1000);  // Convert to JavaScript Date
-            return excelDate; 
-          } else {
-            // If it's a number but not a valid date serial number, treat it as a quantity
-            str+=''
-            return str;  // Return the number as is (for quantities)
-          }
-        }
+      //     if (validExcelSerialRange) {
+      //       const excelDate = new Date((str - excelEpoch) * 86400 * 1000);  // Convert to JavaScript Date
+      //       return excelDate; 
+      //     } else {
+      //       // If it's a number but not a valid date serial number, treat it as a quantity
+      //       str+=''
+      //       return str;  // Return the number as is (for quantities)
+      //     }
+      //   }
      
-      let  convertedStr = String(str).replace(/'/g, "");
-        // console.log("converted str ",str)
-        convertedStr = String(str)
-        if (header == "location" || header=='dealer') {
-          // console.log(convertedStr)
-          return convertedStr.trim();  // Return the string as is for 'dealer location'
-      }
-      else{
-            convertedStr= convertedStr.replace(/[^a-zA-Z0-9\s]/g, "")
-      }
-        return convertedStr.trim();
-      }
+      // let  convertedStr = String(str).replace(/'/g, "");
+      //   // console.log("converted str ",str)
+      //   convertedStr = String(str)
+      //   if (header == "location" || header=='dealer') {
+      //     // console.log(convertedStr)
+      //     return convertedStr.trim();  // Return the string as is for 'dealer location'
+      // }
+      // else{
+      //       convertedStr= convertedStr.replace(/[^a-zA-Z0-9\s]/g, "")
+      // }
+      //   return convertedStr.trim();
+      // }
   
       // Initialize an object to store sheet data
+     
+       function cleanRowData(str, header) {
+  if (str === undefined || str === null) return null;
+
+  // 1️⃣ Try to detect and handle dd/mm/yyyy or dd-mm-yyyy string (CSV case)
+  if (typeof str === 'string') {
+    const ddmmyyyyMatch = str.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/); // supports both / and -
+    if (ddmmyyyyMatch) {
+      const [_, dd, mm, yyyy] = ddmmyyyyMatch;
+      const parsedDate = new Date(`${yyyy}-${mm}-${dd}T00:00:00.000Z`);
+      return parsedDate.toISOString();
+    }
+
+    // 2️⃣ Check if it's a parseable ISO date string
+    if (!isNaN(Date.parse(str))) {
+      const parsedDate = new Date(str);
+      parsedDate.setUTCHours(0, 0, 0, 0);
+      return parsedDate.toISOString();
+    }
+  }
+
+  // 3️⃣ Handle Excel serial date (number)
+  if (typeof str === "number" && !isNaN(str)) {
+    const excelEpoch = 25569;
+    const isExcelDate = (str >= excelEpoch && str <= 999999);
+    if (isExcelDate) {
+      const excelDate = new Date((str - excelEpoch) * 86400 * 1000);
+      excelDate.setUTCHours(0, 0, 0, 0);
+      return excelDate.toISOString();
+    }
+  }
+
+  // 4️⃣ Clean text fields
+  let convertedStr = String(str);
+  if (header === "location" || header === "dealer") {
+    return convertedStr.trim();
+  } else {
+    convertedStr = convertedStr.replace(/[^a-zA-Z0-9\s]/g, "");
+  }
+
+  return convertedStr.trim();
+}
       const result = {
         headers: cleanedHeaders,
         data: cleanedRows,
@@ -1840,47 +1888,90 @@ let headerItemPrev;
       return str2;
     }
    
-    function cleanRowData(str,header) {
-      if (str === undefined || str === null) {
-        return null;  // Replace undefined or null with a database-friendly null
-      }
+  //   function cleanRowData(str,header) {
+  //     if (str === undefined || str === null) {
+  //       return null;  // Replace undefined or null with a database-friendly null
+  //     }
 
-      if (typeof str === "number" && !isNaN(str)) {
-        // Excel serial numbers typically start from 25569 (January 1, 1900)
-        const excelEpoch = 25569;  // Excel date system starts on January 1, 1900
-        const validExcelSerialRange = (str >= excelEpoch && str <= 999999);  // A reasonable upper limit for dates
+  //     if (typeof str === "number" && !isNaN(str)) {
+  //       // Excel serial numbers typically start from 25569 (January 1, 1900)
+  //       const excelEpoch = 25569;  // Excel date system starts on January 1, 1900
+  //       const validExcelSerialRange = (str >= excelEpoch && str <= 999999);  // A reasonable upper limit for dates
     
-        if (validExcelSerialRange) {
-          const excelDate = new Date((str - excelEpoch) * 86400 * 1000);  // Convert to JavaScript Date
-          return excelDate; 
-        } else {
-          // If it's a number but not a valid date serial number, treat it as a quantity
-          str+=''
-          return str;  // Return the number as is (for quantities)
-        }
-      }
+  //       if (validExcelSerialRange) {
+  //         const excelDate = new Date((str - excelEpoch) * 86400 * 1000);  // Convert to JavaScript Date
+  //         return excelDate; 
+  //       } else {
+  //         // If it's a number but not a valid date serial number, treat it as a quantity
+  //         str+=''
+  //         return str;  // Return the number as is (for quantities)
+  //       }
+  //     }
     
      
-     // convertedStr = String(str).replace(/'/g, "");
-    let  convertedStr = String(str)
-    if (header == "location" || header=='dealer') {
-      // console.log(convertedStr)
-      return convertedStr.trim();  // Return the string as is for 'dealer location'
-  }
-  else{
-        convertedStr= convertedStr.replace(/[^a-zA-Z0-9\s]/g, "")
-  }
-    if(str<0 )
-      {
-        str=0;
-      }
-   // Remove all non-alphanumeric characters and symbols
-      // Remove leading/trailing spaces
-      return convertedStr.trim()
-    }
+  //    // convertedStr = String(str).replace(/'/g, "");
+  //   let  convertedStr = String(str)
+  //   if (header == "location" || header=='dealer') {
+  //     // console.log(convertedStr)
+  //     return convertedStr.trim();  // Return the string as is for 'dealer location'
+  // }
+  // else{
+  //       convertedStr= convertedStr.replace(/[^a-zA-Z0-9\s]/g, "")
+  // }
+  //   if(str<0 )
+  //     {
+  //       str=0;
+  //     }
+  //  // Remove all non-alphanumeric characters and symbols
+  //     // Remove leading/trailing spaces
+  //     return convertedStr.trim()
+  //   }
     
 
     // Initialize an object to store sheet data
+   
+   
+     function cleanRowData(str, header) {
+  if (str === undefined || str === null) return null;
+
+  // 1️⃣ Try to detect and handle dd/mm/yyyy or dd-mm-yyyy string (CSV case)
+  if (typeof str === 'string') {
+    const ddmmyyyyMatch = str.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/); // supports both / and -
+    if (ddmmyyyyMatch) {
+      const [_, dd, mm, yyyy] = ddmmyyyyMatch;
+      const parsedDate = new Date(`${yyyy}-${mm}-${dd}T00:00:00.000Z`);
+      return parsedDate.toISOString();
+    }
+
+    // 2️⃣ Check if it's a parseable ISO date string
+    if (!isNaN(Date.parse(str))) {
+      const parsedDate = new Date(str);
+      parsedDate.setUTCHours(0, 0, 0, 0);
+      return parsedDate.toISOString();
+    }
+  }
+
+  // 3️⃣ Handle Excel serial date (number)
+  if (typeof str === "number" && !isNaN(str)) {
+    const excelEpoch = 25569;
+    const isExcelDate = (str >= excelEpoch && str <= 999999);
+    if (isExcelDate) {
+      const excelDate = new Date((str - excelEpoch) * 86400 * 1000);
+      excelDate.setUTCHours(0, 0, 0, 0);
+      return excelDate.toISOString();
+    }
+  }
+
+  // 4️⃣ Clean text fields
+  let convertedStr = String(str);
+  if (header === "location" || header === "dealer") {
+    return convertedStr.trim();
+  } else {
+    convertedStr = convertedStr.replace(/[^a-zA-Z0-9\s]/g, "");
+  }
+
+  return convertedStr.trim();
+}
     const result = {
       headers: cleanedHeaders,
       data: cleanedRows,
