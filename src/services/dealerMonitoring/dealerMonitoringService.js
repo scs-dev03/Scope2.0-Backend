@@ -508,4 +508,23 @@ try {
     
 }
 }
-export {PPNIVALUE12MonthsService,userroleService,partDescwithStockandQuality,reservedForVehicle,groupStock,jobCardByVehicleService,partsByJobCardService,partSubstituteDetailService,locationwisePPNIValueService,advisorwisePPNIValueService,vehiclewisePPNIValueService,partwisePPNIValueService,vehicleSearchService}
+
+const gainerListingService = async(dealerid , locationid , partnumber)=>{
+try {
+        const pool = await getPool2()
+        // const query = `
+        // select pm.partnumber1 , pm.partdesc , pm.Category , pm.mrp , pm.landedcost ,CONCAT(unm.DISCOUNT,'%')as Discount  from SH_UPLOADNONMOVINGPART unm 
+        // join locationinfo li on li.locationid = unm.locationid
+        // join part_master pm on li.brandid = pm.brandid and pm.partnumber = unm.partnumber
+        // where unm.locationid = ${locationid} and unm.partnumber = '${partnumber}'
+        // `
+        const query = `use z_scope EXEC GainerListingSinglePart '${dealerid}', '${partnumber}', ${locationid};`
+
+        const result = await pool.request().query(query)
+        return result.recordset
+} catch (error) {
+    throw new Error(`gainerListingService failed : ${error.message}`);
+    
+}
+}
+export {PPNIVALUE12MonthsService,userroleService,partDescwithStockandQuality,reservedForVehicle,groupStock,jobCardByVehicleService,partsByJobCardService,partSubstituteDetailService,locationwisePPNIValueService,advisorwisePPNIValueService,vehiclewisePPNIValueService,partwisePPNIValueService,vehicleSearchService,gainerListingService}

@@ -36,10 +36,12 @@ const orderDetailsByPartnumberService = async(dealerid,locationid,partnumber,Uda
 
 const query = `
 SELECT DISTINCT 
-pm.partnumber1, pm.partdesc,pm.Category, pm.mrp,pm.landedcost,ooq, ogs.scsOrderno, ogs.openingStock, ogs.OrderQtyPlaced,ogs.DealerRemarks, ogs.addeddate, ito.transferfrombranch , ogs.FinalOrderQty
+pm.partnumber1, pm.partdesc,pm.Category, pm.mrp,pm.landedcost,ooq, ogs.scsOrderno, cs2.Qty as StockQty, ogs.OrderQtyPlaced,ogs.DealerRemarks, ogs.addeddate, ito.transferfrombranch , ogs.FinalOrderQty
 FROM [10.10.152.17].[z_scope].dbo.OGS_OrderData_TD001_${dealerid} ogs
-left join [10.10.152.17].[z_scope].dbo.OGS_SOTD_IndentTransferOrder_TD001_${dealerid} ito on ogs.partnumber = ito.partnumber and ogs.locationid = ito.locationid
+left join [10.10.152.17].[z_scope].dbo.OGS_SOTD_IndentTransferOrder_TD001_8 ito on ogs.scsorderno = ito.scsorderno
 LEFT JOIN LocationInfo li ON li.LocationID = ogs.locationid 
+left join currentstock1 cs1 on cs1.LocationID = li.locationid
+left join CurrentStock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = ogs.partnumber
 LEFT JOIN Part_Master pm ON pm.brandid = ogs.brandid AND pm.partnumber1 = ogs.partnumber
 WHERE ogs.partnumber = @partnumber AND ogs.locationid = @locationid
 AND ogs.addeddate >=  @Udate AND ogs.addeddate <= @Ldate
@@ -112,7 +114,7 @@ function transformOrderData(response) {
       scsOrderno: entry.scsOrderno,
       addeddate: entry.addeddate,
       transferfrombranch: entry.transferfrombranch || 0,
-      openingStock: entry.openingStock || 0,
+      StockQty: entry.StockQty || 0,
       ooq: entry.ooq,
       OrderQtyPlaced: entry.OrderQtyPlaced || 0,
       DealerRemarks: entry.DealerRemarks || "N/A",
