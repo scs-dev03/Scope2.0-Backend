@@ -1,6 +1,8 @@
 import {getPool2 } from "../db/db.js";
 import sql from 'mssql';
 
+
+//Return Location for with data is not uploaded
 const dataValidator = async (dealerid) => {    
   const pool = await getPool2();
 
@@ -30,11 +32,13 @@ const dataValidator = async (dealerid) => {
 //         END
 // JOIN locationinfo li ON d.LocationID = li.LocationID AND li.Status = 1
 // WHERE ds.locationid IS NULL;`
+
+// OgsStatus Check (By Harish Sir 13 Jun 2025)
 const query = `WITH data AS (
   SELECT li.locationid, dsm.NonMovingSale
   FROM z_scope.dbo.Dealer_Setting_Master dsm -- Direct server reference
   JOIN z_scope.dbo.locationinfo li ON li.LocationID = dsm.locationid
-  WHERE dsm.dealerid = @dealerid AND li.Status = 1
+  WHERE dsm.dealerid = @dealerid AND li.Status = 1 and li.OgsStatus = 1
 )
 SELECT li.location, d.NonMovingSale
 FROM data d
@@ -51,7 +55,7 @@ LEFT JOIN ${dynamicTable} ds
             WHEN MONTH(GETDATE()) = 1 THEN YEAR(GETDATE()) - 1
             ELSE YEAR(GETDATE()) 
         END
-JOIN z_scope.dbo.locationinfo li ON d.LocationID = li.LocationID AND li.Status = 1
+JOIN z_scope.dbo.locationinfo li ON d.LocationID = li.LocationID AND li.Status = 1 and li.OgsStatus = 1
 WHERE ds.locationid IS NULL;`
 
 const result = await pool.request()
@@ -80,6 +84,8 @@ return pending;
     throw error;
   }
 };
+
+// Check dashboard is already scheduled or not
 const checkisAlreadyScheduled = async (dashboardcode, brandid, dealerid) => {
   try {
   const pool = await getPool2();
@@ -154,6 +160,7 @@ return false;
 //     return false
 //    }
 // }
+
 // Checking User is Authorised to Perform Actions or not 
 const checkisUserValid = async(addedby)=>{
   const pool = await getPool2()
@@ -165,6 +172,7 @@ const checkisUserValid = async(addedby)=>{
     return false;
   }
 }
+// Check group setting for CID
 const checkGroupSetting = async(dealerid)=>{
   const pool = await getPool2()
   let query = `select count(dealerid) from z_scope.dbo.locationinfo where dealerid =  @dealerid `
@@ -183,6 +191,7 @@ const checkGroupSetting = async(dealerid)=>{
   return false;
   }   
 }
+
 const checkisMappingExists = async (dashboardcode,dealerid)=>{
   // console.log(dashboardcode,dealerid);
   try {

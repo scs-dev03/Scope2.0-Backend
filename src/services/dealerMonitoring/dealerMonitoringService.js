@@ -184,9 +184,9 @@ try {
             join LocationInfo li on li.LocationID = co.LocationID
             join Part_Master pm on li.brandid = pm.brandid and pm.partnumber = co.Part_Number1
             left join CurrentStock1 cs1 on co.LocationID = cs1.locationid 
-            left join  CurrentStock2 cs2 on cs2.StockCode = cs1.tCode  and cs2.PartNumber = co.part_number1
+            left join CurrentStock2 cs2 on cs2.StockCode = cs1.tCode  and cs2.PartNumber = co.part_number1
             left join Stockable_Nonstockable_TD001_${dealerid} sn on sn.locationid = co.locationid and sn.partnumber1 = co.part_number
-            left JOin  Opening_Stock_Upload_TD001_${dealerid} os on os.Locationid = co.LocationID and co.Part_Number = os.Partnumber1
+            left JOin Opening_Stock_Upload_TD001_${dealerid} os on os.Locationid = co.LocationID and co.Part_Number = os.Partnumber1
             left JOIN stock_upload_spm_td001_${dealerid} su ON su.locationid = co.locationid AND co.Part_Number1 = su.Partnumber1
             where co.jobcard_number = '${jobcardno}' and su.stockdate = (select max(stockdate) from stock_upload_spm_td001_${dealerid})    
             `
@@ -260,22 +260,39 @@ try {
             SET @RowsInserted = @@ROWCOUNT; 
         END 
         
-        -- 4) Pull full details for every (Part, BrandID) found 
-        SELECT   
-            pm.PartNumber1, 
-            pm.PartDesc, 
-            pm.LandedCost, 
-            pm.MRP, 
-            pm.PartID, 
-            pm.Category, 
-            pm.MOQ, 
-            pm.BrandID 
-        FROM Part_Master pm 
-        JOIN #PartFamily pf 
-          ON pm.PartNumber1 = pf.Part 
-         AND pm.BrandID     = pf.BrandID 
-        ORDER BY pm.PartNumber1, pm.BrandID; 
-        
+       -- 4) Pull full details for every (Part, BrandID) found 
+SELECT   
+    pm.PartNumber1, 
+    pm.PartDesc, 
+    pm.LandedCost, 
+    pm.MRP, 
+    pm.PartID, 
+    pm.Category, 
+    pm.MOQ, 
+    pm.BrandID,
+    ISNULL(cs2.Qty, 0) AS Qty,
+    CASE 
+	 WHEN os.greenflag = 'Y' OR os.yellowflag = 'Y' OR su.redflag = 'Y' 
+         THEN 'Non-Moving' 
+        WHEN sn.PartNumber1 IS NULL THEN 'Non-Stockable'
+        WHEN sn.MaxValue > 0 THEN 'Stockable'
+        ELSE 'Non-Stockable'
+    END AS PartStatus
+FROM #PartFamily pf
+LEFT JOIN Part_Master pm 
+    ON pm.PartNumber1 = pf.Part AND pm.BrandID = pf.BrandID 
+JOIN CurrentStock1 cs1 
+    ON cs1.LocationID = 14
+LEFT JOIN CurrentStock2 cs2 
+    ON cs2.PartNumber = pf.Part AND cs1.tCode = cs2.StockCode
+LEFT JOIN Stockable_Nonstockable_TD001_8 sn 
+    ON sn.LocationID = cs1.LocationID AND sn.PartNumber1 = pf.Part and sn.stockdate = (select max(stockdate) from Stockable_Nonstockable_TD001_8)
+LEFT Join Opening_Stock_Upload_TD001_8 os 
+on os.Locationid = cs1.LocationID and pf.Part = os.Partnumber1
+LEFT Join stock_upload_spm_td001_8 su 
+ON su.locationid = cs1.locationid AND pf.Part = su.Partnumber1 and  su.stockdate = (select max(stockdate) from stock_upload_spm_td001_8)
+ORDER BY pm.PartNumber1, pm.BrandID;
+
         -- 5) Clean up 
      DROP TABLE #PartFamily;
         `
@@ -491,4 +508,23 @@ try {
     
 }
 }
-export {PPNIVALUE12MonthsService,userroleService,partDescwithStockandQuality,reservedForVehicle,groupStock,jobCardByVehicleService,partsByJobCardService,partSubstituteDetailService,locationwisePPNIValueService,advisorwisePPNIValueService,vehiclewisePPNIValueService,partwisePPNIValueService,vehicleSearchService}
+
+const gainerListingService = async(dealerid , locationid , partnumber)=>{
+try {
+        const pool = await getPool2()
+        // const query = `
+        // select pm.partnumber1 , pm.partdesc , pm.Category , pm.mrp , pm.landedcost ,CONCAT(unm.DISCOUNT,'%')as Discount  from SH_UPLOADNONMOVINGPART unm 
+        // join locationinfo li on li.locationid = unm.locationid
+        // join part_master pm on li.brandid = pm.brandid and pm.partnumber = unm.partnumber
+        // where unm.locationid = ${locationid} and unm.partnumber = '${partnumber}'
+        // `
+        const query = `use z_scope EXEC GainerListingSinglePart '${dealerid}', '${partnumber}', ${locationid};`
+
+        const result = await pool.request().query(query)
+        return result.recordset
+} catch (error) {
+    throw new Error(`gainerListingService failed : ${error.message}`);
+    
+}
+}
+export {PPNIVALUE12MonthsService,userroleService,partDescwithStockandQuality,reservedForVehicle,groupStock,jobCardByVehicleService,partsByJobCardService,partSubstituteDetailService,locationwisePPNIValueService,advisorwisePPNIValueService,vehiclewisePPNIValueService,partwisePPNIValueService,vehicleSearchService,gainerListingService}
