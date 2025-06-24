@@ -760,7 +760,7 @@ function scheduleTask() {
       const query = `use [UAD_BI]
                      SELECT TOP 5  reqid, dashboardcode, brand, brandid, dealer, dealerid, scheduledon
                      FROM SBS_DBS_ScheduledDashboard 
-                     WHERE status = 0 and dateadd(hour,-10,ScheduledOn) <= GETDATE() order by ScheduledOn`
+                     WHERE status = 0 and dateadd(hour,-10,ScheduledOn) <= GETDATE() and dashboardcode not in (13) order by ScheduledOn`
       const result = await pool.request().query(query)
       const tasks = result.recordset
 
@@ -785,8 +785,8 @@ function scheduleTask() {
             case 8: return refreshTOPS(task.dealerid, task.reqid)
             case 9: return refreshSpecialList(task.reqid)
             case 12: return refreshBenchmarking(task.dealerid, task.reqid)
-            case 13: return refreshSI(task.dealerid,task.reqid)
-            // case 14: return refreshGSI(task.brand, task.dealer, task.brandid, task.dealerid, task.reqid)
+            // case 13: return refreshSI(task.dealerid,task.reqid)
+            // // case 14: return refreshGSI(task.brand, task.dealer, task.brandid, task.dealerid, task.reqid)
             case 15: return refreshCID(task.dealerid, task.reqid)
             case 17: return refreshGainerMini(task.reqid)
             default:
@@ -871,9 +871,81 @@ const statusTimelime = async(req,res)=>{
 //     }
 //   })
 // }
-export {getBrandByUser,getDealerByUser,getDashboardbyDealer,uploadSchedule,getRequests,getBDM,editSchedule,scheduleTask,deleteReq,changeLog,changelogView,requestNewDashboard,newDashboardSchedule,requestBy,newDashboardView,countView,statusTimelime}
+// function siRefresh() {
+//   cron.schedule('*/30 * * * *', async () => { 
+//     console.log("Running SI scheduler every 30 minutes")
+//     try {
+//       const pool = await getPool2()
+//       // Fetch tasks to be executed (status = 0 means pending)
+//       const query = `use [UAD_BI]
+//                      SELECT TOP 1  reqid, dashboardcode, brand, brandid, dealer, dealerid, scheduledon
+//                      FROM SBS_DBS_ScheduledDashboard 
+//                      WHERE status = 0 and dateadd(hour,-10,ScheduledOn) <= GETDATE() and dashboardcode = 13 order by ScheduledOn`
+//       const result = await pool.request().query(query)
+//       const task = result.recordset[0]
 
+//       if (!task) {
+//         console.log(`No SI Dashboard scheduled in the last 15 minutes.`)
+//         return
+//       }
 
+    
+//         // console.log(`Processing task for dashboardcode: ${task.dashboardcode}, dealer: ${task.dealer}, scheduledon: ${task.scheduledon}`)
 
+//         try {
+//           // Mark status as "SP IS RUNNING In-Progress" (1)
+//           await pool.request()
+//             .input('reqid', sql.Int,tasks.reqid)
+//             .query(`use [UAD_BI] UPDATE SBS_DBS_ScheduledDashboard SET status = 1 WHERE reqid = @reqid`)
 
+//           await refreshSI(task.dealerid,task.reqid)
+//         } catch (error) {
+//           console.error(`Error processing dashboardCode ${task.dashboardcode} for reqid: ${task.reqid}:`, error.message)
+//         }
 
+//       // Wait for all tasks to push queries to the DB asynchronously
+//       await Promise.allSettled(taskPromises)
+
+//       console.log("All scheduled tasks processed asynchronously")
+//     } catch (error) {
+//       console.error("Error processing scheduled tasks:", error.message)
+//     }
+//   })
+// }
+function siRefresh() {
+  cron.schedule('*/30 * * * *', async () => { 
+    console.log("Running SI scheduler every 30 minutes");
+
+    try {
+      const pool = await getPool2();
+      const query = `
+        use [UAD_BI]
+        SELECT TOP 1 reqid, dashboardcode, brand, brandid, dealer, dealerid, scheduledon
+        FROM SBS_DBS_ScheduledDashboard 
+        WHERE status = 0 
+          AND DATEADD(hour, -10, scheduledon) <= GETDATE() 
+          AND dashboardcode = 13
+        ORDER BY scheduledon`;
+      
+      const task = (await pool.request().query(query)).recordset[0];
+
+      if (!task) {
+        console.log("No SI Dashboard scheduled in the last 30 minutes.");
+        return;
+      }
+
+      // Mark status as In-Progress
+      await pool.request()
+        .input('reqid', sql.Int, task.reqid)
+        .query(`use [UAD_BI] UPDATE SBS_DBS_ScheduledDashboard SET status = 1 WHERE reqid = @reqid`);
+
+      await refreshSI(task.dealerid, task.reqid);
+
+      console.log("✅ SI task processed successfully");
+    } catch (error) {
+      console.error("❌ Error processing SI scheduled task:", error.message);
+    }
+  });
+}
+
+export {siRefresh,getBrandByUser,getDealerByUser,getDashboardbyDealer,uploadSchedule,getRequests,getBDM,editSchedule,scheduleTask,deleteReq,changeLog,changelogView,requestNewDashboard,newDashboardSchedule,requestBy,newDashboardView,countView,statusTimelime}

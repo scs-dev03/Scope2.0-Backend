@@ -1,6 +1,6 @@
 import express  from 'express'
 import cors from 'cors'
-import { scheduleTask } from './controller/dashboardSchedulerController.js'
+import { scheduleTask, siRefresh } from './controller/dashboardSchedulerController.js'
 
 import dashboardSchedule from './routes/dashboardSchedulerRoute.js'
 import salesView from './routes/salesViewRoute.js'
@@ -13,7 +13,11 @@ app.use(cors())
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
- //scheduleTask()
+// scheduleTask()
+// siRefresh()
+
+// setTimeout(()=>scheduleTask(),4000)
+// setTimeout(()=>siRefresh(),3000)
 
 
 app.use('/api', appRoutes); 
