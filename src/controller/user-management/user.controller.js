@@ -1,4 +1,4 @@
-import {getUsers,createUser,editUser,allUsers,deleteUser,requestNewMail,getUserInfo} from '../../services/user-management/user.service.js';
+import {getUsers,createUser,editUser,allUsers,deleteUser,requestNewMail,getUserInfo,getUserListBasedOnBDL} from '../../services/user-management/user.service.js';
 
   const  getUsersInController=async function(req,res){
         try{
@@ -72,6 +72,17 @@ import {getUsers,createUser,editUser,allUsers,deleteUser,requestNewMail,getUserI
             res.status(201).send({error:error.message})
         }
         
+
+    }
+     const getUsersBasedOnBDL=async function(req,res) {
+
+        try{
+            const result=await getUserListBasedOnBDL(req.body);
+            return res.status(200).send({data:result})
+        }
+        catch(error){
+            res.status(201).send({error:error.message})
+        }
     }
 export {
     requestNewMailInController,
@@ -80,5 +91,6 @@ export {
     editUserInController,
     createUserInController,
     getUsersInController,
-    getUserInfoInController
+    getUserInfoInController,
+    getUsersBasedOnBDL
 }

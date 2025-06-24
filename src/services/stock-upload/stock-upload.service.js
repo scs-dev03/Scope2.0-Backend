@@ -26,6 +26,7 @@ const stockUploadSingleLocation = async (req, res) => {
     .input("brandId", brandId)
     .query(`USE [StockUpload]; SELECT part_number, stock_qty, loc,calculativeField, stock_type FROM stock_upload_mapping WHERE brand_id=@brandId AND stock_type='current'`);
 
+   // console.log("mapping ",mapping)
   if (!mapping.length) return { mappingNotPresent: true };
   const mappedData = mapping[0];
 
@@ -81,6 +82,7 @@ const stockUploadSingleLocation = async (req, res) => {
     col => !headers1.includes(col.toLowerCase())
   );
   
+  //console.log("missing fields ",missingFields)
   // Step 4: If missing, throw clear error
   if (missingFields.length > 0) {
    return {headerNotPresent:true,missingFields:missingFields}

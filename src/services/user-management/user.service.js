@@ -121,8 +121,18 @@ const transporter = nodemailer.createTransport({
         try{
             const pool=await getPool1();
             let userType=req.userType;
-            let query=`Select bintId_pk as userId,vcFirstName,vcLastName,concat(vcFirstName,' ',vcLastName) as name, roleId,designation as designationId,business_vertical,vcEmail as emailId,vcMobile as mobileNo,btstatus as status,type from [z_scope].dbo.[adminmaster_gen] where type=@userType order by vcFirstName,vcLastName`;
-            const result=await pool.request().input('userType',userType).query(query);
+            let query,result;
+            let brandId=req.brandId;
+            let dealerId=req.dealerId;
+            let locationId=req.locationId
+            if(userType=='A'){
+                 query=`Select bintId_pk as userId,vcFirstName,vcLastName,concat(vcFirstName,' ',vcLastName) as name, roleId,designation as designationId,business_vertical,vcEmail as emailId,vcMobile as mobileNo,btstatus as status,type from [z_scope].dbo.[adminmaster_gen] where type=@userType order by vcFirstName,vcLastName`;
+                 result=await pool.request().input('userType',userType).query(query);
+            }
+            else{
+                query=`select a.bintId_pk as userId,a.vcFirstName,a.vcLastName,concat(a.vcFirstName,' ',a.vcLastName) as name, a.roleId,a.designation as designationId,a.business_vertical,a.vcEmail as emailId,a.vcMobile as mobileNo,a.btstatus as status,type from [z_scope].dbo.[adminmaster_gen] a join [z_scope].dbo.[vw_spmLocation] s on a.bintId_pk=s.empId where a.type=@userType and s.locationId=@locationId order by vcFirstName,vcLastName `
+                result=await pool.request().input('userType',userType).input('locationId',locationId).query(query);
+            }
             // console.log("----------",result)
             return result.recordset;
         }
@@ -330,6 +340,22 @@ const transporter = nodemailer.createTransport({
             return error;
         }
     }
+
+     const getUserListBasedOnBDL=async function(req){
+    
+            try{
+                
+                const pool=await getPool1();
+                let brandId=req.brandId;
+                let dealerId=req.dealerId;
+                let locationid=req.locationid;
+    
+                let query=``
+            }
+            catch(error){
+    
+            }
+        }
 async function generatePassword(length = 12) {
     const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_-+=<>?';
     let password = '';
@@ -343,5 +369,5 @@ async function generatePassword(length = 12) {
     return password;
 }
 
-export { createUser,editUser,deleteUser,requestNewMail,getUsers,allUsers,getUserInfo}
+export { createUser,editUser,deleteUser,requestNewMail,getUsers,allUsers,getUserInfo,getUserListBasedOnBDL}
 

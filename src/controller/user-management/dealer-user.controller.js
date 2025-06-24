@@ -1,4 +1,5 @@
-import { allDealerUsers, createDealerUser, deleteDealerUser, editDealerUser, getDealerUserInfo, getDealerUsers } from "../../services/user-management/dealer-user.service.js";
+import { allDealerUsers, createDealerUser, deleteDealerUser, 
+    editDealerUser, getDealerUserInfo, getDealerUsers } from "../../services/user-management/dealer-user.service.js";
 
 const  getDealerUsersInController=async function(req,res){
         try{
@@ -74,6 +75,7 @@ const  getDealerUsersInController=async function(req,res){
         
     }
 
+   
     
 export {
    
@@ -82,5 +84,6 @@ export {
     editDealerUserInController,
     createDealerUserInController,
     getDealerUsersInController,
-    getDealerUserInfoInController
+    getDealerUserInfoInController,
+  
 }

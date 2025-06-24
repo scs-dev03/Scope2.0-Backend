@@ -346,6 +346,7 @@ const transporter = nodemailer.createTransport({
         }
     }
 
+   
 async function generatePassword(length = 12) {
     const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_-+=<>?';
     let password = '';
