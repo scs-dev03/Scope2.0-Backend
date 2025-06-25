@@ -14,7 +14,7 @@ router.post('/delete-user',deleteUserInController);
 router.post('/edit-user',editUserInController);
 router.post('/request-new-mail',requestNewMailInController);
 router.post('/user-details',getUserInfoInController)
-router.post('/dealer-user-list',getUsersBasedOnBDL)
+// router.post('/dealer-user-list',getUsersBasedOnBDL)
 
 //for dealer
 router.get('/get-dealer-user',getDealerUsersInController);
