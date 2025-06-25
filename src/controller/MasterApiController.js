@@ -460,4 +460,60 @@ const homePageData = async (req, res) => {
   };
   
 
-export {homePageData,getBrands,getDealers,getLocation,getWorkspace,getDashboard,partNature,model,seasonal,partType,userInfo}
+const latestDates = async (req, res) => {
+  try {
+    const pool = await getPool2();
+    const { locationid, dealerid } = req.body;
+
+    if (!locationid || !dealerid) {
+      return res.status(400).json({ message: 'locationid and dealerid are required' });
+    }
+
+    // Validate dealerid to be numeric and safe
+    if (isNaN(dealerid)) {
+      return res.status(400).json({ message: 'Invalid dealerid' });
+    }
+
+    const tableName = `ppni_report_${dealerid}`;
+
+    const query = `
+      USE [UAD_BI_PPNI];
+
+      WITH latest_stock_date AS (
+        SELECT TOP 1 latest_stock_date FROM ${tableName}
+        WHERE locationid = @locationid
+        ORDER BY latest_stock_date DESC
+      ),
+      latest_jobline AS (
+        SELECT TOP 1 Joblineclosedate FROM ${tableName}
+        WHERE locationid = @locationid
+        ORDER BY Joblineclosedate DESC
+      ),
+      latest_jobcard AS (
+        SELECT TOP 1 Jobcardclosedate FROM ${tableName}
+        WHERE locationid = @locationid
+        ORDER BY Jobcardclosedate DESC
+      )
+
+      SELECT 'stock' AS source, latest_stock_date AS latest_date FROM latest_stock_date
+      UNION
+      SELECT 'jobline' AS source, Joblineclosedate AS latest_date FROM latest_jobline
+      UNION
+      SELECT 'jobcard' AS source, Jobcardclosedate AS latest_date FROM latest_jobcard;
+    `;
+
+    const result = await pool.request()
+      .input('locationid', sql.Int, locationid)
+      .query(query);
+
+    res.status(200).json({
+      Data: result.recordset
+    });
+
+  } catch (error) {
+    res.status(500).json({ Error: error.message });
+  }
+};
+
+
+export {homePageData,getBrands,getDealers,getLocation,getWorkspace,getDashboard,partNature,model,seasonal,partType,userInfo,latestDates}

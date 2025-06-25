@@ -101,7 +101,8 @@ try {
         res.status(200).json({
             Details:data.recordset,
             Reserved:data2.recordset,
-            Group:data3.recordset
+            Substitutes:data3.recordsets[0],
+            Group:data3.recordsets[1]
             })
 } catch (error) {
     res.status(500).json({
@@ -173,7 +174,7 @@ try {
 const locationwisePPNIValue = async(req,res)=>{
 try {
         const {dealerid , nonstockable , jobcardstatus} = req.body
-        if(!dealerid || !nonstockable || !jobcardstatus){
+        if(!dealerid || !nonstockable == null || !jobcardstatus == null){
             return res.status(400).json({
                 message:`dealerid , nonstockable and partstatus is required`
             })
@@ -211,12 +212,13 @@ try {
 const vehiclewisePPNIValue = async(req,res)=>{
 try {
         const {dealerid , locationid, nonstockable , jobcardstatus, advisor} = req.body
-        if(!dealerid || !locationid|| !nonstockable || !jobcardstatus){
+        if(!dealerid || !locationid|| !nonstockable == null || !jobcardstatus == null){
             return res.status(400).json({
                 message:`dealerid , nonstockable and partstatus is required`
             })
         }
        const data = await vehiclewisePPNIValueService(dealerid,locationid,jobcardstatus,nonstockable,advisor)
+    //    console.log(data.recordset);
        
        // Transform the flat data into grouped vehicle-wise structure
 function transformVehiclePartsData(rawData) {
@@ -242,6 +244,7 @@ function transformVehiclePartsData(rawData) {
       ndp: item.price,
       qty: item.Qty,
       value: item.PPNI_Value,
+      type:item.Partnature
     });
   });
 

@@ -1,10 +1,10 @@
 import { getPool1,getPool2 } from "../../db/db.js";
-
+import sql from 'mssql'
 const partDescwithStockandQuality = async (brandid,dealerid,locationid,partnumber)=>{
  try {
        const pool = await getPool2()
        const query = `
-       SELECT DISTINCT
+        SELECT DISTINCT
        pm.partnumber1,
        pm.partid,
        (CASE 
@@ -16,14 +16,12 @@ const partDescwithStockandQuality = async (brandid,dealerid,locationid,partnumbe
        pm.category,
        pm.landedcost,
        pm.mrp,
-       pm.dateadded,
-       pm.lastupdated,
+	   cs2.qty,
        CASE
            WHEN os.greenflag = 'N' OR os.yellowflag = 'N' OR su.redflag = 'N' THEN 'Non-Moving' 
            WHEN sn.Maxvalue = 0 THEN 'Non-Stockable'
            WHEN sn.Maxvalue > 0 THEN 'Stockable'
-       END AS Partstatus,
-       cs2.Qty AS Stock
+       END AS Partstatus
    FROM part_master pm
    LEFT JOIN substitution_master sm 
        ON pm.partnumber1 = sm.partnumber1
@@ -32,16 +30,13 @@ const partDescwithStockandQuality = async (brandid,dealerid,locationid,partnumbe
    LEFT JOIN Opening_Stock_Upload_TD001_${dealerid} os 
        ON os.Locationid = ${locationid} AND pm.PartNumber = os.Partnumber1
    LEFT JOIN stock_upload_spm_td001_${dealerid} su 
-       ON su.locationid = ${locationid} AND pm.PartNumber1 = su.Partnumber1
-   LEFT JOIN CurrentStock2 cs2 
-       ON pm.partnumber = cs2.PartNumber
-   LEFT JOIN (
-       SELECT * FROM CurrentStock1 WHERE LocationID = ${locationid}
-   ) cs1 
-       ON cs1.tCode = cs2.StockCode
+       ON su.locationid = ${locationid}  AND pm.PartNumber1 = su.Partnumber1
+	left JOIN currentstock1 cs1 
+	ON cs1.locationid = ${locationid} 
+	Left JOIN currentstock2 cs2 
+	ON cs1.tcode = cs2.stockcode and cs2.partnumber = pm.partnumber1
    WHERE pm.partnumber1 IN ('${partnumber}')
-     AND pm.brandid = ${brandid}
-     --AND cs1.Locationid = ${locationid}`
+     AND pm.brandid = ${brandid}`
 //    console.log(query);
    
    const result = await pool.request().query(query)
@@ -125,6 +120,7 @@ try {
         );
         SET @RowsInserted = @@ROWCOUNT;
         END
+        select * from #PartFamily
         ;with sub as(
         select LocationID ,location from LocationInfo where dealerid = (select dealerid from
         locationinfo where locationid = ${locationid}) and OgsStatus = 1
@@ -316,21 +312,97 @@ try {
 }
 }
 
-const locationwisePPNIValueService = async(dealerid,jobcardstatus , nonstockable)=>{
-try {
-        const pool = await getPool2()
-        const query = ` USE [UAD_BI_PPNI]
-                        select Location, LocationId ,Advisor,sum(ppni_val)as PPNI_Value
-                        from ppni_report_${dealerid} 
-                        where All_Time_NonStck = '${nonstockable}' and JobCardStatus = '${jobcardstatus}'
-                        group by Location , Advisor , LocationId
-                        order by PPNI_Value DeSc `
-        const result = await pool.request().query(query)
-        return result
-} catch (error) {
+// const locationwisePPNIValueService = async(dealerid,jobcardstatus , nonstockable)=>{
+// try {
+//         const pool = await getPool2()
+//         const query = `
+//         DECLARE @All_Time_NonStck VARCHAR(1) = ${nonstockable};  -- 'Y', 'N', or NULL
+//         DECLARE @JobCardStatus VARCHAR(10) = ${jobcardstatus};    -- 'OPEN', 'CLOSE', or NULL
+        
+//         USE [UAD_BI_PPNI];
+        
+//         SELECT 
+//             Location, 
+//             LocationId, 
+//             Advisor,
+//             SUM(ppni_val) AS PPNI_Value
+//         FROM 
+//             ppni_report_${dealerid}
+//         WHERE  
+//             (
+//                 (@All_Time_NonStck IS NULL AND All_Time_NonStck IN ('Y', 'N')) 
+//                 OR (@All_Time_NonStck IS NOT NULL AND All_Time_NonStck = @All_Time_NonStck)
+//             )
+//             AND
+//             (
+//                 (@JobCardStatus IS NULL AND JobCardStatus IN ('OPEN', 'CLOSE')) 
+//                 OR (@JobCardStatus IS NOT NULL AND JobCardStatus = @JobCardStatus)
+//             )
+//         GROUP BY 
+//             Location, 
+//             LocationId, 
+//             Advisor
+//         HAVING 
+//             SUM(ppni_val) > 0
+//         ORDER BY 
+//             PPNI_Value DESC;
+        
+//         `
+//         const result = await pool.request().query(query)
+//         return result
+// } catch (error) {
+//     throw new Error(`locationwisePPNIValueService failed: ${error.message}`);
+// }
+// }
+
+const locationwisePPNIValueService = async (dealerid, jobcardstatus, nonstockable) => {
+  try {
+    if (!dealerid) throw new Error("dealerid is required");
+
+    const pool = await getPool2();
+
+    const request = pool.request()
+      .input('All_Time_NonStck', sql.VarChar, nonstockable || null)
+      .input('JobCardStatus', sql.VarChar, jobcardstatus || null);
+
+    const tableName = `ppni_report_${dealerid}`;
+
+    const query = `
+      USE [UAD_BI_PPNI];
+
+      SELECT 
+          Location, 
+          LocationId, 
+          Advisor,
+          SUM(ppni_val) AS PPNI_Value
+      FROM ${tableName}
+      WHERE  
+          (
+              (@All_Time_NonStck IS NULL AND All_Time_NonStck IN ('Y', 'N')) 
+              OR (@All_Time_NonStck IS NOT NULL AND All_Time_NonStck = @All_Time_NonStck)
+          )
+          AND
+          (
+              (@JobCardStatus IS NULL AND JobCardStatus IN ('OPEN', 'CLOSE')) 
+              OR (@JobCardStatus IS NOT NULL AND JobCardStatus = @JobCardStatus)
+          )
+      GROUP BY 
+          Location, 
+          LocationId, 
+          Advisor
+      HAVING 
+          SUM(ppni_val) > 0
+      ORDER BY 
+          PPNI_Value DESC;
+    `;
+
+    const result = await request.query(query);
+    return result;
+  } catch (error) {
     throw new Error(`locationwisePPNIValueService failed: ${error.message}`);
-}
-}
+  }
+};
+
 
 const advisorwisePPNIValueService = async(dealerid,locationid,jobcardstatus , nonstockable )=>{
 try {
@@ -347,20 +419,63 @@ try {
 }
 }
 
-const vehiclewisePPNIValueService = async(dealerid,locationid,jobcardstatus , nonstockable , advisor)=>{
-try {
-        const pool = await getPool2()
-        const query = ` USE [UAD_BI_PPNI]
-                        select Vehiclenumber ,PartNumber, PartDesc , part_category, price ,Qty, sum(ppni_val)as PPNI_Value from PPNI_report_${dealerid}
-                        where All_Time_NonStck = '${nonstockable}' and JobCardStatus = '${jobcardstatus}' and locationid = ${locationid} and advisor like '${advisor}' 
-                        group by PartNumber , Vehiclenumber, PartDesc , part_category ,price ,Qty having sum(ppni_val) > 0
-                        order by PPNI_Value DeSc `
-        const result = await pool.request().query(query)
-        return result
-} catch (error) {
-    throw new Error(`advisorwisePPNIValueService failed: ${error.message}`);
-}
-}
+const vehiclewisePPNIValueService = async (dealerid, locationid, jobcardstatus, nonstockable, advisor) => {
+  try {
+    const pool = await getPool2();
+
+    const request = pool.request()
+      .input('All_Time_NonStck', sql.VarChar(1), nonstockable)
+      .input('JobCardStatus', sql.VarChar(10), jobcardstatus)
+      .input('locationid', sql.Int, locationid)
+      .input('advisor', sql.VarChar(100), advisor);
+
+    const query = `
+      USE [UAD_BI_PPNI];
+
+      SELECT 
+          Vehiclenumber,
+          PartNumber, 
+          PartDesc, 
+          part_category, 
+          price,
+          Qty, 
+          SUM(ppni_val) AS PPNI_Value,
+          	CASE 
+    WHEN stock_category = 'NS-NS' THEN 'NON-MOVING'
+    WHEN stock_category IN ('S-NS', 'NS-S') THEN 'NON-STOCKABLE'
+    WHEN stock_category = 'S-S' THEN 'STOCKABLE'
+    ELSE 'UNKNOWN'
+END AS Partnature
+      FROM 
+          PPNI_report_${dealerid}
+      WHERE 
+          (
+              (@All_Time_NonStck IS NULL AND All_Time_NonStck IN ('Y', 'N')) 
+              OR (@All_Time_NonStck IS NOT NULL AND All_Time_NonStck = @All_Time_NonStck)
+          )
+          AND
+          (
+              (@JobCardStatus IS NULL AND JobCardStatus IN ('OPEN', 'CLOSE')) 
+              OR (@JobCardStatus IS NOT NULL AND JobCardStatus = @JobCardStatus)
+          )
+          AND locationid = @locationid
+          AND advisor = @advisor
+      GROUP BY 
+          PartNumber, Vehiclenumber, PartDesc, part_category, price, Qty ,  stock_category
+      HAVING 
+          SUM(ppni_val) > 0
+      ORDER BY 
+          PPNI_Value DESC;
+    `;
+
+    const result = await request.query(query);
+    return result;
+
+  } catch (error) {
+    throw new Error(`vehiclewisePPNIValueService failed: ${error.message}`);
+  }
+};
+
 
 const partwisePPNIValueService = async(dealerid,locationid,jobcardstatus , nonstockable , advisor , vehicleno)=>{
 try {
@@ -468,7 +583,8 @@ try {
           co.Stock AS StockQty,
           co.current_status,
           co.Price * co.Qty AS Value,
-          pr.All_Time_NonStck 
+          pr.All_Time_NonStck,
+          Case when co.JobLineCloseDate IS NULL then 'Not Issued' Else 'Issued' End as IssueStatus
       FROM Create_Order_Request_TD001_${dealerid} co
       JOIN LocationInfo li 
           ON li.LocationID = co.LocationID
