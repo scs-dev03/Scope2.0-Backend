@@ -1,4 +1,4 @@
-import { getPool1 } from "../../db/db.js"
+import { getPool2 } from "../../db/db.js"
 import {
   readExcelFile,
   readExcelFileWithSubColumns,
@@ -11,7 +11,7 @@ import path from 'path';
 import xlsx from 'xlsx';
 
 const stockUploadSingleLocation = async (req, res) => {
-  const pool = await getPool1();
+  const pool = await getPool2();
   const { location_id: locationId, user_id: addedBy } = req.body;
 
   // 1. Fetch dealer and brandId
@@ -24,7 +24,7 @@ const stockUploadSingleLocation = async (req, res) => {
   // 2. Fetch Excel column mapping for the brand
   const { recordset: mapping } = await pool.request()
     .input("brandId", brandId)
-    .query(`USE [StockUpload]; SELECT part_number, stock_qty, loc,calculativeField, stock_type FROM stock_upload_mapping WHERE brand_id=@brandId AND stock_type='current'`);
+    .query(`USE [z_scope]; SELECT part_number, stock_qty, loc,calculativeField, stock_type FROM stock_upload_mapping WHERE brand_id=@brandId AND stock_type='current'`);
 
    // console.log("mapping ",mapping)
   if (!mapping.length) return { mappingNotPresent: true };
@@ -187,12 +187,12 @@ const stockUploadSingleLocation = async (req, res) => {
   const existingUnmatchedParts = new Set(
     (await pool.request()
       .input("brandId", brandId)
-      .query(`USE [StockUpload]; SELECT partnumber FROM part_not_in_master WHERE brand_id = @brandId`)
+      .query(`USE [z_scope]; SELECT partnumber FROM part_not_in_master WHERE brand_id = @brandId`)
     ).recordset.map(p => p.partnumber)
   );
 
   // Clear old unmatched records
-  await pool.request().input("brandId", brandId).query(`USE [StockUpload]; DELETE FROM part_not_in_master WHERE brand_id = @brandId`);
+  await pool.request().input("brandId", brandId).query(`USE [z_scope]; DELETE FROM part_not_in_master WHERE brand_id = @brandId`);
 
   // 9. Map partIds and identify unknowns
   const knownParts = [];
@@ -237,7 +237,7 @@ const stockUploadSingleLocation = async (req, res) => {
   // 11. Check for previous stock for location
   const prevStock = await pool.request()
     .input("locationId", locationId)
-    .query(`USE [StockUpload]; SELECT tcode FROM currentStock1 WHERE locationId=@locationId`);
+    .query(`USE [z_scope]; SELECT tcode FROM currentStock1 WHERE locationId=@locationId`);
   const oldTcode = prevStock.recordset[0]?.tcode || null;
 
   let prevQtySum = 0;
@@ -246,12 +246,12 @@ const stockUploadSingleLocation = async (req, res) => {
   if (oldTcode) {
     const { recordset: prevItems } = await pool.request()
       .input("StockCode", oldTcode)
-      .query(`USE [StockUpload]; SELECT partNumber, qty, partID FROM currentStock2 WHERE StockCode=@StockCode`);
+      .query(`USE [z_scope]; SELECT partNumber, qty, partID FROM currentStock2 WHERE StockCode=@StockCode`);
     prevRecordCount = prevItems.length;
 
     prevQtySum = (await pool.request()
       .input("StockCode", oldTcode)
-      .query(`USE [StockUpload]; SELECT SUM(qty) AS QuantSum FROM currentStock2 WHERE StockCode=@StockCode`)
+      .query(`USE [z_scope]; SELECT SUM(qty) AS QuantSum FROM currentStock2 WHERE StockCode=@StockCode`)
     ).recordset[0]?.QuantSum || 0;
 
     // Merge existing items into deduped list
@@ -271,7 +271,7 @@ const stockUploadSingleLocation = async (req, res) => {
     .input("locationID", locationId)
     .input("formattedDate", now)
     .input("addedBy", addedBy)
-    .query(`USE [StockUpload]; INSERT INTO currentStock1(locationID, stockdate, addedby) OUTPUT inserted.tcode VALUES(@locationID, @formattedDate, @addedBy)`);
+    .query(`USE [z_scope]; INSERT INTO currentStock1(locationID, stockdate, addedby) OUTPUT inserted.tcode VALUES(@locationID, @formattedDate, @addedBy)`);
 
   const newTcode = insertedStock.tcode;
 
@@ -298,7 +298,7 @@ const stockUploadSingleLocation = async (req, res) => {
   // 15. Log the upload
   const totalQty = (await pool.request()
     .input("StockCode", newTcode)
-    .query(`USE [StockUpload]; SELECT SUM(qty) AS currentQuantSum FROM currentStock2 WHERE stockCode = @StockCode`)
+    .query(`USE [z_scope]; SELECT SUM(qty) AS currentQuantSum FROM currentStock2 WHERE stockCode = @StockCode`)
   ).recordset[0].currentQuantSum;
 
   await pool.request()
@@ -310,13 +310,13 @@ const stockUploadSingleLocation = async (req, res) => {
     .input("currentQuantSum", totalQty)
     .input("countPrevRecords", prevRecordCount)
     .input("quantitySumPrev", prevQtySum)
-    .query(`USE [StockUpload]; INSERT INTO Stock_Upload_Logs(location_id, stockCode, added_by, brand_id, stockUploadCount, operation_type, quantitySum, prevStockUploadCount, prevQuantitySum)
+    .query(`USE [z_scope]; INSERT INTO Stock_Upload_Logs(location_id, stockCode, added_by, brand_id, z_scopeCount, operation_type, quantitySum, prevz_scopeCount, prevQuantitySum)
             VALUES(@locationId, @StockCode, @addedBy, @brandId, @rowCount, 'single-location upload stock', @currentQuantSum, @countPrevRecords, @quantitySumPrev)`);
 
   // 16. Delete old stock entries
   if (oldTcode) {
-    await pool.request().input("stockCode", oldTcode).query(`USE [StockUpload]; DELETE FROM currentStock2 WHERE stockCode=@stockCode`);
-    await pool.request().input("stockCode", oldTcode).query(`USE [StockUpload]; DELETE FROM currentStock1 WHERE tcode=@stockCode`);
+    await pool.request().input("stockCode", oldTcode).query(`USE [z_scope]; DELETE FROM currentStock2 WHERE stockCode=@stockCode`);
+    await pool.request().input("stockCode", oldTcode).query(`USE [z_scope]; DELETE FROM currentStock1 WHERE tcode=@stockCode`);
   }
 
   return {
@@ -329,7 +329,7 @@ const stockUploadSingleLocation = async (req, res) => {
 
 const getPartNotInMasterSingleLocationInService = async (req, res) => {
   try {
-    const pool = await getPool1();
+    const pool = await getPool2();
 
     let locationId = req.location_id;
 
@@ -340,7 +340,7 @@ const getPartNotInMasterSingleLocationInService = async (req, res) => {
       .query(getBrandQuery);
     let brandId = result.recordset[0].brandId;
     // console.log(brandId);
-    let getQuery = `use [StockUpload] Select partnumber from part_not_in_master where brand_id=@brandId`;
+    let getQuery = `use [z_scope] Select partnumber from part_not_in_master where brand_id=@brandId`;
     const result1 = await pool
       .request()
       .input("brandId", brandId)
@@ -355,10 +355,10 @@ const getPartNotInMasterSingleLocationInService = async (req, res) => {
 
 const getAllRecordsSingleLocation = async (req, res) => {
   try {
-    const pool = await getPool1();
+    const pool = await getPool2();
     let locationId = req.location_id;
    // let userId=req.added_by;
-    let getQuery = `use [StockUpload] select added_on,added_by,stockUploadCount,quantitySum,prevQuantitySum,prevStockUploadCount from stock_upload_logs where location_id=@locationId`;
+    let getQuery = `use [z_scope] select added_on,added_by,z_scopeCount,quantitySum,prevQuantitySum,prevz_scopeCount from stock_upload_logs where location_id=@locationId`;
 
     const result = await pool
       .request()
@@ -379,11 +379,11 @@ const getAllRecordsSingleLocation = async (req, res) => {
 
 const getUploadedDataSingleLocationInService = async (req, res) => {
   try {
-    const pool = await getPool1();
+    const pool = await getPool2();
     let locationId = req.location_id;
     let brand,dealer;
     let location;
-    // let getQuery = `use [StockUpload] select ck2.partnumber,ck2.qty from currentStock2 ck2 join 
+    // let getQuery = `use [z_scope] select ck2.partnumber,ck2.qty from currentStock2 ck2 join 
     //     currentStock1 ck1 on ck1.tcode=ck2.StockCode where locationId=@locationId`;
 let getNameQuery=`use [z_scope] SELECT location,brand,dealer,brandId FROM locationInfo WHERE locationId = @locationId`;
     const result1=await pool.request().input('locationId',locationId).query(getNameQuery);
@@ -394,10 +394,10 @@ let getNameQuery=`use [z_scope] SELECT location,brand,dealer,brandId FROM locati
    
 // if partno belongs in part master and substituionmaster then take subpartnumber
 //  else partno of partmaster is considered as latest part number
-    let getQuery=`use [StockUpload] select c1.stockDate, c.partNumber, c.qty as Quantity, vw.partDesc,vw.PartType,vw.LandedCost,vw.mrp,vw.moq,
+    let getQuery=`use [z_scope] select c1.stockDate, c.partNumber, c.qty as Quantity, vw.partDesc,vw.PartType,vw.LandedCost,vw.mrp,vw.moq,
 vw.partNature,
-case when vw.partNo=s.partnumber then s.subpartnumber else vw.partNo end as LatestPartNumber from [stockupload].dbo.currentStock2 c 
-join [stockUpload].dbo.currentStock1 c1 on c1.tcode=c.StockCode and c1.LocationID=@locationId
+case when vw.partNo=s.partnumber then s.subpartnumber else vw.partNo end as LatestPartNumber from [z_scope].dbo.currentStock2 c 
+join [z_scope].dbo.currentStock1 c1 on c1.tcode=c.StockCode and c1.LocationID=@locationId
 left join  [z_scope].dbo.VW_PartMaster vw on c.PartNumber=vw.partNo and vw.BrandID=@brandId
 left join  [z_scope].dbo.Substitution_Master s on s.brandid=vw.BrandID and vw.PartNo=s.partnumber `;
  const result = await pool
@@ -443,7 +443,7 @@ const stockUploadMultiLocation = async (req, res) => {
     let dealerId = parseInt(req.body.dealer_id);
     let files = req.files;
     // console.log(files,files[0].path)
-    const pool=await getPool1();
+    const pool=await getPool2();
     let addedBy = parseInt(req.body.user_id);
 
     // let brandQuery = `use [z_scope] select brandId,brand from locationInfo where dealerID=@dealerId`;
@@ -453,7 +453,7 @@ const stockUploadMultiLocation = async (req, res) => {
     //   .query(brandQuery);
     // let brandId = parseInt(brandRes.recordset[0].brandId,10);
     // //  console.log("brandid in stock upload multi location ",brandId)
-    // let getMappingQuery = `use [StockUpload] select part_number,stock_qty,loc,stock_type from stock_upload_mapping where brand_id=@brandId and stock_type='current'`;
+    // let getMappingQuery = `use [z_scope] select part_number,stock_qty,loc,stock_type from stock_upload_mapping where brand_id=@brandId and stock_type='current'`;
 
     // const mappingResult = await pool
     //   .request()
@@ -474,7 +474,7 @@ const stockUploadMultiLocation = async (req, res) => {
     // let partMasterResult = result.recordset;
     // // console.log(" part master result in stock upload multi location ",partMasterResult)
     // let partNotInMasterArray = [];
-    // const getPartNumberQuery = `use [StockUpload] select partnumber as partnumber from part_not_in_master where brand_id=@brandId`;
+    // const getPartNumberQuery = `use [z_scope] select partnumber as partnumber from part_not_in_master where brand_id=@brandId`;
     // let res123 = await pool
     //   .request()
     //   .input("brandId", brandId)
@@ -499,7 +499,7 @@ const brandId = parseInt(brandRes.recordset[0].brandId, 10);
 
 // Define queries
 const getMappingQuery = `
-  USE [StockUpload] 
+  USE [z_scope] 
   SELECT part_number, stock_qty, loc, stock_type ,calculativeField
   FROM stock_upload_mapping 
   WHERE brand_id = @brandId AND stock_type = 'current'
@@ -513,7 +513,7 @@ const partMasterQuery = `
 `;
 
 const getPartNumberQuery = `
-  USE [StockUpload] 
+  USE [z_scope] 
   SELECT partnumber AS partnumber 
   FROM part_not_in_master 
   WHERE brand_id = @brandId
@@ -539,7 +539,7 @@ let partMasterResult = []=partMasterRecords.recordset;
 let partNotInMasterArray =[]= partNotInMasterResult.recordset;
 let partNotInMasterSet=new Set()
 let partMasterMap=new Map();
-    let deletePartMasterQuery = `use [StockUpload] delete from part_not_in_master where brand_id=@brandId`;
+    let deletePartMasterQuery = `use [z_scope] delete from part_not_in_master where brand_id=@brandId`;
     await pool.request().input("brandId", brandId).query(deletePartMasterQuery);
    
     for (let i = 0; i < locations.length; i++) {
@@ -705,18 +705,18 @@ let partMasterMap=new Map();
           };
     });
  
-  let query12=`use [StockUpload] Select tcode from currentStock1 where locationId=@locationId`;
+  let query12=`use [z_scope] Select tcode from currentStock1 where locationId=@locationId`;
   let res45=await pool.request().input('locationId',locationId).query(query12);
  let  StockCode=res45?.recordset[0]?.tcode;
   let countPrevRecords=0;
   let insertedDataResult=[];
 //console.log("tcode ",StockCode,locationId)
   if(res45.recordset.length>0){
-    //  let quantityPrevQuery=`use [StockUpload] select sum(qty) as prevQuantSum from currentStock2 where StockCode=@StockCode`;
+    //  let quantityPrevQuery=`use [z_scope] select sum(qty) as prevQuantSum from currentStock2 where StockCode=@StockCode`;
     //  let res456=await pool.request().input('StockCode',StockCode).query(quantityPrevQuery);
     //  quantitySumPrev=res456.recordset[0].prevQuantSum
 
-    //   let insertedDataQuery = `use [StockUpload] Select partNumber,partID,qty from currentStock2 where Stockcode=@StockCode`;
+    //   let insertedDataQuery = `use [z_scope] Select partNumber,partID,qty from currentStock2 where Stockcode=@StockCode`;
     
     //   let result56 = await pool
     //     .request()
@@ -725,7 +725,7 @@ let partMasterMap=new Map();
     //    insertedDataResult = result56.recordset;
     //   countPrevRecords = insertedDataResult.length;
     const combinedQuery = `
-    USE [StockUpload];
+    USE [z_scope];
     SELECT 
       SUM(qty) OVER () AS prevQuantSum,
       partNumber,
@@ -989,7 +989,7 @@ const combinedData = updatedFilteredRowData1.map(item => {
       const formattedDate = currentDate.toISOString().split("T")[0]; // Outputs: '2025-03-08'
       // console.log(formattedDate);
       if(updatedFilteredRowData2.length>0){
-      let insertQueryForCurrentStock1 = `use [StockUpload] insert into currentStock1(locationID,stockdate,addedby) output inserted.tcode values(@locationID,@formattedDate,@addedBy)`;
+      let insertQueryForCurrentStock1 = `use [z_scope] insert into currentStock1(locationID,stockdate,addedby) output inserted.tcode values(@locationID,@formattedDate,@addedBy)`;
 
       const result1 = await pool
         .request()
@@ -1009,7 +1009,7 @@ const combinedData = updatedFilteredRowData1.map(item => {
           ];
         });
         try {
-          await pool.request().query('use stockupload')
+          await pool.request().query('use z_scope')
           const table1 = new sql.Table("currentStock2"); // Updated table name
           table1.create = false;
   
@@ -1041,7 +1041,7 @@ const combinedData = updatedFilteredRowData1.map(item => {
         }
       }
      
-      let currentCountQuery = `use [StockUpload] select sum(qty) as currentQuantSum from currentStock2 where stockCode=@tCode`;
+      let currentCountQuery = `use [z_scope] select sum(qty) as currentQuantSum from currentStock2 where stockCode=@tCode`;
       let result678 = await pool
         .request()
         .input("tCode", tCode)
@@ -1051,8 +1051,8 @@ const combinedData = updatedFilteredRowData1.map(item => {
         currentQuantSum = result678.recordset[0].currentQuantSum;
       }
 
-      let logQuery = `use [StockUpload] insert into Stock_Upload_Logs(location_id,stockCode,added_by,brand_id, stockUploadCount,operation_type,quantitySum,
-prevStockUploadCount,prevQuantitySum) values(@locationId,@tCode,@addedBy,@brandId,@rowCount,'multi-location upload stock',@currentQuantSum,@countPrevRecords,@quantitySumPrev)`;
+      let logQuery = `use [z_scope] insert into Stock_Upload_Logs(location_id,stockCode,added_by,brand_id, z_scopeCount,operation_type,quantitySum,
+prevz_scopeCount,prevQuantitySum) values(@locationId,@tCode,@addedBy,@brandId,@rowCount,'multi-location upload stock',@currentQuantSum,@countPrevRecords,@quantitySumPrev)`;
       await pool
         .request()
         .input("tCode", tCode)
@@ -1067,7 +1067,7 @@ prevStockUploadCount,prevQuantitySum) values(@locationId,@tCode,@addedBy,@brandI
 
         if (res45.recordset.length > 0) {
           // const deleteQuery = `
-          //   USE [StockUpload];
+          //   USE [z_scope];
           //   DELETE FROM currentStock1 WHERE tcode = @StockCode;
           //   DELETE FROM currentStock2 WHERE stockcode = @StockCode;
           // `;
@@ -1077,8 +1077,8 @@ prevStockUploadCount,prevQuantitySum) values(@locationId,@tCode,@addedBy,@brandI
           //   .input("StockCode", StockCode)
           //   .query(deleteQuery);
         }
-        await pool.request().input("StockCode", StockCode).query(`USE [StockUpload]; DELETE FROM currentStock2 WHERE StockCode=@StockCode`);
-        await pool.request().input("StockCode", StockCode).query(`USE [StockUpload]; DELETE FROM currentStock1 WHERE tcode=@StockCode`);
+        await pool.request().input("StockCode", StockCode).query(`USE [z_scope]; DELETE FROM currentStock2 WHERE StockCode=@StockCode`);
+        await pool.request().input("StockCode", StockCode).query(`USE [z_scope]; DELETE FROM currentStock1 WHERE tcode=@StockCode`);
         
     }
     
@@ -1093,7 +1093,7 @@ prevStockUploadCount,prevQuantitySum) values(@locationId,@tCode,@addedBy,@brandI
         ];
       });
       try {
-        await pool.request().query('use stockupload')
+        await pool.request().query('use z_scope')
         const table = new sql.Table("part_not_in_master"); // Updated table name
         table.create = false;
   
@@ -1135,13 +1135,13 @@ prevStockUploadCount,prevQuantitySum) values(@locationId,@tCode,@addedBy,@brandI
 const getAllRecordsMultiLocation=async (req,res)=>{
 
     try {
-        const pool = await getPool1();
+        const pool = await getPool2();
         let locations=req.locations;
         let data=[];
      //   let userId=req.added_by;
         for(let i=0;i<locations.length;i++){
             let locationId =locations[i].location;
-            let getQuery = `use [StockUpload] select location_id,added_on,added_by,stockUploadCount,quantitySum,prevQuantitySum,prevStockUploadCount from stock_upload_logs where location_id=@locationId`;
+            let getQuery = `use [z_scope] select location_id,added_on,added_by,z_scopeCount,quantitySum,prevQuantitySum,prevz_scopeCount from stock_upload_logs where location_id=@locationId`;
     
             let result = await pool
               .request()
@@ -1162,7 +1162,7 @@ const getAllRecordsMultiLocation=async (req,res)=>{
 }
 
 const getUploadedDataMultiLocationInService = async (req, res) => {
-  const pool = await getPool1();
+  const pool = await getPool2();
   const locations = req.locations; 
   const archive = new yazl.ZipFile();
   const brandId=req.brand_id;
@@ -1184,13 +1184,13 @@ const getUploadedDataMultiLocationInService = async (req, res) => {
               const result = await pool.request().input('locationId', locationId).query(getBrandQuery);
               let locationName = result.recordset[0]?.location; 
               
-              // let getQuery = `use [StockUpload] select ck2.partnumber,ck2.qty from currentStock2 ck2 join 
+              // let getQuery = `use [z_scope] select ck2.partnumber,ck2.qty from currentStock2 ck2 join 
               //     currentStock1 ck1 on ck1.tcode=ck2.StockCode where locationId=@locationId`;
 
-                 let getQuery=`use [StockUpload] select c1.stockDate, c.partNumber, c.qty as Quantity, vw.partDesc,vw.PartType,vw.LandedCost as rate,vw.mrp,vw.moq,
+                 let getQuery=`use [z_scope] select c1.stockDate, c.partNumber, c.qty as Quantity, vw.partDesc,vw.PartType,vw.LandedCost as rate,vw.mrp,vw.moq,
 vw.partNature,
-case when vw.partNo=s.partnumber then s.subpartnumber else vw.partNo end as LatestPartNumber from [stockupload].dbo.currentStock2 c 
-join [stockUpload].dbo.currentStock1 c1 on c1.tcode=c.StockCode and c1.LocationID=@locationId
+case when vw.partNo=s.partnumber then s.subpartnumber else vw.partNo end as LatestPartNumber from [z_scope].dbo.currentStock2 c 
+join [z_scope].dbo.currentStock1 c1 on c1.tcode=c.StockCode and c1.LocationID=@locationId
 left join  [z_scope].dbo.VW_PartMaster vw on c.PartNumber=vw.partNo and vw.BrandID=@brandId
 left join  [z_scope].dbo.Substitution_Master s on s.brandid=vw.BrandID and vw.PartNo=s.partnumber `;
               
@@ -1247,7 +1247,7 @@ left join  [z_scope].dbo.Substitution_Master s on s.brandid=vw.BrandID and vw.Pa
 
 const getPartNotInMasterMultiLocationInService=async(req,res)=>{
 
-    const pool = await getPool1();
+    const pool = await getPool2();
     const locations = req.locations; // Assuming locations are passed in the request bod
   
     const tempDir = path.join(process.cwd(), 'temp');
@@ -1275,7 +1275,7 @@ const getPartNotInMasterMultiLocationInService=async(req,res)=>{
             let brandName=result.recordset[0].brand
     
             // Fetch partnumbers based on brandId
-            const getQuery = `use [StockUpload] SELECT partnumber FROM part_not_in_master WHERE brand_id = @brandId`;
+            const getQuery = `use [z_scope] SELECT partnumber FROM part_not_in_master WHERE brand_id = @brandId`;
             const result1 = await pool
               .request()
               .input('brandId', brandId)
@@ -1316,7 +1316,7 @@ const getPartNotInMasterMultiLocationInService=async(req,res)=>{
 const getPartNotInMasterBulkInService=async(req,res)=>{
 
  try {
-    const pool = await getPool1();
+    const pool = await getPool2();
 
     let dealerId = req.dealer_id;
     let brandId=req.brand_id;
@@ -1328,7 +1328,7 @@ const getPartNotInMasterBulkInService=async(req,res)=>{
     let brand= result.recordset[0].brand;
    // console.log("brand id ",result)
     //console.log(brandId);
-    let getQuery = `use [StockUpload] Select partnumber from part_not_in_master where brand_id=@brandId`;
+    let getQuery = `use [z_scope] Select partnumber from part_not_in_master where brand_id=@brandId`;
     const result1 = await pool
       .request()
       .input("brandId", brandId)
@@ -1347,7 +1347,7 @@ const getPartNotInMasterBulkInService=async(req,res)=>{
 
 const uploadBulkData=async(req,res)=>{
    try {
-    const pool = await getPool1();
+    const pool = await getPool2();
     let addedBy = parseInt(req.body.user_id,10);
     let rowData;
     let brandId = parseInt(req.body.brand_id,10);
@@ -1379,7 +1379,7 @@ const uploadBulkData=async(req,res)=>{
     let mappingResult;
       
          // 2. Fetch Excel column mapping for the brand
-         let getMappingQuery = `use [StockUpload] select part_number,stock_qty,loc,stock_type,calculativeField from stock_upload_mapping where brand_id=@brandId and stock_type='current'`;
+         let getMappingQuery = `use [z_scope] select part_number,stock_qty,loc,stock_type,calculativeField from stock_upload_mapping where brand_id=@brandId and stock_type='current'`;
 
           mappingResult = await pool
            .request()
@@ -1391,7 +1391,7 @@ const uploadBulkData=async(req,res)=>{
     }
   //  console.log("mapping result ", mappingResult);
 
-    let checkDealerLocationMappingQuery = `use [StockUpload] select inventory_location,locationID as locationId from dealer_location_mapping where dealerId=@dealerId and status='active'`;
+    let checkDealerLocationMappingQuery = `use [z_scope] select inventory_location,locationID as locationId from dealer_location_mapping where dealerId=@dealerId and status='active'`;
     const resDealerAndLoc = await pool
       .request()
       .input("dealerId", dealerId)
@@ -1557,7 +1557,7 @@ const partMasterQuery = `
 `;
 
 const getPartNumberQuery = `
-  USE [StockUpload];
+  USE [z_scope];
   SELECT partnumber FROM part_not_in_master WHERE brand_id = @brandId
 `;
 
@@ -1580,14 +1580,14 @@ let partMasterResult = partMasterRecords.recordset;
 let partNotInMasterArray = partNotInMasterResult?.recordset || [];
 
 const deletePartMasterQuery = `
-  USE [StockUpload]; 
+  USE [z_scope]; 
   DELETE FROM part_not_in_master WHERE brand_id = @brandId
 `;
 
 const locationIds = locations.map((location) => parseInt(location.locationId, 10));
 
 const query12 = `
-  USE [StockUpload]; 
+  USE [z_scope]; 
   SELECT tcode, locationId 
   FROM currentStock1 
   WHERE locationId IN (${locationIds.map((_, i) => `@loc${i}`).join(", ")})
@@ -1618,7 +1618,7 @@ let stockCodes = tCodeFromStock1;
   
     if (res45?.recordset?.length > 0) {
       let insertedDataQuery = `
-      USE [StockUpload]; 
+      USE [z_scope]; 
       SELECT c2.stockcode, c2.partNumber, c2.partID, c2.qty, c1.locationId
       FROM currentStock2 c2
       JOIN currentStock1 c1
@@ -1856,7 +1856,7 @@ updatedFilteredRowData = Array.from(partCountMap.values());
         // console.log("countRecords inserted ",countPrevRecords)
         // StockCode = insertedDataResult[0].StockCode;
         let tcodeQuery = `
-        USE [StockUpload]; 
+        USE [z_scope]; 
         SELECT tcode
         FROM currentStock1
         WHERE locationId =@locId
@@ -1882,18 +1882,18 @@ updatedFilteredRowData = Array.from(partCountMap.values());
           //console.log("prevCount ",prevCountRecords)
         }
 
-        let deleteQuery=`use [stockupload] Delete from currentstock1 where tcode=@resTcode`;
+        let deleteQuery=`use [z_scope] Delete from currentstock1 where tcode=@resTcode`;
 
         let res34=await pool.request().input('resTcode',resTcode).query(deleteQuery);
 
-        let deleteQuery1=`use [stockupload] delete from currentstock2 where stockcode=@resTcode`;
+        let deleteQuery1=`use [z_scope] delete from currentstock2 where stockcode=@resTcode`;
         await pool.request().input('resTcode',resTcode).query(deleteQuery1)
         }
        
       }
       // console.log("updated filtered row after getting unique location id ",updatedFilteredRowData)
       // console.log("current stock1 ",locId,formattedDate,addedBy)
-      let insertQueryForCurrentStock1 = `use [StockUpload] insert into currentStock1(locationID,stockdate,addedby) output inserted.tcode values(@locId,getDate(),@addedBy)`;
+      let insertQueryForCurrentStock1 = `use [z_scope] insert into currentStock1(locationID,stockdate,addedby) output inserted.tcode values(@locId,getDate(),@addedBy)`;
 
       const result1 = await pool
         .request()
@@ -1916,7 +1916,7 @@ updatedFilteredRowData = Array.from(partCountMap.values());
       //  console.log("values ",values1);
       try {
         await pool.request();
-        await pool.request().query("use [StockUpload]");
+        await pool.request().query("use [z_scope]");
         const table1 = new sql.Table("currentStock2"); // Updated table name
         table1.create = false;
 
@@ -1940,7 +1940,7 @@ updatedFilteredRowData = Array.from(partCountMap.values());
       }
     }
       let currentQuantSum = 0;
-      let currentCountQuery = `use [StockUpload] select sum(qty) as currentQuantSum from currentStock2 where stockCode=@currentStockCode`;
+      let currentCountQuery = `use [z_scope] select sum(qty) as currentQuantSum from currentStock2 where stockCode=@currentStockCode`;
       let result678 = await pool
         .request()
         .input("currentStockCode", currentStockCode)
@@ -1950,8 +1950,8 @@ updatedFilteredRowData = Array.from(partCountMap.values());
         currentQuantSum = result678?.recordset[0]?.currentQuantSum;
       }
       //  console.log("currentquant ",currentQuantSum)
-      let logQuery = `use [StockUpload] insert into Stock_Upload_Logs(Stockcode,location_id,dealer_id,added_by,brand_id, stockUploadCount,operation_type,quantitySum,
-     prevStockUploadCount,prevQuantitySum) values(@currentStockCode,@locId,@dealerId,@addedBy,@brandId,@rowCount,'bulk stock upload ',@currentQuantSum,@countPrevRecords,@quantitySumPrev)`;
+      let logQuery = `use [z_scope] insert into Stock_Upload_Logs(Stockcode,location_id,dealer_id,added_by,brand_id, z_scopeCount,operation_type,quantitySum,
+     prevz_scopeCount,prevQuantitySum) values(@currentStockCode,@locId,@dealerId,@addedBy,@brandId,@rowCount,'bulk stock upload ',@currentQuantSum,@countPrevRecords,@quantitySumPrev)`;
       await pool
         .request()
         .input("currentStockCode", currentStockCode)
@@ -1984,7 +1984,7 @@ updatedFilteredRowData = Array.from(partCountMap.values());
         ];
       });
       try {
-        await pool.request().query("use [StockUpload]");
+        await pool.request().query("use [z_scope]");
         const table = new sql.Table("part_not_in_master"); // Updated table name
         table.create = false;
 

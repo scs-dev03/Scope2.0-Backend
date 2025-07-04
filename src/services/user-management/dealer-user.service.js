@@ -126,11 +126,15 @@ const transporter = nodemailer.createTransport({
             // use [z_scope] Select um.brandId,um.dealerId,um.locationId,um.vcFirstName,um.vcLastName ,um.bintId_pk as userId ,l.brand,l.dealer,l.location from [UAD_user_master] um join [locationInfo] l on um.brandId=l.brandId and um.dealerId=l.dealerId and um.locationId=l.locationId
             const pool=await getPool1();
             let userType=req.userType;
-            let query=`Select um.bintId_pk as userId,um.vcFirstName,um.vcLastName,concat(vcFirstName,' ',vcLastName) as name, um.roleId,um.designation as designationId,um.business_vertical,um.vcEmail as emailId,um.vcMobile as mobileNo,
-            um.btstatus as status,um.brandId,um.dealerId,um.locationId,l.brand,l.dealer,l.location from [z_scope].dbo.[UAD_user_master] um join locationinfo l on um.brandId=l.brandId and um.dealerId=l.dealerId and um.locationId=l.locationId
+            let dealerId=parseInt(req.dealerId,10);
+            let query=`Select um.bintId_pk as userId,um.vcFirstName,um.vcLastName,concat(vcFirstName,' ',vcLastName) as name, um.roleId,um.designation as designation,um.business_vertical,um.vcEmail as emailId,um.vcMobile as mobileNo,
+            um.btstatus as status,um.dealerId,um.locationId,l.brand,l.dealer,l.location from [z_scope].dbo.[UAD_user_master] um join [z_scope].dbo.locationinfo l on  um.dealerId=@dealerId and um.locationId=l.locationId
              order by vcFirstName,vcLastName`;
-            const result=await pool.request().input('userType',userType).query(query);
-            // console.log("----------",result)
+
+            // let query=`Select um.bintId_pk as userId,um.vcFirstName,um.vcLastName,concat(vcFirstName,' ',vcLastName) as name, um.roleId,um.designation as designationId,um.business_vertical,um.vcEmail as emailId,um.vcMobile as mobileNo,
+            // um.btstatus as status,um.brandId,um.dealerId,um.locationId from [z_scope].dbo.[UAD_user_master]um  where um.dealerid=20304`
+            const result=await pool.request().input('dealerId',dealerId).query(query);
+          //   console.log("----------",result)
             return result.recordset;
         }
         catch(error){

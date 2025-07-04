@@ -1,10 +1,10 @@
-import { getPool1 } from "../../db/db.js"
+import { getPool2 } from "../../db/db.js"
 import  XLSX from "xlsx";
 import fs from "fs";
 import he from 'he'
 export const getBrands = async () => {
   try {
-    const pool = await getPool1();
+    const pool = await getPool2();
     const query = `use [z_scope] Select distinct Brand as brand ,BrandId as brand_id from locationInfo where BrandStatus=1 order by brand`;
     const result = await pool.request().query(query);
     return result.recordset;
@@ -404,7 +404,7 @@ const readExcelFile = async (filePath) => {
 
 export const  getDealersBasedOnBrandIDInService=async function(req){
   try{
-      const pool = await getPool1();
+      const pool = await getPool2();
 
 
 // Prepare the SQL query for inserting data into SIMS_STOCK_FILE
@@ -443,7 +443,7 @@ const removeSpecialCharacters = (str) => {
 };
 export const getLocationsInService= async function (req) {
   try {
-    const pool = await getPool1();
+    const pool = await getPool2();
    
     let dealer_id = req.dealer_id;
    
@@ -467,7 +467,7 @@ export const getLocationsInService= async function (req) {
 
 export const getDesignations=async function(req){
   try{
-      let pool=await getPool1();
+      let pool=await getPool2();
       let query=`use [z_scope] Select id,designation_name from designation_master`;
 
      let result= await pool.request().query(query);
@@ -481,7 +481,7 @@ export const getDesignations=async function(req){
 
 export const getRoles=async function(req){
   try{
-      let pool=await getPool1();
+      let pool=await getPool2();
       let query=`use [z_scope] Select id,role_name from role_module_master where status=1`;
      let result= await pool.request().query(query);
    //  console.log("result ",result.recordset)
@@ -495,7 +495,7 @@ export const getRoles=async function(req){
 
 export const getBusinessVertical=async function(req){
   try{
-      let pool=await getPool1();
+      let pool=await getPool2();
       let query=`use [z_scope] SELECT id,business_vertical from business_vertical_master`;
 
      let result= await pool.request().query(query);
@@ -509,7 +509,7 @@ export const getBusinessVertical=async function(req){
 
 export const  getLocationsBasedOnBrand= async function (req) {
   try {
-    const pool = await getPool1();
+    const pool = await getPool2();
     //console.log("Connected to the database successfully!");
     // Begin a transaction for inserting data
     brand_id = req.brand_id;

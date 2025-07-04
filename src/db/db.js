@@ -91,10 +91,10 @@ const config3 = {
 
 
 const config4 = {
-    server: process.env.SERVER1,
+    server: process.env.SERVER2,
     database: process.env.DATABASE4,
-    user: process.env.USER1,
-    password: process.env.PASSWORD1,
+    user: process.env.USER2,
+    password: process.env.PASSWORD2,
     // port: Number(process.env.DB_PORT3),
     options: {
         encrypt: false,
@@ -119,7 +119,7 @@ const connectDB = async () => {
         // console.log(`Connected to DB3: ${process.env.SERVER3} using ${process.env.USER3}`);
 
         leadTimePool=await new sql.ConnectionPool(config4).connect();
-         console.log(`Connected to ${process.env.DATABASE4}: ${process.env.SERVER1} using ${process.env.USER1}`);
+         console.log(`Connected to ${process.env.DATABASE4}: ${process.env.SERVER2} using ${process.env.USER2}`);
     } catch (err) {
         console.error("Database connection failed!", err);
         throw err;

@@ -21,7 +21,7 @@ import {bulkMahindraInsertMRNData,bulkMahindraInsertPOData} from './Mahindra-Bul
 import bulkTATAPCInsertPOData from './TATA-PC-Bulk-Data.js'
 import bulkTATACVPOInsertData from './TATA-CV-Bulk-Data.js'
 import archiver from 'archiver';
-import { getLeadTimePool, getPool1 } from "../../db/db.js"
+import { getLeadTimePool, getPool2 } from "../../db/db.js"
 
  const getLocationMaster= async function (req) {
   try {

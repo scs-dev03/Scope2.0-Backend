@@ -1,4 +1,4 @@
-import { getPool1 } from "../../db/db.js"
+import { getPool2 } from "../../db/db.js"
 import moment from 'moment-timezone';
 export const addMapping=async (req,res)=>{
 
@@ -10,8 +10,8 @@ export const addMapping=async (req,res)=>{
     //    let partNumber=req.values.partNumber;
     //    let location=req.values.location;
     //    let stockQty=req.values.stockQty;
-      const pool=await getPool1();
-      let query=`use [stockUpload] Insert into Stock_Upload_Mapping(part_number,stock_qty,loc,added_by,brand_id,stock_type,brandColumns,operation,calculativeField) 
+      const pool=await getPool2();
+      let query=`use [z_scope] Insert into Stock_Upload_Mapping(part_number,stock_qty,loc,added_by,brand_id,stock_type,brandColumns,operation,calculativeField) 
       output inserted.id
        values(@partNumber,@stockQty,@location,@userId,@brandId,@stockType,@brandColumns,'create',@calculativeField)`;
    //  console.log("stock qty ",JSON.stringify(req.values.stockQty),req.calculativeField)
@@ -28,7 +28,7 @@ export const addMapping=async (req,res)=>{
 
       let insertedId=result.recordset[0]?.id;
     //   console.log("result ",result,insertedId)
-      let logQuery=`use [StockUpload] Insert into Stock_Upload_Logs(added_by,operation_type,part_number,stock_qty,location,calculativeField) 
+      let logQuery=`use [z_scope] Insert into Stock_Upload_Logs(added_by,operation_type,part_number,stock_qty,location,calculativeField) 
       values(@userId,'create stock upload mapping',@partNumber,@stockQty,@location,@calculativeField)`
     await pool.request()
     .input('userId',req.userId)
@@ -48,9 +48,9 @@ export const addMapping=async (req,res)=>{
 
 export const viewMapping=async (req,res)=>{
     try{
-        const pool=await getPool1();
+        const pool=await getPool2();
         let brandId=req.brand_id;
-        let query='use [StockUpload] Select * from Stock_Upload_Mapping where brand_id=@brandId';
+        let query='use [z_scope] Select * from Stock_Upload_Mapping where brand_id=@brandId';
         const result=await pool.request().input('brandId',brandId).query(query);
   
         return result.recordset;
@@ -64,8 +64,8 @@ export const viewMapping=async (req,res)=>{
 export const editMapping=async(req,res)=>{
     try{
         const currentDateInIST = moment.tz("Asia/Kolkata").format('YYYY-MM-DD HH:mm:ss');
-       const pool=await getPool1();
-       let query=`use [StockUpload] Update Stock_Upload_Mapping set 
+       const pool=await getPool2();
+       let query=`use [z_scope] Update Stock_Upload_Mapping set 
        part_number=@partNumber,
        stock_qty=@stockQty,
        loc=@location,
@@ -95,7 +95,7 @@ export const editMapping=async(req,res)=>{
        .query(query);
  
       
-       let logQuery=`use [StockUpload] Insert into Stock_Upload_Logs(added_by,operation_type,part_number,stock_qty,location,calculativeField)
+       let logQuery=`use [z_scope] Insert into Stock_Upload_Logs(added_by,operation_type,part_number,stock_qty,location,calculativeField)
         values(@userId,'update stock upload mapping',@partNumber,@stockQty,@location,@calculativeField)`
      await pool.request()
      .input('userId',req.userId)
@@ -114,8 +114,8 @@ export const editMapping=async(req,res)=>{
 
 export const alreadyExistedMapping=async(req,res)=>{
     try{
-        const pool=await getPool1();
-        let query =`use [stockUpload] select * from stock_upload_mapping`;
+        const pool=await getPool2();
+        let query =`use [z_scope] select * from stock_upload_mapping`;
         const result =await pool.request().query(query);
   
         return result.recordset;

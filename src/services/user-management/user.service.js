@@ -5,6 +5,7 @@ import nodemailer from 'nodemailer';
 import { getPool1 } from '../../db/db.js';
 import { getLocalIp, getPublicIp, getClientIp }  from "../getIP.js";
 import "dotenv/config"
+import { partialDeepStrictEqual } from 'assert';
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -42,16 +43,22 @@ const transporter = nodemailer.createTransport({
             let businessVertical=req.associatedBusiness;
             let token=req.token;
             let status=req.status;
+            let brand=parseInt(req?.brand,10);
+            let dealer=parseInt(req?.dealer,10);
+            let location=req?.location;
             let clientIp = getClientIp(req);
             let localIp = getLocalIp();
             let userType=req.userType;
             let password = await generatePassword(9);
            // console.log("password generate in user service ",password)
+
+
             let publicIp = "Fetching public IP..."
             publicIp = await getPublicIp();
             let pool=await getPool1();
             status=1;
-            let query=`use [z_scope] Insert into adminmaster_gen (vcFirstName,vcLastName,designation,roleId,vcEmail,vcMobile,vcPassword,btstatus,addedby,business_vertical,vcUserName,type) 
+          
+        let query=`use [z_scope] Insert into adminmaster_gen (vcFirstName,vcLastName,designation,roleId,vcEmail,vcMobile,vcPassword,btstatus,addedby,business_vertical,vcUserName,type) 
             OUTPUT INSERTED.bintID_pk values (@firstName,@lastName,@designationId,@roleId,@email,@mobileNo,@password,@status,@addedBy,@businessVertical,'SCS$2025',@userType)`;
             
             let result=await pool.request().input('firstName',firstName).input('lastName',lastName)
@@ -88,6 +95,15 @@ const transporter = nodemailer.createTransport({
             .input('insertedId',insertedId)
             .query(query2)
 
+            if(userType=='D'){
+            for(let i=0;i<location.length;i++){
+                let locationId=parseInt(location[i],10);
+                let query3='insert into [z_scope].dbo.[dealer_user_relation](userid,dealerid,locationid) values(@insertedId,@dealer,@location)';
+            let result=await pool.request().input('insertedId',insertedId).input('dealer',dealer).input('location',locationId).query(query3);
+            }
+   
+           }
+            
            // console.log("link generated ",link)
             const expiryTime = Date.now() + (5 * 60 * 1000); // 15 minutes from now
             const encodedUserName = encodeURIComponent(userName);
@@ -130,8 +146,11 @@ const transporter = nodemailer.createTransport({
                  result=await pool.request().input('userType',userType).query(query);
             }
             else{
-                query=`select a.bintId_pk as userId,a.vcFirstName,a.vcLastName,concat(a.vcFirstName,' ',a.vcLastName) as name, a.roleId,a.designation as designationId,a.business_vertical,a.vcEmail as emailId,a.vcMobile as mobileNo,a.btstatus as status,type from [z_scope].dbo.[adminmaster_gen] a join [z_scope].dbo.[vw_spmLocation] s on a.bintId_pk=s.empId where a.type=@userType and s.locationId=@locationId order by vcFirstName,vcLastName `
-                result=await pool.request().input('userType',userType).input('locationId',locationId).query(query);
+                query=`select a.bintId_pk as userId,a.vcFirstName,s.locationid,a.vcLastName,concat(a.vcFirstName,' ',a.vcLastName) as name, a.roleId,a.designation as designationId,a.business_vertical,a.vcEmail as emailId,a.vcMobile as mobileNo,a.btstatus as status,type from [z_scope].dbo.[adminmaster_gen] a 
+                join [z_scope].dbo.[vw_spmLocation] s on a.bintId_pk=s.empId where a.type=@userType and s.dealerid=@dealerId order by vcFirstName,vcLastName `
+                //  query=`select a.bintId_pk as userId,a.vcFirstName,a.vcLastName,concat(a.vcFirstName,' ',a.vcLastName) as name, a.roleId,a.designation as designationId,a.business_vertical,a.vcEmail as emailId,a.vcMobile as mobileNo,a.btstatus as status,type from [z_scope].dbo.[adminmaster_gen] a 
+                // join [z_scope].dbo.[dealer_user_relation] s on a.bintId_pk=s.userid where a.type=@userType and s.locationId=@locationId order by vcFirstName,vcLastName `
+                result=await pool.request().input('userType',userType).input('dealerId',dealerId).query(query);
             }
             // console.log("----------",result)
             return result.recordset;
@@ -211,17 +230,135 @@ const transporter = nodemailer.createTransport({
             let userType=req.userType;
             let clientIp = getClientIp(req);
             let localIp = getLocalIp();
+            let brand=parseInt(req.brand,10);
+            let dealer=parseInt(req.dealer,10);
+            let location=req.location;
+            let pool = await getPool1()
             if(status=='Active' || status=='active'){
                 btstatus=1;
             }
             else{
                 btstatus=0;
             }
+
+              if(userType=='D'){
+                let query4=`select locationid,dealerid from [z_scope].dbo.[dealer_user_relation] where userid=@userID`;
+                let res23=await pool.request().input('userId',userId).query(query4);
+                let dealerUserRecords=res23.recordset;
+
+               // console.log("dealer records ",location.length)
+                if(res23.recordset.length>0){
+
+                    if(parseInt(dealerUserRecords[0].dealerid,10)==dealer){
+
+            for (let i = 0; i < location.length; i++) {
+  let locationId = parseInt(location[i], 10);
+
+  // Get the existing record object (or undefined)
+  const existingRecord = dealerUserRecords.find(
+    (record) => record.locationid == locationId
+  );
+
+ // console.log("Checking locationId:", locationId, "existingRecord?", existingRecord);
+
+  if (existingRecord) {
+    // Mark traversed
+    existingRecord.isTraversed = true;
+  } else {
+    // Not present, insert
+    let query3 = `
+      INSERT INTO [z_scope].dbo.[dealer_user_relation]
+      (userid, dealerid, locationid)
+      VALUES (@userID, @dealer, @location)
+    `;
+    await pool.request()
+      .input('userID', userId)
+      .input('dealer', dealer)
+      .input('location', locationId)
+      .query(query3);
+
+    // Push to dealerUserRecords with isTraversed:true
+    dealerUserRecords.push({
+      locationid: locationId,
+      isTraversed: true
+    });
+  }
+}
+dealerUserRecords = dealerUserRecords.map(record => ({
+  ...record,
+  isTraversed: typeof record.isTraversed === "undefined" ? false : record.isTraversed
+}));
+
+//console.log("dealer user re o ",dealerUserRecords)
+                for (const record of dealerUserRecords) {
+  if (record.isTraversed == false) {
+    //console.log(`Deleting locationid ${record.locationid} because isTraversed is false.`);
+
+    const deleteQuery = `
+      DELETE FROM [z_scope].dbo.[dealer_user_relation]
+      WHERE dealerid = @dealer AND userid = @userID AND locationid = @location
+    `;
+
+    await pool.request()
+      .input('dealer', dealer)
+      .input('userID', userId)
+      .input('location', record.locationid)
+      .query(deleteQuery);
+  }
+}
+
+                        }else{
+                        // let deleteQuery=`delete from [z_scope].dbo.[dealer_user_relation] where userid=@userID and locationid=@locationId`;
+                        // let res234=await pool.request().input('userId',userId).input('locationId',locationId).query(deleteQuery);
+
+                         for(let i=0;i<location.length;i++){
+                        let locationId=parseInt(location[i],10);
+                        let query3='insert into [z_scope].dbo.[dealer_user_relation](userid,dealerid,locationid) values(@userID,@dealer,@location)';
+                    let result=await pool.request().input('userID',userId).input('dealer',dealer).input('location',locationId).query(query3);
+                     }
+                    }
+
+                
+                    // let query3='update [z_scope].dbo.[dealer_user_relation] dealerid=@dealer,locationid=@location where userid=@userID';
+                    // let result=await pool.request().input('userID',userId).input('dealer',dealer).input('location',location).query(query3);
+
+                }
+                else{
+            for (let i = 0; i < location.length; i++) {
+            let locationId = parseInt(location[i], 10);
+            let query3 = `
+      INSERT INTO [z_scope].dbo.[dealer_user_relation]
+      (userid, dealerid, locationid)
+      VALUES (@userID, @dealer, @location)
+    `;
+    await pool.request()
+      .input('userID', userId)
+      .input('dealer', dealer)
+      .input('location', locationId)
+      .query(query3);
+            }
+                }
+           }
+           else{
+             let query4=`select locationid,dealerid from [z_scope].dbo.[dealer_user_relation] where userid=@userID`;
+                let res23=await pool.request().input('userId',userId).query(query4);
+                let dealerUserRecords=res23.recordset;
+
+               // console.log("dealer records ",location.length)
+                if(res23.recordset.length>0){
+                    const deleteQuery = `
+      DELETE FROM [z_scope].dbo.[dealer_user_relation]
+      WHERE  userid = @userID
+    `;
+    await pool.request()
+      .input('userID', userId)
+      .query(deleteQuery);
+                }
+           }
             let publicIp = "Fetching public IP...";
             publicIp = await getPublicIp();
             
-            let pool = await getPool1()
-            
+        
             // Update the user details in the database
             let query = ` use [z_scope]
                 UPDATE [adminmaster_gen]

@@ -3,7 +3,7 @@ import path from "path";
 import AdmZip from "adm-zip";
 import xlsx from "xlsx";
 import fs from "fs";
-import { getPool1 } from "../../db/db.js";
+import { getPool2 } from "../../db/db.js";
 
 
  const createRole =async function (req) {
@@ -19,7 +19,7 @@ import { getPool1 } from "../../db/db.js";
       let token = req.token;
       let modules = req.modules;
       let roleType=req.roleType;
-      const pool = await getPool1()
+      const pool = await getPool2()
       const clientIp = getClientIp(req);
       const localIp = getLocalIp();
 
@@ -163,7 +163,7 @@ let query3 = `use [z_scope] Insert into role_module_mapping(role_id,module_id,vi
 
   const viewRole= async function (req, res) {
     try {
-      const pool = await getPool1()
+      const pool = await getPool2()
 
       let query = `use [z_scope] Select id,role_name as name,sims,hr,audit,gainer,it,other,status from role_module_master `;
 
@@ -214,7 +214,7 @@ let query3 = `use [z_scope] Insert into role_module_mapping(role_id,module_id,vi
       //console.log("role ",OTHER,GAINER,HR,IT,AUDIT,SIMS)
       // let status=req.status;
       // console.log(IT,SIMS,AUDIT,GAINER,OTHER,HR)
-      const pool = await getPool1()
+      const pool = await getPool2()
       const clientIp = getClientIp(req);
       const localIp = getLocalIp();
       let moduleIds = [];
@@ -396,7 +396,7 @@ let   view1 = 0;
 
       let publicIp = "Fetching public IP...";
       publicIp = await getPublicIp();
-      const pool = await getPool1()
+      const pool = await getPool2()
       if (req.status == "Active") {
         status = 1;
       } else {
@@ -437,7 +437,7 @@ let   view1 = 0;
 
   const downloadRoleFormat = async function (req, res) {
     try {
-      const pool = await getPool1()
+      const pool = await getPool2()
       let vertical_ids = req.vertical_ids;
       // console.log("verticalid ", typeof vertical_ids,vertical_ids);
 
@@ -522,7 +522,7 @@ let   view1 = 0;
     // console.log("req ",req);
     try {
       const excelData = await readExcelFile(filePath);
-      const pool = await getPool1()
+      const pool = await getPool2()
       // console.log("head row ",excelData);
 let isWrongFile=false;
       let userId = req["userId"];
@@ -721,7 +721,7 @@ let isWrongFile=false;
 
  const getAccessSettingsBasedOnRole= async function (req) {
     try {
-      const pool = await getPool1()
+      const pool = await getPool2()
       let vertical_ids = req.vertical_ids;
       // console.log("verticalid ", typeof vertical_ids[0]);
 
@@ -744,7 +744,7 @@ let isWrongFile=false;
 
  const getEditAccessSettingsBasedOnRole= async function (req) {
     try {
-      const pool = await getPool1();
+      const pool = await getPool2();
       let vertical_ids = req.vertical_ids;
       let roleId = req.roleId;
       let moduleType=req.moduleType;

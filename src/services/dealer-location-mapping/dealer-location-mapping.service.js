@@ -1,4 +1,4 @@
-import { getPool1 } from "../../db/db.js"
+import { getPool2 } from "../../db/db.js"
 import {readExcelFile} from '../utilities/utilities.service.js'
 import sql from 'mssql';
 const addDealerLocationMappingInService=async (req,res)=>{
@@ -12,7 +12,7 @@ const addDealerLocationMappingInService=async (req,res)=>{
         let filePath=req.file.path;
        let  isDealerAndLocationExist=true;        
         fileData=await readExcelFile(filePath)
-        const pool=await getPool1();
+        const pool=await getPool2();
         const dealerLocationNotInMaster = [];
         headers=fileData.headers;
         rowData=fileData.data;
@@ -117,7 +117,7 @@ const addDealerLocationMappingInService=async (req,res)=>{
             // console.log("values ",values);
         
             try {
-                await pool.request().query('use [StockUpload]')
+                await pool.request().query('use [z_scope]')
             const table = new sql.Table('Dealer_Location_Mapping'); // Updated table name
             table.create = false;
         
@@ -153,7 +153,7 @@ const addDealerLocationMappingInService=async (req,res)=>{
             return error; // Rethrow the error for further handling if necessary
         }
 
-        let logQuery=` use [StockUpload] Insert into Stock_Upload_Logs(brand_id,added_by,operation_type,dealerLocationMappingRowCount) 
+        let logQuery=` use [z_scope] Insert into Stock_Upload_Logs(brand_id,added_by,operation_type,dealerLocationMappingRowCount) 
         values(@brandId,@userId,'create dealer location mapping',@rowCount)`;
 
         await pool.request().input('brandId',brandId)
@@ -282,8 +282,8 @@ const editDealerLocationMappingInService=async(req,res)=>{
 
     try{
         let brandId=req.body.brand_id;
-        const pool=await getPool1();
-        let getMappingQuery=`use [StockUpload]  Select dealerId,locationId,inventory_location as 'inventory location',location,id from dealer_location_mapping where brandId=@brandId `;
+        const pool=await getPool2();
+        let getMappingQuery=`use [z_scope]  Select dealerId,locationId,inventory_location as 'inventory location',location,id from dealer_location_mapping where brandId=@brandId `;
         const res1=await pool.request().input('brandId',brandId).query(getMappingQuery);
         let mappedData=res1.recordset;
         let fileData;
@@ -412,7 +412,7 @@ rowData.forEach((row, index) => {
             return {multipleInventoryLocationsData:rowData1.data,multipleInventoryLocations:true}
           }
 
-        await pool.request().query('use [StockUpload]') 
+        await pool.request().query('use [z_scope]') 
         let operation="update dealer location mapping";
          let normalizedRowData=[];
        let updatedMappedData= mappedData.map((item)=>({
@@ -702,7 +702,7 @@ rowData.forEach((row, index) => {
               if(item!==undefined){
                 if(item?.isTraversed){
                     operation="update dealer location mapping"
-                    let updateQuery=`use [stockUpload]  Update dealer_location_mapping set added_on=Getdate(),operation=@operation,inventory_location=@inventoryLocation,location=@location,locationId=@locationId,dealer=@dealer,dealerId=@dealerId where id=@id`;
+                    let updateQuery=`use [z_scope]  Update dealer_location_mapping set added_on=Getdate(),operation=@operation,inventory_location=@inventoryLocation,location=@location,locationId=@locationId,dealer=@dealer,dealerId=@dealerId where id=@id`;
                     await pool.request().input('id',item.id)
                     .input('inventoryLocation',item["inventory location"])
                     .input('dealer',item.dealer)
@@ -716,7 +716,7 @@ rowData.forEach((row, index) => {
             })
             rowCount=rowData?.length;
 
-            let logQuery=`use [stockUpload] Insert into Stock_Upload_Logs(brand_id,added_by,operation_type,dealerLocationMappingRowCount) 
+            let logQuery=`use [z_scope] Insert into Stock_Upload_Logs(brand_id,added_by,operation_type,dealerLocationMappingRowCount) 
             values(@brandId,@userId,'update dealer location mapping',@rowCount)`;
     
             await pool.request().input('brandId',brandId)
@@ -737,9 +737,9 @@ const exportUploadedData=async (req,res)=>{
 
     try{
         let brandId=req.brand_id;
-        const pool=await getPool1();
+        const pool=await getPool2();
         // console.log(brandId)
-        let query=`use [stockUpload] Select dealer,location ,inventory_location,added_by,added_on,brandId from dealer_location_mapping where brandId=@brandId`;
+        let query=`use [z_scope] Select dealer,location ,inventory_location,added_by,added_on,brandId from dealer_location_mapping where brandId=@brandId`;
         const result=await pool.request().input('brandId',brandId).query(query);
 
         //  console.log(result.recordset);
@@ -753,11 +753,11 @@ const exportUploadedData=async (req,res)=>{
 
 const deleteQuery=async (updatedElement)=>{
 
-    const pool=await getPool1();
+    const pool=await getPool2();
     // console.log(updatedElement);
     let id=updatedElement.id;
     
-    let deleteQuery=`use [StockUpload] Delete from dealer_location_mapping where id=@id `;
+    let deleteQuery=`use [z_scope] Delete from dealer_location_mapping where id=@id `;
 
     await pool.request().input('id',id).query(deleteQuery);
 
@@ -785,11 +785,11 @@ const  getCurrentDateTimeInIST=async ()=> {
 const viewDealerLocationMappingInService=async(req)=>{
 
     try{
-        const pool=await getPool1();
+        const pool=await getPool2();
         let brandId=req.brand_id;
         let added_by=req.user_id;
         
-        let getDealerQuery=`use [stockUpload] Select dealer,location,dealerId,locationId as location_id,added_on,inventory_location,status,id ,added_by,remark from dealer_location_mapping 
+        let getDealerQuery=`use [z_scope] Select dealer,location,dealerId,locationId as location_id,added_on,inventory_location,status,id ,added_by,remark from dealer_location_mapping 
         where brandId=@brandId `;
         const res= await pool.request().input('brandId',brandId)
         .query(getDealerQuery);
@@ -806,13 +806,13 @@ const viewDealerLocationMappingInService=async(req)=>{
 const deleteDealerLocationMappingInService=async(req,res)=>{
 
     try{
-        const pool=await getPool1();
+        const pool=await getPool2();
 
         let added_by=req.user_id;
         let brandId=req.brand_id;
         let id=req.id;
         let status=req.status;
-        let updateQuery=`Use [stockUpload] update dealer_location_mapping set status=@status ,added_by=@added_by, 
+        let updateQuery=`Use [z_scope] update dealer_location_mapping set status=@status ,added_by=@added_by, 
         added_on=getDate(),operation='update status' where  id=@id`;
 
         // .input('brandId',brandId)
@@ -828,7 +828,7 @@ const deleteDealerLocationMappingInService=async(req,res)=>{
 const editLocationInService=async(req,res)=>{
 
   try{
-    let pool=await getPool1();
+    let pool=await getPool2();
     let locationId=req.location_id;
     let location=req.location;
     let inventoryLocation=req.inventory_location;
@@ -836,7 +836,7 @@ const editLocationInService=async(req,res)=>{
     let id=req.id;
     let remark=req.remark;
     let rowCount;
-    let updateQuery=`use [stockupload]
+    let updateQuery=`use [z_scope]
     update dealer_location_mapping
     set locationId=@locationId,
     inventory_location=@inventoryLocation,
@@ -852,7 +852,7 @@ const editLocationInService=async(req,res)=>{
     .input('remark',remark)
     .input('id',id).query(updateQuery);
 
-     let logQuery=`use [stockUpload] Insert into Stock_Upload_Logs(location_id,added_by,operation_type) 
+     let logQuery=`use [z_scope] Insert into Stock_Upload_Logs(location_id,added_by,operation_type) 
             values(@locationid,@addedBy,'update dealer location mapping through table')`;
     
             await pool.request().input('locationId',locationId)
