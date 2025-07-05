@@ -215,8 +215,6 @@ function mergeHeaders(headerRows) {
   return merged;
 }
 
-
-
 // Function to process Excel file dynamically
 const readExcelFileWithSubColumns = async (filePath) => {
   try {
