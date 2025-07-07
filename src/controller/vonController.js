@@ -10,7 +10,7 @@ import { partfamilySaleservice } from '../services/norms-management/utils.servic
 const remarkMaster = async (req, res) => {
     try {
 
-        const pool = await getPool1()
+        const pool = await getPool2()
         const { brandid, usertype } = req.body
         if (!brandid || !usertype) {
             return res.status(500).json({ Error: `Brandid and usertype are required` })
@@ -24,7 +24,7 @@ const remarkMaster = async (req, res) => {
 }
 const newRemark = async (req, res) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool2()
         const { remark, brandid, addedby, usertype } = req.body
         if (!remark || !addedby || !usertype) {
             return res.status(400).json({ message: `All fields are required` })
@@ -62,7 +62,7 @@ const newRemark = async (req, res) => {
 }
 const viewRemark = async (req, res) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool2()
         const { brandid, usertype } = req.body
 
         if (!usertype === 'A' || !usertype === 'U') {
@@ -95,7 +95,7 @@ const viewRemark = async (req, res) => {
 }
 const userView = async (req, res) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool2()
         const { brandid, dealerid, r1, r2, l1, l2, partnumber, locationid, flag, seasonalid, modelid, natureid, parttype } = req.body
         if (!dealerid && !brandid) {
             return res.status(400).json({ Error: `Dealerid and Brandid is a required Parameter` })
@@ -133,9 +133,9 @@ const userView = async (req, res) => {
 const userFeedbacklog = async (req, res) => {
     try {
         // const pool = await getPool1()
-        const pool =await getPool1()
-        const { brandid, dealerid, locationid, partid, max, remarkid, customrem, proposedqty } = req.body
-        if (!brandid || !dealerid || !locationid || !partid || max == null || proposedqty == null || !remarkid) {
+        const pool = await getPool2()
+        const { brandid, dealerid, locationid, partid, max, remarkid, customrem, proposedqty, addedby } = req.body
+        if (!brandid || !dealerid || !locationid || !addedby || !partid || max == null || proposedqty == null || !remarkid) {
             return res.status(400).json({ Error: `All Fields are required` })
         }
         const partCheck = await partBrandCheck(dealerid, locationid, partid)
@@ -184,12 +184,13 @@ const userFeedbacklog = async (req, res) => {
 
         const query = `
                    Insert into  ${dynamicTable} (brandid , dealerid , locationid , PartID , LatestPartID , MaxValue , UserID , UserFBRemarkID ,Customrem, ProposedQty , FeedbackDate , PreviousFBID)
-                   Values (@brandid,@dealerid , @locationid , @partid,@latestid,@max,1,@userfbid,@customrem,@proposedqty,GETDATE(),@previousfbid)`
+                   Values (@brandid,@dealerid , @locationid , @partid,@latestid,@max,@userid,@userfbid,@customrem,@proposedqty,GETDATE(),@previousfbid)`
         const request = await pool.request()
         request.input('brandid', sql.TinyInt, brandid)
         request.input('dealerid', sql.Int, dealerid)
         request.input('locationid', sql.Int, locationid)
         request.input('partid', sql.Int, partid)
+        request.input('userid', sql.Int, addedby)
         request.input('latestid', sql.VarChar, LatestPartID)
         request.input('max', sql.Int, max)
         request.input('userfbid', sql.Int, remarkid)
@@ -205,7 +206,7 @@ const userFeedbacklog = async (req, res) => {
 }
 const viewLog = async (req, res) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool2()
         const { brandid, dealerid, locationid, partid } = req.body
         if (!brandid || !dealerid) {
             return res.status(400).json({ message: `Brandid and Dealerid are required Parameter` })
@@ -330,9 +331,9 @@ const adminView = async (req, res) => {
 }
 const adminFeedbackLog = async (req, res) => {
     try {
-        const pool = await getPool1()
-        const { brandid, dealerid, locationid, feedbackid, AdminRemark, customRem, ApprovedQty } = req.body
-        if ((!brandid || !dealerid || !locationid || !AdminRemark || !ApprovedQty) || (feedbackid == null)) {
+        const pool = await getPool2()
+        const { brandid, dealerid, locationid, feedbackid, AdminRemark, customRem, ApprovedQty ,addedby} = req.body
+        if ((!brandid || !dealerid || !locationid || !AdminRemark || !addedby || !ApprovedQty) || (feedbackid == null)) {
             return res.status(400).json({ message: `All Fields are required and Feedbackid cannot be null` })
         }
 
@@ -363,13 +364,14 @@ const adminFeedbackLog = async (req, res) => {
         }
         let query = ` use [UAD_VON]             
                     insert into ${dynamicTable} (brandid,  dealerid , locationid, feedbackid ,AdminID,AdminRemark,ApprovedQty,PreviousAdminFBID,customrem)
-                    values (@brandid , @dealerid , @locationid ,@feedbackid , 146297 , @adminremarkid , @approvedqty,@previousadminfbid,@customrem)`
+                    values (@brandid , @dealerid , @locationid ,@feedbackid , @addedby , @adminremarkid , @approvedqty,@previousadminfbid,@customrem)`
 
         const request = await pool.request()
         request.input('brandid', sql.TinyInt, brandid)
         request.input('dealerid', sql.Int, dealerid)
         request.input('locationid', sql.Int, locationid)
         request.input('feedbackid', sql.Int, feedbackid)
+        request.input('addedby', sql.Int, addedby)
         // request.input('latestid',sql.VarChar,LatestPartID)            
         // request.input('max',sql.Int,max)            
         request.input('adminremarkid', sql.Int, AdminRemark)
@@ -582,7 +584,7 @@ const partFamilySale = async (req, res) => {
 // }
 const adminPendingView = async (req, res) => {
     try {
-        const pool = await getPool1();
+        const pool = await getPool2();
         let {
             brandid,
             dealerid,
@@ -663,9 +665,10 @@ const adminPendingView = async (req, res) => {
 
 const dealerUpload = async (req, res) => {
     let transaction; // Declare transaction outside try block
+    const {addedby} = req.body 
 
     try {
-        const pool = await getPool1();
+        const pool = await getPool2();
         transaction = await pool.transaction(); // Initialize transaction
 
         if (!req.file || req.file.length === 0) {
@@ -914,9 +917,16 @@ const dealerUpload = async (req, res) => {
 
 
         // console.log("PreviousFBIDs:", previousFBIDs);
-        const UserID = 1; // Static User ID
-        const UserFBRemarkID = 1; // Static feedback remark ID
+        const UserID = addedby; // Static User ID
+        // const UserFBRemarkID = 1; // Static feedback remark ID
+// Fetch remark mappings
+const remarkQuery = `SELECT RemarkID, Remark as RemarkName FROM UAD_VON..UAD_VON_RemarksMaster where usertype = 'U' and brandid = ${brandResults[0].brandid}`;
+const remarkResult = await pool.request().query(remarkQuery);
 
+const remarkMappings = remarkResult.recordset.map(row => ({
+    RemarkID: row.RemarkID,
+    RemarkName: row.RemarkName.trim().toLowerCase()
+}));
         //   console.log("latestPartIDs:", latestPartIDs);
         // console.log("maxValueMapping:", maxValueMapping);
         // console.log("previousFBIDs:", previousFBIDs);
@@ -947,6 +957,10 @@ const dealerUpload = async (req, res) => {
                 pfb.LocationID === locationid
             );
 
+                // Find matching remark ID
+            const matchedRemark = remarkMappings.find(r =>
+                r.RemarkName === (item.UserRemark || "").trim().toLowerCase()
+            );
             return {
                 brandid: brandMapping?.brandid,
                 dealerid: dealerMapping?.dealerid,
@@ -955,14 +969,26 @@ const dealerUpload = async (req, res) => {
                 partid: item.Partid,
                 latestpartid: latestpartidMapping?.LatestPartID ?? null,
                 UserID: UserID,
-                UserFBRemarkID: UserFBRemarkID,
+                // UserFBRemarkID: UserFBRemarkID,
+                UserFBRemarkID: matchedRemark?.RemarkID ?? null, 
                 CustomRem: item.UserRemark,
                 ProposedQty: item.ProposedQty,
                 PreviousFBID: partidPreviousFBIDMapping?.PreviousFBID ?? null,
                 PartNumber:item.partnumber
             };
         });
-        
+//         const missingRemarks = formattedData.filter(item => !item.UserFBRemarkID);
+
+// if (missingRemarks.length > 0) {
+//     return res.status(400).json({
+//         message: "Some remarks could not be mapped to RemarkID.",
+//         unmappedRemarks: missingRemarks.map(r => ({
+//             PartNumber: r.PartNumber,
+//             Remark: r.CustomRem
+//         }))
+//     });
+// }
+
         const invalidRecords = formattedData.filter(item =>
             !item.locationid ||
             !item.maxvalue
@@ -1015,8 +1041,8 @@ const dealerUpload = async (req, res) => {
 
 const adminUpload = async (req, res) => {
     // const pool = await getPool1()
-    const pool = await getPool1()
-    const {file} = req.body
+    const pool = await getPool2()
+    const {file,addedby} = req.body
     if (!req.file || req.file.length === 0) {
         return res.status(400).json({ message: "No files received" });
     }
@@ -1163,8 +1189,21 @@ const adminUpload = async (req, res) => {
     // console.log(previousFBIDs);
 
 
-    const AdminID = 1; // Static User ID
-    const AdminRemark = 1; // Static feedback remark ID
+    const AdminID = addedby; // Static User ID
+    // const AdminRemark = 1; // Static feedback remark ID
+
+    const remarkQuery = `
+  SELECT RemarkID, Remark AS RemarkName 
+  FROM UAD_VON..UAD_VON_RemarksMaster 
+  WHERE usertype = 'A' AND brandid = ${brandResults[0].brandid}
+`;
+const remarkResult = await pool.request().query(remarkQuery);
+
+const remarkMappings = remarkResult.recordset.map(row => ({
+    RemarkID: row.RemarkID,
+    RemarkName: row.RemarkName.trim().toLowerCase()
+}));
+
 
     const formattedData = cleanedData.map(item => {
         const brandMapping = brandResults.find(b => b.brand === item.brand);
@@ -1174,7 +1213,10 @@ const adminUpload = async (req, res) => {
         // Convert locationid to NUMBER to match mappings
         const locationid = locationMapping ? Number(locationMapping.locationid) : null;
         const previousMapping = previousFBIDs.find(prev => prev.FeedbackID === item.feedbackid);
-
+            // Match AdminRemark dynamically
+    const matchedRemark = remarkMappings.find(r =>
+        r.RemarkName === (item.AdminRemark || "").trim().toLowerCase()
+    );
 
         return {
             brandid: brandMapping?.brandid,
@@ -1182,7 +1224,8 @@ const adminUpload = async (req, res) => {
             locationid: locationid,
             feedbackid: item.feedbackid,
             AdminID: AdminID,
-            AdminRemark: AdminRemark,
+            // AdminRemark: AdminRemark,
+            AdminRemarkID: matchedRemark?.RemarkID ?? null,
             ApprovedQty: item.ApprovedQty,
             CustomRem: item.AdminRemark,
             PreviousAdminFBID: previousMapping ? previousMapping.PreviousAdminFBID : null // Assign found value or null
@@ -1190,7 +1233,19 @@ const adminUpload = async (req, res) => {
         };
     });
     // console.log(formattedData);
-    
+// const missingRemarks = formattedData.filter(item => !item.AdminRemarkID);
+
+// if (missingRemarks.length > 0) {
+//     return res.status(400).json({
+//         message: "Some remarks could not be mapped to RemarkID.",
+//         unmappedRemarks: missingRemarks.map(r => ({
+//             FeedbackID: r.feedbackid,
+//             Remark: r.CustomRem
+//         }))
+//     });
+// }
+
+
     const check = await checkReviewedFeedbackByBrand(brandResults[0].brandid, formattedData);
     if (check.length > 0) {
         return res.status(400).json({

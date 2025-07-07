@@ -39,7 +39,7 @@ const partBrandCheck = async(dealerid,locationid,partid)=>{
         }
 }
 const statusCheck = async(locationid,partid,table)=>{
-  const pool = await getPool1()
+  const pool = await getPool2()
   // console.log(locationid,partid,table);
   const query =  `select top 1 status from ${table} where locationid = ${locationid} and partid = ${partid} order by feedbackid desc`
   const result = await pool.request().query(query)
@@ -115,7 +115,7 @@ const readExcel = async (filePath) => {
 
 // -----------BULK INSERTION ---------------------------
 const insertData = async (formattedData, tableName) => {
-  const pool = await getPool1();
+  const pool = await getPool2();
   const transaction = pool.transaction();
   // console.log(tableName);
   
@@ -197,7 +197,7 @@ const insertData = async (formattedData, tableName) => {
   } 
 };
 const insertAdminFeedback = async (formattedData, brandId) => {
-  const pool = await getPool1();
+  const pool = await getPool2();
   const transaction = pool.transaction();
   
   try {
