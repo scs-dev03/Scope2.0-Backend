@@ -18,6 +18,7 @@ const partDetailsservice = async (brandid,dealerid,locationid,partnumber,res)=>{
                 WHEN os.greenflag = 'Y' OR os.yellowflag = 'Y' OR su.redflag = 'Y' 
                 THEN 'Non-Moving' 
                 WHEN sn.Maxvalue = 0 THEN 'Non-Stockable'
+               WHEN sn.Maxvalue IS NULL THEN 'Non-Stockable'
         		WHEN sn.Maxvalue > 0 THEN 'Stockable'
             END AS Partstatus
               FROM part_master pm
