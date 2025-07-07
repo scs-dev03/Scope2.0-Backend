@@ -5,7 +5,7 @@ import nodemailer from 'nodemailer';
 import { getPool1 } from '../../db/db.js';
 import { getLocalIp, getPublicIp, getClientIp }  from "../getIP.js";
 import "dotenv/config"
-import { partialDeepStrictEqual } from 'assert';
+
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
