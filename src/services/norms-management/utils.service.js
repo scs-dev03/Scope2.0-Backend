@@ -4,7 +4,7 @@ const partfamilySaleservice = async (brandid,dealerid,locationid,partnumber) => 
         // console.log(brandid,dealerid,locationid,partnumber);
         
         const pool = await getPool2()
-        const query = `use [z_scope] EXEC  sp_partfamilysale '${partnumber}',${brandid},${dealerid},${locationid}`
+        const query = `use [z_scope] EXEC sp_partfamilysale '${partnumber}',${brandid},${dealerid},${locationid}`
         const result = await pool.request().query(query)
         return result
     } catch (error) {

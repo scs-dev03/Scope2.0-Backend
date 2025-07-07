@@ -492,7 +492,7 @@ const partBrandMappingCheck = async (Brandid, Data) => {
   try {
     // console.log(Data);
     
-    const pool = await getPool1();
+    const pool = await getPool2();
     const query = `
       USE z_scope;
       SELECT brandid, partnumber FROM z_scope.dbo.Part_Master WHERE brandid = ${Brandid}
