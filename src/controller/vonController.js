@@ -395,7 +395,7 @@ const adminFeedbackLog = async (req, res) => {
 }
 const partFamily = async (req, res) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool2()
         const { partnumber, brandid } = req.body
         if (!partnumber || !brandid) {
             return res.status(400).json({ Error: `partnumber and brandid is required` })
@@ -505,7 +505,7 @@ const partFamily = async (req, res) => {
 }
 const countPending = async (req, res) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool2()
         const { brandid, dealerid } = req.body
 
         const query = `USE [UAD_VON]; 
@@ -677,7 +677,7 @@ const dealerUpload = async (req, res) => {
         // console.log(req.file.path);
 
         let {headers,data} = await readExcel(req.file.path);
-        //   console.log(`data` , data[0]);
+        // console.log(`data` , data[0]);
         // console.log(headers)
         fs.unlinkSync(req.file.path); // Delete uploaded file after processing
 
@@ -716,7 +716,8 @@ const dealerUpload = async (req, res) => {
                 UserRemark,
                 ProposedQty
             }));
-// 
+    //  console.log(cleanedData[0]);
+     
         // Fetch the brandid and dealerid for a given brand and dealer if needed
         const brand = cleanedData[0].Brand;
         const dealer = cleanedData[0].Dealer;
@@ -736,6 +737,8 @@ const dealerUpload = async (req, res) => {
         const query = `select distinct  partid , partnumber from z_scope..Stockable_Nonstockable_TD001_${dealerid} where Locationid = ${locationid}`;
         
         const partidpartnumberresult = await pool.request().query(query);
+        console.log(partidpartnumberresult);
+        
         
         if (partidpartnumberresult.recordset.length > 0) {
             partidpartnumbermapping.push(...partidpartnumberresult.recordset);
@@ -917,11 +920,11 @@ const dealerUpload = async (req, res) => {
 
 
         // console.log("PreviousFBIDs:", previousFBIDs);
-        const UserID = addedby; // Static User ID
+        const UserID = addedby; 
         // const UserFBRemarkID = 1; // Static feedback remark ID
-// Fetch remark mappings
-const remarkQuery = `SELECT RemarkID, Remark as RemarkName FROM UAD_VON..UAD_VON_RemarksMaster where usertype = 'U' and brandid = ${brandResults[0].brandid}`;
-const remarkResult = await pool.request().query(remarkQuery);
+    // Fetch remark mappings
+    const remarkQuery = `SELECT RemarkID, Remark as RemarkName FROM UAD_VON..UAD_VON_RemarksMaster where usertype = 'U' and brandid = ${brandResults[0].brandid}`;
+    const remarkResult = await pool.request().query(remarkQuery);
 
 const remarkMappings = remarkResult.recordset.map(row => ({
     RemarkID: row.RemarkID,
@@ -1043,6 +1046,9 @@ const adminUpload = async (req, res) => {
     // const pool = await getPool1()
     const pool = await getPool2()
     const {file,addedby} = req.body
+    if(!addedby){
+       return res.status(400).json({ message: "addedby is required" });
+    }
     if (!req.file || req.file.length === 0) {
         return res.status(400).json({ message: "No files received" });
     }
@@ -1121,7 +1127,7 @@ const adminUpload = async (req, res) => {
         }
     }
     const AdmintableName = `UAD_VON..UAD_VON_AdminFeedback_${brandResults[0].brandid}`
-    const tableName = `UAD_VON..UAD_VON_SPMFeedback_${brandResults[0].brandid}`
+    const tableName = `UAD_VON_SPMFeedback_${brandResults[0].brandid}`
     // console.log(AdmintableName);
 
     const dealerResults = [];
@@ -1253,7 +1259,21 @@ const remarkMappings = remarkResult.recordset.map(row => ({
             pendingRecords: check
         });
     }
-    await insertAdminFeedback(formattedData, brandResults[0].brandid)  // Insert Function to insert formatted data into table
+    // console.log(formattedData);
+    
+   const {feedbackIds}=  await insertAdminFeedback(formattedData, brandResults[0].brandid)  // Insert Function to insert formatted data into table
+// console.log(feedbackIds);
+// Update the status to 'Reviewed' where FeedbackID is in the feedbackIds string
+try {
+      const statusQuery = `
+        UPDATE UAD_VON..${tableName}
+        SET Status = 'Reviewed'
+        WHERE FeedbackID IN (${feedbackIds})
+      `;
+        await pool.request().query(statusQuery);
+} catch (error) {
+    return res.status(400).json({message:`error in updating status Reviewed in admin , ${error.message}`})
+}
     res.status(200).json({ message: "Data inserted successfully", data: formattedData });
 
 }

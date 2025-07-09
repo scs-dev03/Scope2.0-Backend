@@ -124,7 +124,8 @@ const insertData = async (formattedData, tableName) => {
     // ✅ Explicitly specify database and schema
     const databaseName = "UAD_VON";
     const schemaName = "dbo"; // Replace with your schema if different
-    const fullTableName = `${databaseName}.${schemaName}.UAD_VON_SPMFeedback_9`;
+    const fullTableName = `${databaseName}.${schemaName}.${tableName}`;
+    // const fullTableName = `${databaseName}.${schemaName}.UAD_VON_SPMFeedback_9`;
 
     const table = new sql.Table(fullTableName); // Use fully qualified name
     table.create = false;
@@ -196,7 +197,8 @@ const insertData = async (formattedData, tableName) => {
     throw err; // Re-throw for upstream handling
   } 
 };
-const insertAdminFeedback = async (formattedData, brandId) => {
+
+const insertAdminFeedback = async (formattedData, brandid) => {
   const pool = await getPool2();
   const transaction = pool.transaction();
   
@@ -205,7 +207,8 @@ const insertAdminFeedback = async (formattedData, brandId) => {
         // ✅ Explicitly specify database and schema
         const databaseName = "UAD_VON";
         const schemaName = "dbo"; // Replace with your schema if different
-        const fullTableName = `${databaseName}.${schemaName}.UAD_VON_AdminFeedback_9`;
+        // const fullTableName = `${databaseName}.${schemaName}.${tableName}`;
+        const fullTableName = `${databaseName}.${schemaName}.UAD_VON_AdminFeedback_${brandid}`;
      
     // console.log(fullTableName);
     
@@ -260,9 +263,28 @@ const insertAdminFeedback = async (formattedData, brandId) => {
 
     const request = new sql.Request(transaction);
     await request.bulk(table);
+
+        // After bulk insert, retrieve the inserted AdminFBID values
+    const feedbackIds = formattedData.map(item => item.feedbackid); // or another unique identifier for feedback
+    const query = `
+      SELECT FeedbackID, AdminFBID 
+      FROM ${fullTableName} 
+      WHERE FeedbackID IN (${feedbackIds.join(', ')})
+    `;
+    const result = await request.query(query);
+
+    // You can now associate AdminFBID with each row
+    const insertedIds = result.recordset.map(row => ({
+      FeedbackID: row.FeedbackID,
+      AdminFBID: row.AdminFBID
+    }));
+
+ // Extract AdminFBID values and join them into a string
+const FeedbackIDs = insertedIds.map(item => item.FeedbackID).join(',');
+
     await transaction.commit();
     console.log('Admin feedback inserted successfully');
-    return { success: true, insertedCount: formattedData.length };
+    return { success: true, insertedCount: formattedData.length ,feedbackIds:FeedbackIDs};
 
   } catch (err) {
     console.error('Error during admin feedback insert:', err);
@@ -270,6 +292,7 @@ const insertAdminFeedback = async (formattedData, brandId) => {
     throw err;
   }
 };
+
 function findLocationPartidDuplicates(data) {
   const seen = new Map();
   const duplicates = [];

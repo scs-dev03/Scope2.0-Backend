@@ -760,7 +760,7 @@ function scheduleTask() {
       const query = `use [UAD_BI]
                      SELECT TOP 5  reqid, dashboardcode, brand, brandid, dealer, dealerid, scheduledon
                      FROM SBS_DBS_ScheduledDashboard 
-                     WHERE status = 0 and dateadd(hour,-10,ScheduledOn) <= GETDATE() and dashboardcode not in (13) order by ScheduledOn`
+                     WHERE status = 0 and dateadd(hour,-12,ScheduledOn) <= GETDATE() and dashboardcode not in (13) order by ScheduledOn`
       const result = await pool.request().query(query)
       const tasks = result.recordset
 
@@ -786,7 +786,7 @@ function scheduleTask() {
             case 9: return refreshSpecialList(task.reqid)
             case 12: return refreshBenchmarking(task.dealerid, task.reqid)
             // case 13: return refreshSI(task.dealerid,task.reqid)
-            // // case 14: return refreshGSI(task.brand, task.dealer, task.brandid, task.dealerid, task.reqid)
+            // case 14: return refreshGSI(task.brand, task.dealer, task.brandid, task.dealerid, task.reqid)
             case 15: return refreshCID(task.dealerid, task.reqid)
             case 17: return refreshGainerMini(task.reqid)
             default:
@@ -923,8 +923,8 @@ function siRefresh() {
         SELECT TOP 1 reqid, dashboardcode, brand, brandid, dealer, dealerid, scheduledon
         FROM SBS_DBS_ScheduledDashboard 
         WHERE status = 0 
-          AND DATEADD(hour, -10, scheduledon) <= GETDATE() 
-          AND dashboardcode = 13
+        AND DATEADD(hour, -10, scheduledon) <= GETDATE() 
+        AND dashboardcode = 13
         ORDER BY scheduledon`;
       
       const task = (await pool.request().query(query)).recordset[0];
@@ -939,6 +939,9 @@ function siRefresh() {
         .input('reqid', sql.Int, task.reqid)
         .query(`use [UAD_BI] UPDATE SBS_DBS_ScheduledDashboard SET status = 1 WHERE reqid = @reqid`);
 
+      console.log(`Reqid : ${task.reqid} , Dealerid : ${task.dealerid}`);
+      // console.log(`Calling refreshSI`);
+      
       await refreshSI(task.dealerid, task.reqid);
 
       console.log("✅ SI task processed successfully");
