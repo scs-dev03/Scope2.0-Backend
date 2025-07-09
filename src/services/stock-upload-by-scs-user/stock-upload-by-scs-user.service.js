@@ -445,8 +445,8 @@ import xlsx from "xlsx";
 //       currentQuantSum = result678.recordset[0].currentQuantSum;
 //     }
 
-//     let logQuery = `use [z_scope] insert into Stock_Upload_Logs(location_id,stockCode,added_by,brand_id, z_scopeCount,operation_type,quantitySum,
-//       prevz_scopeCount,prevQuantitySum,dealer_id) values(@locationId,@StockCode,@addedBy,@brandId,@rowCount,'single stock upload ',@currentQuantSum,@countPrevRecords,@quantitySumPrev,@dealerId)`;
+//     let logQuery = `use [z_scope] insert into Stock_Upload_Logs(location_id,stockCode,added_by,brand_id, StockUploadCount,operation_type,quantitySum,
+//       prevStockUploadCount,prevQuantitySum,dealer_id) values(@locationId,@StockCode,@addedBy,@brandId,@rowCount,'single stock upload ',@currentQuantSum,@countPrevRecords,@quantitySumPrev,@dealerId)`;
 //     await pool
 //       .request()
 //       .input("StockCode", StockCodeCurrent)
@@ -813,13 +813,18 @@ if (missingFields.length > 0) {
     }
   }
 
+   // 16. Delete old stock entries
+  if (oldTcode) {
+    await pool.request().input("stockCode", oldTcode).query(`USE [z_scope]; DELETE FROM currentStock2 WHERE stockCode=@stockCode`);
+    await pool.request().input("stockCode", oldTcode).query(`USE [z_scope]; DELETE FROM currentStock1 WHERE tcode=@stockCode`);
+  }
   // 12. Insert into currentStock1 and get new tcode
   const now = new Date().toISOString().split("T")[0];
   const { recordset: [insertedStock] } = await pool.request()
     .input("locationID", locationId)
     .input("formattedDate", formattedDate)
     .input("addedBy", addedBy)
-    .query(`USE [z_scope]; INSERT INTO currentStock1(locationID, stockdate, addedby) OUTPUT inserted.tcode VALUES(@locationID, @formattedDate, @addedBy)`);
+    .query(`USE [z_scope]; INSERT INTO currentStock1(locationID, stockdate, addedby,addedDate) OUTPUT inserted.tcode VALUES(@locationID, @formattedDate, @addedBy,cast(getDate() as smalldatetime))`);
 
   const newTcode = insertedStock.tcode;
    //  console.log("depued data ",deduped)
@@ -837,11 +842,16 @@ if (missingFields.length > 0) {
 
   
   const stockTable = new sql.Table("currentStock2");
-  stockTable.columns.add("StockCode", sql.BigInt);
-  stockTable.columns.add("PartNumber", sql.VarChar(35));
-  stockTable.columns.add("Qty", sql.Decimal(18, 2));
-  stockTable.columns.add("PartID", sql.Int);
-  deduped.forEach(row => stockTable.rows.add(newTcode, row.part_number, row.qty, row.partId));
+  stockTable.columns.add("StockCode", sql.BigInt,{nullable:false});
+  stockTable.columns.add("PartNumber", sql.VarChar(35),{nullable:false});
+  stockTable.columns.add("Qty", sql.Decimal(18, 2),{nullable:false});
+  stockTable.columns.add("PartID", sql.Int,{nullable:true});
+  deduped.forEach(row => {
+    const rawPartId = row.partId;
+      const safePartId = rawPartId && !isNaN(rawPartId) ? parseInt(rawPartId, 10) : 0;
+      stockTable.rows.add(BigInt(newTcode), String(row.part_number), parseFloat(row.qty), safePartId)
+  
+  } )
   await pool.request().bulk(stockTable);
   }
   // 15. Log the upload
@@ -859,14 +869,10 @@ if (missingFields.length > 0) {
     .input("currentQuantSum", totalQty)
     .input("countPrevRecords", prevRecordCount)
     .input("quantitySumPrev", prevQtySum)
-    .query(`USE [z_scope]; INSERT INTO Stock_Upload_Logs(location_id, stockCode, added_by, brand_id, z_scopeCount, operation_type, quantitySum, prevz_scopeCount, prevQuantitySum)
+    .query(`USE [z_scope]; INSERT INTO Stock_Upload_Logs(location_id, stockCode, added_by, brand_id, StockUploadCount, operation_type, quantitySum, prevStockUploadCount, prevQuantitySum)
             VALUES(@locationId, @StockCode, @addedBy, @brandId, @rowCount, 'single-location upload stock', @currentQuantSum, @countPrevRecords, @quantitySumPrev)`);
 
-  // 16. Delete old stock entries
-  if (oldTcode) {
-    await pool.request().input("stockCode", oldTcode).query(`USE [z_scope]; DELETE FROM currentStock2 WHERE stockCode=@stockCode`);
-    await pool.request().input("stockCode", oldTcode).query(`USE [z_scope]; DELETE FROM currentStock1 WHERE tcode=@stockCode`);
-  }
+ 
 
   return {
     currentSumQuantity: totalQty,
@@ -907,7 +913,7 @@ const getAllRecords = async (req, res) => {
     const pool = await getPool2();
     let locationId = req.location_id;
    // let userId = req.added_by;
-    let getQuery = `use [z_scope] select added_on,added_by,z_scopeCount,quantitySum,prevQuantitySum,prevz_scopeCount from stock_upload_logs where location_id=@locationId`;
+    let getQuery = `use [z_scope] select added_on,added_by,StockUploadCount,quantitySum,prevQuantitySum,prevStockUploadCount from stock_upload_logs where location_id=@locationId`;
 
     const result = await pool
       .request()
@@ -1515,8 +1521,8 @@ const getAllRecords = async (req, res) => {
 //         currentQuantSum = result678?.recordset[0]?.currentQuantSum;
 //       }
 //       //  console.log("currentquant ",currentQuantSum)
-//       let logQuery = `use [z_scope] insert into Stock_Upload_Logs(Stockcode,location_id,dealer_id,added_by,brand_id, z_scopeCount,operation_type,quantitySum,
-//      prevz_scopeCount,prevQuantitySum) values(@currentStockCode,@locId,@dealerId,@addedBy,@brandId,@rowCount,'bulk stock upload ',@currentQuantSum,@countPrevRecords,@quantitySumPrev)`;
+//       let logQuery = `use [z_scope] insert into Stock_Upload_Logs(Stockcode,location_id,dealer_id,added_by,brand_id, StockUploadCount,operation_type,quantitySum,
+//      prevStockUploadCount,prevQuantitySum) values(@currentStockCode,@locId,@dealerId,@addedBy,@brandId,@rowCount,'bulk stock upload ',@currentQuantSum,@countPrevRecords,@quantitySumPrev)`;
 //       await pool
 //         .request()
 //         .input("currentStockCode", currentStockCode)
@@ -2328,7 +2334,7 @@ updatedFilteredRowData = Array.from(partCountMap.values());
       }
       // console.log("updated filtered row after getting unique location id ",updatedFilteredRowData)
       // console.log("current stock1 ",locId,formattedDate,addedBy)
-      let insertQueryForCurrentStock1 = `use [z_scope] insert into currentStock1(locationID,stockdate,addedby) output inserted.tcode values(@locId,@formattedDate,@addedBy)`;
+      let insertQueryForCurrentStock1 = `use [z_scope] insert into currentStock1(locationID,stockdate,addedby,addedDate) output inserted.tcode values(@locId,@formattedDate,@addedBy,cast(getDate() as smalldatetime))`;
 
       const result1 = await pool
         .request()
@@ -2342,11 +2348,13 @@ updatedFilteredRowData = Array.from(partCountMap.values());
       if(filteredData.length){
 
       const values1 = filteredData.map((item) => {
+         const rawPartId = item["partId"];
+  const safePartId = rawPartId && !isNaN(rawPartId) ? parseInt(rawPartId, 10) : 0;
         return [
-          parseInt(currentStockCode, 10),
-          item["part_number"],
+          BigInt(currentStockCode),
+          String(item["part_number"]),
           parseFloat(item["qty"]),
-          item["partId"],
+         safePartId
         ];
       });
       //  console.log("values ",values1);
@@ -2356,9 +2364,9 @@ updatedFilteredRowData = Array.from(partCountMap.values());
         const table1 = new sql.Table("currentStock2"); // Updated table name
         table1.create = false;
 
-        table1.columns.add("StockCode", sql.BigInt, { nullable: true });
-        table1.columns.add("PartNumber", sql.VarChar(35), { nullable: true });
-        table1.columns.add("Qty", sql.Decimal(18, 2), { nullable: true });
+        table1.columns.add("StockCode", sql.BigInt, { nullable: false });
+        table1.columns.add("PartNumber", sql.VarChar(35), { nullable: false });
+        table1.columns.add("Qty", sql.Decimal(18, 2), { nullable: false });
         table1.columns.add("PartID", sql.Int, { nullable: true });
         // Add rows to the table
         values1.forEach((row) => {
@@ -2372,7 +2380,7 @@ updatedFilteredRowData = Array.from(partCountMap.values());
         await pool.request().bulk(table1);
       } catch (error) {
         console.error("Error during bulk insert in single upload: ", error);
-        return { error: error }; // Rethrow the error for further handling if necessary
+        //return { error: error }; // Rethrow the error for further handling if necessary
       }
     }
       let currentQuantSum = 0;
@@ -2386,8 +2394,8 @@ updatedFilteredRowData = Array.from(partCountMap.values());
         currentQuantSum = result678?.recordset[0]?.currentQuantSum;
       }
       //  console.log("currentquant ",currentQuantSum)
-      let logQuery = `use [z_scope] insert into Stock_Upload_Logs(Stockcode,location_id,dealer_id,added_by,brand_id, z_scopeCount,operation_type,quantitySum,
-     prevz_scopeCount,prevQuantitySum) values(@currentStockCode,@locId,@dealerId,@addedBy,@brandId,@rowCount,'bulk stock upload ',@currentQuantSum,@countPrevRecords,@quantitySumPrev)`;
+      let logQuery = `use [z_scope] insert into Stock_Upload_Logs(Stockcode,location_id,dealer_id,added_by,brand_id, StockUploadCount,operation_type,quantitySum,
+     prevStockUploadCount,prevQuantitySum) values(@currentStockCode,@locId,@dealerId,@addedBy,@brandId,@rowCount,'bulk stock upload ',@currentQuantSum,@countPrevRecords,@quantitySumPrev)`;
       await pool
         .request()
         .input("currentStockCode", currentStockCode)
@@ -2458,7 +2466,7 @@ const getBulkRecordsInService = async (req, res) => {
     
 
     let getQuery = ` use [z_scope]
-  SELECT added_on, added_by, z_scopeCount, location_id,quantitySum, prevQuantitySum, prevz_scopeCount 
+  SELECT added_on, added_by, StockUploadCount, location_id,quantitySum, prevQuantitySum, prevStockUploadCount 
   FROM stock_upload_logs
   WHERE dealer_id =@dealerId
 `;

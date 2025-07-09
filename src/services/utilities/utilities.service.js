@@ -1,4 +1,4 @@
-import { getPool2 } from "../../db/db.js"
+import { getPool1, getPool2 } from "../../db/db.js"
 import  XLSX from "xlsx";
 import fs from "fs";
 import he from 'he'
@@ -465,10 +465,11 @@ export const getLocationsInService= async function (req) {
 
 export const getDesignations=async function(req){
   try{
-      let pool=await getPool2();
+      let pool=await getPool1();
       let query=`use [z_scope] Select id,designation_name from designation_master`;
 
      let result= await pool.request().query(query);
+     // console.log("result in designation ",result)
       return result;
 
   }
@@ -493,7 +494,7 @@ export const getRoles=async function(req){
 
 export const getBusinessVertical=async function(req){
   try{
-      let pool=await getPool2();
+      let pool=await getPool1();
       let query=`use [z_scope] SELECT id,business_vertical from business_vertical_master`;
 
      let result= await pool.request().query(query);

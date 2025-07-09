@@ -299,7 +299,7 @@ const editDealerLocationMappingInService=async(req,res)=>{
         const dealerLocationNotInMaster = [];
         headers=fileData.headers;
         rowData=fileData.data;
-        console.log("headers ",headers)
+      //  console.log("headers ",headers)
        if(headers?.length==0 || headers==undefined){
         isDealerAndLocationNull=true;
          return {isDealerAndLocationNull:isDealerAndLocationNull}
@@ -315,7 +315,7 @@ const editDealerLocationMappingInService=async(req,res)=>{
          // console.log("headers ",headers,rowData)
         
          isDealerAndLocationNull=await checkFields(rowData);
-           console.log("is dealer location null in file ",isDealerAndLocationNull)
+        //   console.log("is dealer location null in file ",isDealerAndLocationNull)
       //  console.log("row data ",rowData)
          if(isDealerAndLocationNull){
             return {isDealerAndLocationNull:isDealerAndLocationNull}

@@ -16,7 +16,7 @@ import { getPool1, getPool2 } from "../../db/db.js";
    const  getModulesBasedOnRoles=async function(req){
 
         try{
-            const pool=await getPool1();
+            const pool=await getPool2();
             let userId=parseInt(req.userId,10);
             let moduleType=req.moduleType;
             let query1=`select roleId ,vcphoto from z_scope..adminmaster_gen where bintId_pk=@userId`;

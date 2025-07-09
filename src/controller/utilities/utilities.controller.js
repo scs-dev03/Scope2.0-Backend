@@ -76,6 +76,7 @@ export const getLocationsBasedOnBrandInController=async function (req,res) {
 export const getDesignationsInController=async function(req,res){
     try{
   const result=await getDesignations(req);
+  //console.log("result ",result)
    res.send({status:200,data:result.recordset})
     }
     catch(error){
