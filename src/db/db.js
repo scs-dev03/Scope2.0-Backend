@@ -71,7 +71,7 @@ const config2 = {
         trustServerCertificate: true,
     },
     requestTimeout: 6000000,
-    connectionTimeout: 30000,
+    connectionTimeout: 300000000,
 };
 
 const config3 = {

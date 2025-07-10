@@ -117,77 +117,60 @@ const readExcel = async (filePath) => {
 const insertData = async (formattedData, tableName) => {
   const pool = await getPool2();
   const transaction = pool.transaction();
-  // console.log(tableName);
+  console.log(`tablename`,tableName);
   
   try {
     await transaction.begin();
     // ✅ Explicitly specify database and schema
+    const name = tableName.split("..").pop()
     const databaseName = "UAD_VON";
     const schemaName = "dbo"; // Replace with your schema if different
-    const fullTableName = `${databaseName}.${schemaName}.UAD_VON_SPMFeedback_9`;
+    const fullTableName = `${databaseName}.${schemaName}.${name}`;
+
+    // const fullTableName = `${databaseName}.${schemaName}.UAD_VON_SPMFeedback_9`;
+    // console.log(fullTableName);
 
     const table = new sql.Table(fullTableName); // Use fully qualified name
     table.create = false;
-
-    // 1. CORRECT COLUMN DEFINITIONS TO MATCH YOUR SCHEMA
-    // ------------------------------------------------
-    // Original schema from your database:
-    // Brandid (int, nullable)
-    // Dealerid (int, NOT NULL)
-    // Locationid (int, NOT NULL)
-    // LatestPartID (varchar(100), nullable)
-    // PreviousFBID (int, nullable)
     
-    table.columns.add('Brandid', sql.Int, { nullable: true });          // int
-    table.columns.add('Dealerid', sql.Int, { nullable: false });        // int (WAS VARCHAR)
-    table.columns.add('Locationid', sql.Int, { nullable: false });      // int (WAS VARCHAR)
-    table.columns.add('MaxValue', sql.Decimal(18, 2), { nullable: false }); // decimal (WAS INT)
-    table.columns.add('PartID', sql.Int, { nullable: false });
-    table.columns.add('LatestPartID', sql.VarChar(100), { nullable: true }); // varchar (WAS INT)
-    table.columns.add('UserID', sql.Int, { nullable: false });
-    table.columns.add('UserFBRemarkID', sql.Int, { nullable: true });
-    table.columns.add('CustomRem', sql.VarChar(50), { nullable: true }); // varchar(50)
-    table.columns.add('ProposedQty', sql.Int, { nullable: true });
-    table.columns.add('PreviousFBID', sql.Int, { nullable: true });     // int (WAS VARCHAR)
+  
+// 2) Define the 11 non-default columns, in exact ordinal order & types:
+table.columns.add('Brandid',        sql.TinyInt,      { nullable: false  });   // tinyint
+table.columns.add('Dealerid',       sql.Int,          { nullable: false });  // int
+table.columns.add('Locationid',     sql.Int,          { nullable: false });  // int
+table.columns.add('PartID',         sql.Int,          { nullable: false });  // int
+table.columns.add('LatestPartID',   sql.VarChar(100), { nullable: true  });  // varchar(100)
+table.columns.add('MaxValue',       sql.Decimal(10,2),{ nullable: false });  // decimal(10,2)
+table.columns.add('UserID',         sql.Int,          { nullable: false });  // int
+table.columns.add('UserFBRemarkID', sql.Int,          { nullable: true  });  // int
+table.columns.add('CustomRem',      sql.NVarChar(500),{ nullable: true  });  // nvarchar(500)
+table.columns.add('ProposedQty',    sql.Decimal(10,2),{ nullable: true  });  // decimal(10,2)  ← fixed!
+table.columns.add('PreviousFBID',   sql.BigInt,       { nullable: true  });  // bigint
 
-    // 2. DATA CONVERSION BEFORE INSERTION
-    // -----------------------------------
-    formattedData.forEach(row => {
-      // Convert string numbers to integers where needed
-      const convertedRow = {
-        ...row,
-        Dealerid: parseInt(row.dealerid, 10),
-        Locationid: parseInt(row.locationid, 10),
-        PreviousFBID: row.PreviousFBID ? parseInt(row.PreviousFBID, 10) : null,
-        LatestPartID: row.latestpartid ? String(row.latestpartid) : null // Handle object/null
-      };
-
-      // Validate critical fields
-      if (isNaN(convertedRow.Dealerid)) {
-        throw new Error(`Invalid Dealerid: ${row.dealerid}`);
-      }
-
-      table.rows.add(
-        convertedRow.brandid,
-        convertedRow.Dealerid,        // Now a number
-        convertedRow.Locationid,      // Now a number
-        convertedRow.maxvalue,        // Should be decimal (verify input)
-        convertedRow.partid,
-        convertedRow.LatestPartID,    // String or null
-        convertedRow.UserID,
-        convertedRow.UserFBRemarkID,
-        convertedRow.CustomRem,
-        convertedRow.ProposedQty,
-        convertedRow.PreviousFBID     // Now a number or null
-      );
-    });
+// 3) When adding rows, make sure you parse ProposedQty as a float:
+formattedData.forEach(r => {
+  table.rows.add(
+    parseInt(r.brandid,       10),
+    parseInt(r.dealerid,      10),
+    parseInt(r.locationid,    10),
+    parseInt(r.partid,        10),
+    r.latestpartid  != null ? String(r.latestpartid) : null,
+    parseFloat(r.maxvalue),
+    parseInt(r.UserID,        10),
+    r.UserFBRemarkID != null ? parseInt(r.UserFBRemarkID,10) : null,
+    r.CustomRem               || null,
+    r.ProposedQty    != null ? parseFloat(r.ProposedQty) : null, // decimal(10,2)
+    r.PreviousFBID   != null ? parseInt(r.PreviousFBID, 10) : null
+  );
+});
+console.log(formattedData);
 
     // 3. PROPER TRANSACTION HANDLING
     // ------------------------------
     const request = new sql.Request(transaction); // Use transaction, not pool
     await request.bulk(table);
     await transaction.commit();
-    // console.log('Bulk insert successful');
+    console.log('Bulk insert successful');
     return
 
   } catch (err) {
@@ -196,7 +179,8 @@ const insertData = async (formattedData, tableName) => {
     throw err; // Re-throw for upstream handling
   } 
 };
-const insertAdminFeedback = async (formattedData, brandId) => {
+
+const insertAdminFeedback = async (formattedData, brandid) => {
   const pool = await getPool2();
   const transaction = pool.transaction();
   
@@ -205,7 +189,8 @@ const insertAdminFeedback = async (formattedData, brandId) => {
         // ✅ Explicitly specify database and schema
         const databaseName = "UAD_VON";
         const schemaName = "dbo"; // Replace with your schema if different
-        const fullTableName = `${databaseName}.${schemaName}.UAD_VON_AdminFeedback_9`;
+        // const fullTableName = `${databaseName}.${schemaName}.${tableName}`;
+        const fullTableName = `${databaseName}.${schemaName}.UAD_VON_AdminFeedback_${brandid}`;
      
     // console.log(fullTableName);
     
@@ -223,8 +208,8 @@ const insertAdminFeedback = async (formattedData, brandId) => {
     // table.columns.add('AdminFBDate', sql.DateTime, { nullable: true });
     table.columns.add('PreviousAdminFBID', sql.BigInt, { nullable: true });
     table.columns.add('CustomRem', sql.NVarChar(255), { nullable: true });
-
-    // Process each feedback item
+    
+    // Process each feedback item    
     formattedData.forEach(item => {
       const convertedRow = {
         Brandid: parseInt(item.brandid, 10),
@@ -260,9 +245,28 @@ const insertAdminFeedback = async (formattedData, brandId) => {
 
     const request = new sql.Request(transaction);
     await request.bulk(table);
+
+        // After bulk insert, retrieve the inserted AdminFBID values
+    const feedbackIds = formattedData.map(item => item.feedbackid); // or another unique identifier for feedback
+    const query = `
+      SELECT FeedbackID, AdminFBID 
+      FROM ${fullTableName} 
+      WHERE FeedbackID IN (${feedbackIds.join(', ')})
+    `;
+    const result = await request.query(query);
+
+    // You can now associate AdminFBID with each row
+    const insertedIds = result.recordset.map(row => ({
+      FeedbackID: row.FeedbackID,
+      AdminFBID: row.AdminFBID
+    }));
+
+ // Extract AdminFBID values and join them into a string
+const FeedbackIDs = insertedIds.map(item => item.FeedbackID).join(',');
+
     await transaction.commit();
     console.log('Admin feedback inserted successfully');
-    return { success: true, insertedCount: formattedData.length };
+    return { success: true, insertedCount: formattedData.length ,feedbackIds:FeedbackIDs};
 
   } catch (err) {
     console.error('Error during admin feedback insert:', err);
@@ -270,6 +274,7 @@ const insertAdminFeedback = async (formattedData, brandId) => {
     throw err;
   }
 };
+
 function findLocationPartidDuplicates(data) {
   const seen = new Map();
   const duplicates = [];
