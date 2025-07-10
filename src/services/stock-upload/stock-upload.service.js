@@ -280,7 +280,7 @@ const stockUploadSingleLocation = async (req, res) => {
     .input("locationID", locationId)
     .input("formattedDate", now)
     .input("addedBy", addedBy)
-    .query(`USE [z_scope]; INSERT INTO currentStock1(locationID, stockdate, addedby,AddedDate) OUTPUT inserted.tcode VALUES(@locationID, @formattedDate, @addedBy,@formattedDate)`);
+    .query(`USE [z_scope]; INSERT INTO currentStock1(locationID, stockdate, addedby,AddedDate) OUTPUT inserted.tcode VALUES(@locationID, @formattedDate, @addedBy,CAST(getdate() as smalldatetime))`);
 
   const newTcode = insertedStock.tcode;
 
@@ -1059,7 +1059,7 @@ const combinedData = updatedFilteredRowData1.map(item => {
           
         }
       if(updatedFilteredRowData2.length>0){
-      let insertQueryForCurrentStock1 = `use [z_scope] insert into currentStock1(locationID,stockdate,addedby,AddedDate) output inserted.tcode values(@locationID,@formattedDate,@addedBy,@formattedDate)`;
+      let insertQueryForCurrentStock1 = `use [z_scope] insert into currentStock1(locationID,stockdate,addedby,AddedDate) output inserted.tcode values(@locationID,@formattedDate,@addedBy,CAST(getdate() as smalldatetime))`;
 
       const result1 = await pool
         .request()
