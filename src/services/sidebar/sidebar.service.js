@@ -31,9 +31,9 @@ import { getPool1, getPool2 } from "../../db/db.js";
 
             const result=await pool.request().input('roleId',roleId).query(query);
             //console.log("------",result.recordset)
-            let combinedData=[{modules:result.recordset,profile:vcphoto}]
+            let combinedData={modules:result.recordset,profile:vcphoto};
             //console.log("combinedData ",combinedData)
-            return combinedData;
+            return {modules:result.recordset,profile:vcphoto};
         }
         catch(error){
            // console.log("error in siderbar service ",error)
