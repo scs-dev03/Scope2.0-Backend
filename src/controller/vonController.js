@@ -734,10 +734,10 @@ const dealerUpload = async (req, res) => {
         
         const partidpartnumbermapping = [];
 
-        const query = `select distinct  partid , partnumber from z_scope..Stockable_Nonstockable_TD001_${dealerid} where Locationid = ${locationid}`;
+        const query = `select  partid , partnumber from z_scope..Stockable_Nonstockable_TD001_${dealerid} where Locationid = ${locationid} and Stockdate = (select MAX(stockdate) from Stockable_Nonstockable_TD001_${dealerid})`;
         
         const partidpartnumberresult = await pool.request().query(query);
-        console.log(partidpartnumberresult);
+        // console.log(partidpartnumberresult);
         
         
         if (partidpartnumberresult.recordset.length > 0) {
@@ -819,7 +819,7 @@ const dealerUpload = async (req, res) => {
 
         // Get location IDs for each distinct location
         const locationResults = [];
-
+        let locResult   
         for (const loc of distinctLocations) {
             const queryLocation = `
     SELECT locationid 
@@ -828,7 +828,7 @@ const dealerUpload = async (req, res) => {
       AND dealerid = '${dealerid}'
       AND location LIKE '${loc}'
   `;
-            const locResult = await pool.request().query(queryLocation);
+             locResult = await pool.request().query(queryLocation);
             if (locResult.recordset.length) {
                 locationResults.push({
                     location: loc,
@@ -841,20 +841,65 @@ const dealerUpload = async (req, res) => {
         // console.log(locationResults[0].locationid);
 
 
+        // console.log(locResult.recordset[0].locationid);
         const latestPartIDs = [];
-
-        const queryLatestPartID = `SELECT partid, subpartid FROM z_scope..Substitution_Master WHERE brandid = ${brandResults[0].brandid}`;
+        
+        // const queryLatestPartID = `SELECT partid, subpartid FROM z_scope..Substitution_Master WHERE brandid = ${brandResults[0].brandid}`;
+        // const queryLatestPartID = `
+        // select partid , partnumber1
+        // from Part_Master where partnumber1 in (
+        // select (CASE 
+        // WHEN sn.partnumber1 = sm.partnumber1 THEN sm.subpartnumber ELSE sn.partnumber END) AS LatestPartno from Stockable_Nonstockable_TD001_${dealerResults[0].dealerid} sn
+        // join LocationInfo li on li.LocationID = sn.Locationid
+        // left join Substitution_Master sm on sm.partnumber1 = sn.partnumber1 and li.BrandID = sm.brandid
+        // where sn.Stockdate = (select MAX(Stockdate) from Stockable_Nonstockable_TD001_${dealerResults[0].dealerid}) and sn.Locationid = ${locResult.recordset[0].locationid}) and brandid = ${brandResults[0].brandid}`
+        
+        const queryLatestPartID = `
+        WITH LatestParts AS (
+  SELECT
+    sn.partnumber1,
+    COALESCE(sm.subpartnumber, sn.partnumber1) AS LatestPartno,
+    li.BrandID
+  FROM Stockable_Nonstockable_TD001_${dealerResults[0].dealerid} AS sn
+  JOIN LocationInfo     AS li
+    ON li.LocationID = sn.LocationID
+  LEFT JOIN Substitution_Master AS sm
+    ON sm.partnumber1 = sn.partnumber1
+   AND sm.brandid     = li.BrandID
+  WHERE sn.Stockdate = (
+          SELECT MAX(Stockdate)
+            FROM Stockable_Nonstockable_TD001_${dealerResults[0].dealerid}
+        )
+    AND sn.LocationID = ${locResult.recordset[0].locationid}
+)
+SELECT
+  lp.partnumber1,
+  pm1.partid    AS PartID,
+  lp.LatestPartno,
+  pm2.partid    AS LatestPartID
+FROM LatestParts AS lp
+-- join to get the original PartID
+JOIN Part_Master AS pm1
+  ON pm1.brandid      = lp.BrandID
+ AND pm1.partnumber1  = lp.partnumber1
+-- join to get the substituted/latest PartID
+LEFT JOIN Part_Master AS pm2
+  ON pm2.brandid      = lp.BrandID
+ AND pm2.partnumber1  = lp.LatestPartno;
+        `
         const queryResult = await pool.request().query(queryLatestPartID);
+        // console.log(queryResult);
 
         if (queryResult.recordset.length) {
             queryResult.recordset.forEach(row => {
                 latestPartIDs.push({
-                    Partid: row.partid,       // Mapping partid correctly
-                    LatestPartID: row.subpartid // Mapping subpartid correctly
+                    Partid: row.PartID,       // Mapping partid correctly
+                    LatestPartID: row.LatestPartID // Mapping subpartid correctly
                 });
             });
         }
-
+        // console.log(latestPartIDs);
+        
         // Inside "Get previousFBIDs" section
         const previousFBIDs = [];
 
@@ -915,9 +960,6 @@ const dealerUpload = async (req, res) => {
         }
 
         // console.log(maxValueMapping);
-
-
-
 
         // console.log("PreviousFBIDs:", previousFBIDs);
         const UserID = addedby; 
