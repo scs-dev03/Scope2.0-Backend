@@ -117,8 +117,8 @@ const connectDB = async () => {
         pool1 = await new sql.ConnectionPool(config1).connect();
         console.log(`Connected to DB1: ${process.env.SERVER1} using ${process.env.USER1}`);
 
-        pool2 = await new sql.ConnectionPool(config2).connect();
-        console.log(`Connected to DB2: ${process.env.SERVER2} using ${process.env.USER2}`);
+        pool2 = await new sql.ConnectionPool(config1).connect();
+        console.log(`Connected to DB2: ${process.env.SERVER1} using ${process.env.USER1}`);
 
         // pool3 = await new sql.ConnectionPool(config3).connect();
         // console.log(`Connected to DB3: ${process.env.SERVER3} using ${process.env.USER3}`);

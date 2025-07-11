@@ -345,8 +345,8 @@ const stockUploadSingleLocation = async (req, res) => {
       parseInt(validPartID)
     );
   } catch (e) {
-    console.error(`🚨 Failed on row ${i}:`, row);
-    console.error("❌ Error while adding row:", e);
+    console.error(`🚨 Failed on row ${i}:`, row,e);
+   // console.error("❌ Error while adding row:", e);
   }
   // stockTable.rows.add(BigInt(newTcode), String(row.part_number), validQty, validFreeStockQty, validPartID);
   });
