@@ -70,8 +70,13 @@ const config2 = {
         enableArithAbort: true,
         trustServerCertificate: true,
     },
+      pool: {
+    max: 10,               // up to 10 connections
+    min: 0,                // no minimum
+    idleTimeoutMillis: 36000000 // keep idle connections 10hr
+  },
     requestTimeout: 6000000,
-    connectionTimeout: 300000000,
+    connectionTimeout: 30000,
 };
 
 const config3 = {
@@ -105,7 +110,7 @@ const config4 = {
     connectionTimeout: 30000,
 };
 
-let pool1, pool2 , pool3,leadTimePool;
+let pool1, pool2 , pool3,leadTimePool , pool4;
 
 const connectDB = async () => {
     try {
@@ -117,6 +122,8 @@ const connectDB = async () => {
 
         // pool3 = await new sql.ConnectionPool(config3).connect();
         // console.log(`Connected to DB3: ${process.env.SERVER3} using ${process.env.USER3}`);
+        pool4 = await new sql.ConnectionPool(config2).connect()
+        console.log(`Ds Connected to Live: ${process.env.SERVER2} using ${process.env.USER2}`);
 
         leadTimePool=await new sql.ConnectionPool(config4).connect();
          console.log(`Connected to ${process.env.DATABASE4}: ${process.env.SERVER2} using ${process.env.USER2}`);
@@ -136,9 +143,9 @@ const getPool2 = () => {
     return pool2;
 };
 
-const getPool3 = () => {
-    if (!pool3) throw new Error("DB3 not connected");
-    return pool3;
+const DSpool = () => {
+    if (!pool4) throw new Error("DB3 not connected");
+    return pool4;
 };
 
 const getLeadTimePool=()=>{
@@ -152,4 +159,4 @@ const getLeadTimePool=()=>{
 // getPool2 -> for Live Connection
 // getPool3 -> for OGS Server Connection
 
-export { connectDB, getPool1, getPool2 ,getLeadTimePool };
+export { connectDB, getPool1, getPool2 ,getLeadTimePool ,DSpool };

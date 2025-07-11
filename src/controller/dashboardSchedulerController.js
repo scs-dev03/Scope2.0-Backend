@@ -1,12 +1,15 @@
 import sql from 'mssql'
 import cron from 'node-cron'
-import {getPool2} from '../db/db.js'
+import {DSpool} from '../db/db.js'
 import {dataValidator,checkisAlreadyScheduled,checkisUserValid, checkisMappingExists,checkGroupSetting} from '../utils/dashboardscheduleHelper.js'
 import {refreshBenchmarking, refreshPPNI, refreshSI, refreshTOPS, refreshCID, refreshSpecialList, refreshGainerMini} from '../utils/refreshDashboard.js'
 
+
+// const pool = await DSpool()
+
 const getBrandByUser = async (req, res) => {
   try {
-    const pool = await getPool2();
+    const pool = await DSpool();
     const { userid } = req.body;
     if(!userid){
       return res.status(400).json({
@@ -29,7 +32,7 @@ const getBrandByUser = async (req, res) => {
 };
 
 const getDealerByUser = async(req,res)=>{
-const pool = await getPool2()
+const pool = await DSpool()
 const {userid,brandid} = req.body
 if(!userid || !brandid){
   return res.status(400).json({
@@ -46,7 +49,7 @@ const result = await pool.request().query(query)
   })
 }
 const getDashboardbyDealer = async(req,res)=>{
-  const pool = await getPool2();
+  const pool = await DSpool();
   const {dealerid} = req.body
 try {  
     const query = ` use [z_scope]
@@ -177,7 +180,7 @@ if(error.message=== `Invalid object name'DB_DashboardMaster'.`){
 //     }
 // };
 const uploadSchedule = async (req, res) => {
-  const pool =await  getPool2();
+  const pool =await  DSpool();
   try {
     const {dashboardcodes, brandid, brand, dealer, dealerid, scheduledon, addedby } = req.body;    
      // Validate other required fields
@@ -286,7 +289,7 @@ const uploadSchedule = async (req, res) => {
   }
 };
 const getBDM = async(req,res)=>{
-  const pool = await getPool2()
+  const pool = await DSpool()
 try {
     // const {bigint_pk} = req.body
     // const query = `use [z_scope] select bintId_Pk, vcFirstName , vcLastName from AdminMaster_GEN where isBDM = 'y' and bintId_Pk = @bigint_pk`
@@ -310,7 +313,7 @@ const getRequests = async (req, res) => {
     }
 };  
 const editSchedule = async (req, res) => {
-  const pool = await getPool2();
+  const pool = await DSpool();
   try {
     const { reqid, bintid_pk, scheduledon } = req.body;
 
@@ -388,7 +391,7 @@ const editSchedule = async (req, res) => {
 };
 const deleteReq = async(req,res)=>{
 try {
-    const pool = await getPool2()
+    const pool = await DSpool()
   const {reqid,bintid_pk} = req.body
   if(!reqid , !bintid_pk){
     return res.status(401).json({details:'reqid and userid is required in this request'})
@@ -405,7 +408,7 @@ try {
 
 // const fetchRequests = async (userid) => {
 //   try {
-//     const pool = await getPool2();
+//     const pool = await DSpool();
 //     let usertype
 
 //      const usertypeQuery  = `select isBDM , Designation from z_scope..adminmaster_gen where bintid_pk = ${userid}`
@@ -472,7 +475,7 @@ try {
 
 const fetchRequests = async (userid) => {
   try {
-    const pool = await getPool2();
+    const pool = await DSpool();
     let usertype;
 
     // 🔍 Step 1: Determine user type (BDM or Admin)
@@ -545,7 +548,7 @@ const fetchRequests = async (userid) => {
 
 const changeLog = async(req,res)=>{
 try {
-    const pool = await getPool2()
+    const pool = await DSpool()
     const {dashboardcode , workspaceid , refbrandid , refdealerid ,changeby , requestby , requeston , url , remarks} = req.body
     if(!dashboardcode || !workspaceid || !refbrandid || !refdealerid || !changeby || !requestby || !requeston || !url || !remarks){
       return res.status(400).json({message:`All fields are required`})
@@ -571,7 +574,7 @@ try {
 }
 const changelogView = async(req,res)=>{
     try {
-      const pool  = await getPool2()
+      const pool  = await DSpool()
       const query = ` use [UAD_BI]
                       SELECT DISTINCT dm.Dashboard,  wm.Workspace,  li.Brand,  li.Dealer,  CONCAT(adm.vcFirstName, ' ', adm.vcLastName) AS ChangedBy,   cl.ChangedOn, am.Name AS RequestedBy,   cl.RequestOn,   cl.Url , cl.remarks 
                       FROM SBS_DBS_ChangeLog cl  
@@ -591,7 +594,7 @@ const changelogView = async(req,res)=>{
   }
 const newDashboardSchedule = async (req, res) => {
   try {
-    const pool = await getPool2();
+    const pool = await DSpool();
     const { brandid, brand, dealer, dealerid, dashboardcodes, scheduledon, addedby } = req.body;
 
     // Validate required fields
@@ -709,7 +712,7 @@ const newDashboardSchedule = async (req, res) => {
 };
 const requestNewDashboard = async (req,res)=>{
  try {
-   const pool = await getPool2()
+   const pool = await DSpool()
    const {dealerid} = req.body
    const query = `select tcode , Dashboard from z_scope.dbo.DB_DashboardMaster where tcode not in (
                    select dm.tCode  from DB_DashboardLocMapping dlm                  
@@ -727,7 +730,7 @@ const requestNewDashboard = async (req,res)=>{
 }
 const requestBy = async(req,res)=>{
   try {
-    const pool = await getPool2()
+    const pool = await DSpool()
     const query = `select * from UAD_BI..SBS_DBS_AdminMaster`
     const result = await pool.request().query(query)
     res.status(200).json({Data:result.recordset})
@@ -738,7 +741,7 @@ const requestBy = async(req,res)=>{
 }
 const newDashboardView = async(req,res)=>{
 try {
-    const pool = await getPool2()
+    const pool = await DSpool()
     const query = `use [UAD_BI] select distinct  nrt.id,  li.brand , li.dealer , dm.dashboard ,concat(amg.vcFirstName,' ',amg.vcLastName) as Addedby,nrt.addedon  from UAD_BI..SBS_DBS_newrequesttracker nrt
                     join locationinfo li on li.DealerID = nrt.dealerid and li.BrandID = nrt.brandid
                     join z_scope.dbo.DB_DashboardMaster dm on dm.tcode = nrt.dashboardcode 
@@ -751,11 +754,11 @@ try {
 }
 }
 //  '0,30 0-9 * * *'  for every 30 minutes interval between 12 midnight to 9 am 
-function scheduleTask() {
-  cron.schedule('*/15 * * * *', async () => { 
+async function scheduleTask() {
+  // cron.schedule('*/15 * * * *', async () => { 
     console.log("Running scheduler every 15 minutes")
     try {
-      const pool = await getPool2()
+      const pool = await DSpool()
       // Fetch tasks to be executed (status = 0 means pending)
       const query = `use [UAD_BI]
                      SELECT TOP 5  reqid, dashboardcode, brand, brandid, dealer, dealerid, scheduledon
@@ -805,11 +808,11 @@ function scheduleTask() {
     } catch (error) {
       console.error("Error processing scheduled tasks:", error.message)
     }
-  })
+  // })
 }
 const countView =  async(req,res)=>{
   try {
-    const pool = await getPool2()
+    const pool = await DSpool()
     const query =`SELECT 
       COUNT(reqid) AS Total,
       SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) AS InProgress,
@@ -826,7 +829,7 @@ const countView =  async(req,res)=>{
 }
 const statusTimelime = async(req,res)=>{
   try {
-    const pool = await getPool2()
+    const pool = await DSpool()
     const {reqid} = req.body
     if(!reqid){
       return res.status(400).send(`Reqid is Required`)
@@ -875,7 +878,7 @@ const statusTimelime = async(req,res)=>{
 //   cron.schedule('*/30 * * * *', async () => { 
 //     console.log("Running SI scheduler every 30 minutes")
 //     try {
-//       const pool = await getPool2()
+//       const pool = await DSpool()
 //       // Fetch tasks to be executed (status = 0 means pending)
 //       const query = `use [UAD_BI]
 //                      SELECT TOP 1  reqid, dashboardcode, brand, brandid, dealer, dealerid, scheduledon
@@ -912,12 +915,12 @@ const statusTimelime = async(req,res)=>{
 //     }
 //   })
 // }
-function siRefresh() {
+async function siRefresh() {
   cron.schedule('*/30 * * * *', async () => { 
     console.log("Running SI scheduler every 30 minutes");
 
     try {
-      const pool = await getPool2();
+      const pool = await DSpool();
       const query = `
         use [UAD_BI]
         SELECT TOP 1 reqid, dashboardcode, brand, brandid, dealer, dealerid, scheduledon
