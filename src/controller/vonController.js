@@ -257,7 +257,8 @@ const viewLog = async (req, res) => {
             WHEN rmm.Remark = 'Custom' THEN af.Customrem 
             ELSE rmm.Remark 
         END AS AdminRemark, af.ApprovedQty, 
-        af.AdminFBDate, sf.Status
+        af.AdminFBDate, sf.Status ,
+         af.adminid , CONCAT(amg.vcFirstName, ' ',amg.vcLastName)as updatedby
     FROM ${spmdynamicTable} sf
     JOIN z_scope..part_master pm 
         ON pm.brandid = sf.Brandid AND pm.partid = sf.partid
@@ -269,6 +270,8 @@ const viewLog = async (req, res) => {
         ON li.LocationID = sf.Locationid
     JOIN UAD_VON..UAD_VON_Remarksmaster rm 
         ON rm.Remarkid = sf.UserFBRemarkID 
+    join z_scope..AdminMaster_GEN amg
+		ON amg.bintId_Pk = af.adminid
     WHERE sf.Dealerid = @dealerid
     AND (@LocationID IS NULL OR sf.locationid = @LocationID)
     AND (@PartID IS NULL OR pm.partid = @PartID);
@@ -439,7 +442,7 @@ const partFamily = async (req, res) => {
                         SELECT DISTINCT
                             sm.SubPartNumber1,
                             sm.BrandID
-                        FROM Substitution_Master AS sm
+                        FROM z_scope..Substitution_Master AS sm
                         JOIN #PartFamily AS f
                           ON sm.PartNumber1 = f.Part
                          AND sm.BrandID    = f.BrandID
@@ -455,7 +458,7 @@ const partFamily = async (req, res) => {
                         SELECT DISTINCT
                             sm.PartNumber1,
                             sm.BrandID
-                        FROM Substitution_Master AS sm
+                        FROM z_scope..Substitution_Master AS sm
                         JOIN #PartFamily AS f
                           ON sm.SubPartNumber1 = f.Part
                          AND sm.BrandID        = f.BrandID
@@ -480,11 +483,11 @@ const partFamily = async (req, res) => {
                         pm.Category,
                         pm.MOQ,
                         pm.BrandID
-                    FROM Part_Master pm
+                    FROM z_scope..Part_Master pm
                     JOIN #PartFamily pf
                       ON pm.PartNumber1 = pf.Part
                      AND pm.BrandID     = pf.BrandID
-					 JOIN Substitution_Master sm 
+					 JOIN z_scope..Substitution_Master sm 
 					 on pf.BrandID = sm.brandid
 					 and pf.part = sm.partnumber1
                     ORDER BY pm.PartNumber1, pm.BrandID;

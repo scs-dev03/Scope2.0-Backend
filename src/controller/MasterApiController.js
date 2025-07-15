@@ -348,24 +348,35 @@ const homePageData = async (req, res) => {
       const pool = await getPool2();
   
       // Define all static queries
-      const stockquery = `SELECT SUM(qty) AS StockQty, AddedDate FROM [z_scope].dbo.CurrentStock1 cs1
+      // const stockquery = `SELECT SUM(qty) AS StockQty, AddedDate FROM [z_scope].dbo.CurrentStock1 cs1
+      //                     JOIN CurrentStock2 cs2 ON cs1.tCode = cs2.StockCode
+      //                     WHERE LocationID = ${locationId}
+      //                     GROUP BY AddedDate`;
+      
+      const stockquery = ` use [z_scope]
+                          SELECT SUM(qty) AS StockQty, AddedDate FROM [z_scope].dbo.CurrentStock1 cs1
                           JOIN CurrentStock2 cs2 ON cs1.tCode = cs2.StockCode
-                          WHERE LocationID = ${locationId}
-                          GROUP BY AddedDate`;
-  
+                          join LocationInfo li on cs1.LocationID = li.LocationID
+                          join Part_Master pm on pm.brandid = li.brandid and cs2.PartNumber = pm.partnumber1
+                          WHERE cs1.LocationID = ${locationId} and pm.PartTypeID = 1 --Sparepart
+                          GROUP BY AddedDate`
+
       const stockvaluequery = `SELECT SUM((cs2.Qty * pm.landedcost)) AS stockvalue FROM [z_scope].dbo.CurrentStock1 cs1
                                JOIN [z_scope].dbo.CurrentStock2 cs2 ON cs2.StockCode = cs1.tCode
                                JOIN [z_scope].dbo.locationinfo li ON li.LocationID = cs1.LocationID
                                JOIN [z_scope].dbo.Part_Master pm ON pm.brandid = li.BrandID AND cs2.PartNumber = pm.partnumber
-                               WHERE cs1.locationid = ${locationId}`;
+                               WHERE cs1.locationid = ${locationId} and pm.PartTypeID = 1`;
   
-      const ppnivaluequery = `SELECT SUM(PPNI_Val) AS PPNIValue FROM [UAD_BI_PPNI].dbo.PPNI_report_${dealerid}
-                              WHERE locationid = ${locationId}`;
+      const ppnivaluequery = `SELECT SUM(PPNI_Val) AS PPNIValue FROM [UAD_BI_PPNI].dbo.PPNI_report_${dealerid} ppni
+                              join z_scope..LocationInfo li on ppni.LocationID = li.LocationID
+                              join z_scope..Part_Master pm on pm.brandid = li.brandid and ppni.PartNumber = pm.partnumber1
+                              WHERE ppni.locationid = ${locationId} and pm.PartTypeID = 1`;
   
-      const snstockvaluequery = `WITH LatestSN AS (
-                                  SELECT * FROM stockable_nonstockable_td001_${dealerid}
-                                  WHERE locationid = ${locationId}
-                                  AND stockdate = (SELECT MAX(stockdate) FROM stockable_nonstockable_td001_${dealerid} WHERE locationid = ${locationId})
+      const snstockvaluequery = `use [z_scope] ;WITH LatestSN AS (
+                                  SELECT sn.partnumber1 , sn.Locationid , sn.Maxvalue FROM stockable_nonstockable_td001_${dealerid} sn
+								                  join Part_Master pm on pm.brandid = sn.Brandid and sn.partnumber1 = pm.partnumber1 
+                                  WHERE sn.locationid = ${locationId} and pm.PartTypeID = 1
+                                  AND sn.stockdate = (SELECT MAX(stockdate) FROM stockable_nonstockable_td001_${dealerid} WHERE locationid = ${locationId})
                                 )
                                 SELECT  
                                     SUM(CASE WHEN sn.MaxValue IS NULL OR sn.MaxValue = 0 THEN 1 ELSE 0 END) AS NonStockable,
@@ -435,9 +446,8 @@ const homePageData = async (req, res) => {
         SELECT ' + @SumColumns + '
         FROM ' + @Dealerold + ' ds
         JOIN [z_scope].dbo.LocationInfo li ON li.LocationID = ds.LocationId
-        LEFT JOIN [z_scope].dbo.part_master pm ON pm.brandid = li.BrandID AND ds.PartNumber1 = pm.partnumber1
+        LEFT JOIN [z_scope].dbo.part_master pm ON pm.brandid = li.BrandID AND ds.PartNumber1 = pm.partnumber1 and pm.parttypeid = 1
         WHERE li.locationid = ${locationId}';
-  
         EXEC sp_executesql @sql;
       `;
   
@@ -474,40 +484,45 @@ const latestDates = async (req, res) => {
       return res.status(400).json({ message: 'Invalid dealerid' });
     }
 
-    const tableName = `ppni_report_${dealerid}`;
+    // const tableName = `ppni_report_${dealerid}`;
 
+    // const query = `
+    //   USE [UAD_BI_PPNI];
+
+    //   WITH latest_stock_date AS (
+    //     SELECT TOP 1 latest_stock_date FROM ${tableName}
+    //     WHERE locationid = @locationid
+    //     ORDER BY latest_stock_date DESC
+    //   ),
+    //   latest_jobline AS (
+    //     SELECT TOP 1 Joblineclosedate FROM ${tableName}
+    //     WHERE locationid = @locationid
+    //     ORDER BY Joblineclosedate DESC
+    //   ),
+    //   latest_jobcard AS (
+    //     SELECT TOP 1 Jobcardclosedate FROM ${tableName}
+    //     WHERE locationid = @locationid
+    //     ORDER BY Jobcardclosedate DESC
+    //   )
+
+    //   SELECT 'stock' AS source, latest_stock_date AS latest_date FROM latest_stock_date
+    //   UNION
+    //   SELECT 'jobline' AS source, Joblineclosedate AS latest_date FROM latest_jobline
+    //   UNION
+    //   SELECT 'jobcard' AS source, Jobcardclosedate AS latest_date FROM latest_jobcard;
+    // `;
     const query = `
-      USE [UAD_BI_PPNI];
-
-      WITH latest_stock_date AS (
-        SELECT TOP 1 latest_stock_date FROM ${tableName}
-        WHERE locationid = @locationid
-        ORDER BY latest_stock_date DESC
-      ),
-      latest_jobline AS (
-        SELECT TOP 1 Joblineclosedate FROM ${tableName}
-        WHERE locationid = @locationid
-        ORDER BY Joblineclosedate DESC
-      ),
-      latest_jobcard AS (
-        SELECT TOP 1 Jobcardclosedate FROM ${tableName}
-        WHERE locationid = @locationid
-        ORDER BY Jobcardclosedate DESC
-      )
-
-      SELECT 'stock' AS source, latest_stock_date AS latest_date FROM latest_stock_date
-      UNION
-      SELECT 'jobline' AS source, Joblineclosedate AS latest_date FROM latest_jobline
-      UNION
-      SELECT 'jobcard' AS source, Jobcardclosedate AS latest_date FROM latest_jobcard;
-    `;
-
+      select MAX(stockdate)as StockDate from z_scope..stock_upload_spm_td001_${dealerid} where locationid = ${locationid}
+      select MAX(joblineclosedate)as JoblineCloseDate from z_scope..create_order_request_td001_${dealerid} where locationid = ${locationid}
+      select MAX(final_close_date)as JobCardCloseDate from z_scope..create_order_request_td001_${dealerid} where locationid = ${locationid}
+    `
     const result = await pool.request()
       .input('locationid', sql.Int, locationid)
       .query(query);
-
+    // console.log(result.recordsets);
+    
     res.status(200).json({
-      Data: result.recordset
+     Data:result.recordsets
     });
 
   } catch (error) {
