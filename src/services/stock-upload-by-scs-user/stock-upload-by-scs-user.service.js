@@ -510,11 +510,11 @@ import xlsx from "xlsx";
 const singleUploadStockInService = async (req, res) => {
 
   const pool = await getPool2();
-    let locationId = req.body.location_id;
-    let addedBy = req.body.user_id;
+    let locationId = parseInt(req.body.location_id,10);
+    let addedBy = parseInt(req.body.user_id,10);
     let rowData;
     let brandId = parseInt(req.body.brand_id,10);
-    let dealerId = req.body.dealer_id;
+    let dealerId = parseInt(req.body.dealer_id,10);
     let date = req.body.date;
     const date1 = new Date(date);
     const formattedDate = date1.toLocaleDateString('en-CA');
@@ -585,8 +585,9 @@ let isOlderUploadForHyundai=false;
   
   if (requiredBrandIds.includes(brandId)) {
       const requiredFields = ["availability", "status"];
+     // console.log("normalized header ",normalizedHeaders,requiredFields)
       const hasRequiredFields = requiredFields.every(field => normalizedHeaders.includes(field));
-  
+     // console.log("has required fields ",hasRequiredFields)
       if (!hasRequiredFields) {
           return { headerNotPresent: true };
       }
@@ -601,8 +602,6 @@ let isOlderUploadForHyundai=false;
     }
   }
 
-
-  
   // Return false if general validation fails
   if (!isValid) {
       return { headerNotPresent: true };
@@ -610,20 +609,6 @@ let isOlderUploadForHyundai=false;
 
  // console.log("mapping ",mappedData)
 
-  // 5. Format data
-  // const normalizedData = rowDataArray.map(row => {
-  //   const getVal = (key) => {
-  //     const match = Object.keys(row).find(k => k.toLowerCase() == key.toLowerCase());
-  //     return match ? row[match]?.toString().trim() : "";
-  //   };
-
-  //   return {
-  //     part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),
-  //     qty: parseFloat(getVal(mappedData.stock_qty)) || 0,
-  //     availability: getVal("availability"),
-  //     status: getVal("status")
-  //   };
-  // });
 
  // console.log("headers not present",headerNotPresent);
 
@@ -696,18 +681,6 @@ if (missingFields.length > 0) {
   
   
 //  console.log("normalized data ",normalizedData)
-
-  // 6. Filter data by brand-specific rules
-  // const filteredData = normalizedData.filter(row => {
-  //   const hasPart = !!row.part_number;
-  //   const hasQty = row.qty > 0;
-  //   const avail = row.availability.toLowerCase();
-  //   const status = row.status.toLowerCase();
-
-  //   if ([17, 28].includes(brandId)) return hasPart && hasQty && avail === "on hand" && status === "good";
-  //   if (brandId === 22) return hasPart && hasQty && avail === "on hand";
-  //   return hasPart && hasQty;
-  // });
   let filteredData = normalizedData.filter((row) => {
     const stockQty = parseFloat(row.qty);
     const hasPartNumber = row.part_number && row.part_number.trim() !== "" && row.part_number!=0;
@@ -785,9 +758,9 @@ if (missingFields.length > 0) {
   // 11. Check for previous stock for location
   const prevStock = await pool.request()
     .input("locationId", locationId)
-    .query(`USE [z_scope]; SELECT tcode FROM currentStock1 WHERE locationId=@locationId`);
+    .query(`USE [z_scope]; SELECT tcode,stockDate FROM currentStock1 WHERE locationId=@locationId`);
   const oldTcode = prevStock.recordset[0]?.tcode || null;
-
+  const previousStockDate=prevStock.recordset[0]?.stockDate;
   let prevQtySum = 0;
   let prevRecordCount = 0;
 
@@ -803,14 +776,14 @@ if (missingFields.length > 0) {
     ).recordset[0]?.QuantSum || 0;
 
     // Merge existing items into deduped list
-    const existingMap = new Map(deduped.map(i => [i.partId, i]));
-    for (const item of prevItems) {
-      if (!existingMap.has(item.partID)) {
-        deduped.push({ part_number: item.partNumber, qty: item.qty, partId: item.partID });
-      } else {
-        existingMap.get(item.partID).qty += item.qty;
-      }
-    }
+    // const existingMap = new Map(deduped.map(i => [i.partId, i]));
+    // for (const item of prevItems) {
+    //   if (!existingMap.has(item.partID)) {
+    //     deduped.push({ part_number: item.partNumber, qty: item.qty, partId: item.partID });
+    //   } else {
+    //     existingMap.get(item.partID).qty += item.qty;
+    //   }
+    // }
   }
 
    // 16. Delete old stock entries
@@ -829,7 +802,17 @@ if (missingFields.length > 0) {
   const newTcode = insertedStock.tcode;
    //  console.log("depued data ",deduped)
   // 13. Bulk insert unknown parts
-  if (unknownParts.length) {
+   if(existingUnmatchedParts.length!=0 && unknownParts.length==0){
+   // console.log("exsited ",unknownParts.length)
+     const table = new sql.Table("part_not_in_master");
+    table.columns.add("brand_id", sql.Int);
+    table.columns.add("partnumber", sql.VarChar(100));
+    existingUnmatchedParts.forEach(p => table.rows.add(brandId, p));
+    await pool.request().bulk(table);
+  }
+  else
+  if (unknownParts.length!=0) {
+    await pool.request().query('use z_scope')
     const table = new sql.Table("part_not_in_master");
     table.columns.add("brand_id", sql.Int);
     table.columns.add("partnumber", sql.VarChar(100));
@@ -840,7 +823,7 @@ if (missingFields.length > 0) {
   // 14. Bulk insert to currentStock2
   if(deduped.length){
 
-  
+   await pool.request().query('use z_scope')
   const stockTable = new sql.Table("currentStock2");
   stockTable.columns.add("StockCode", sql.BigInt,{nullable:false});
   stockTable.columns.add("PartNumber", sql.VarChar(35),{nullable:false});
@@ -853,12 +836,59 @@ if (missingFields.length > 0) {
   
   } )
   await pool.request().bulk(stockTable);
+
+  //Bulk Inser in stock_upload_spm_td001_{dealerid}
+
+ if (formattedDate < formattedToday){
+   await pool.request().query('use z_scope')
+   const tableName = `stock_upload_spm_td001_${dealerId}`;
+    const spmTable = new sql.Table(tableName);
+    spmTable.create = false
+  spmTable.columns.add("Dealerid", sql.Int,{nullable:false});
+  spmTable.columns.add("Brandid", sql.Int,{nullable:false});
+  spmTable.columns.add("Locationid", sql.Int,{nullable:false});
+  spmTable.columns.add("Userid", sql.Int,{nullable:false});
+    spmTable.columns.add("Partnumber", sql.NVarChar(50),{nullable:true});
+      spmTable.columns.add("Partnumber1", sql.NVarChar(50),{nullable:true});
+        spmTable.columns.add("Qty", sql.Decimal(18,2),{nullable:false});
+          spmTable.columns.add("Stockdate", sql.DateTime,{nullable:false});
+            spmTable.columns.add("Dateadded", sql.DateTime,{nullable:false});
+              spmTable.columns.add("PartId", sql.Int,{nullable:true});
+  deduped.forEach(row => {
+    const rawPartId = row.partId;
+      const safePartId = rawPartId && !isNaN(rawPartId) ? parseInt(rawPartId, 10) : 0;
+      spmTable.rows.add(
+        parseInt(dealerId), 
+         parseInt(brandId), 
+          parseInt(locationId), 
+           parseInt(addedBy), 
+      String(row.part_number),
+      String(row.part_number), 
+      parseFloat(row.qty), 
+      formattedDate,
+      new Date(),
+      safePartId)
+  } )
+  await pool.request().bulk(spmTable);
+
+  await updateMaxCountDaysStockZero(dealerId,previousStockDate,formattedDate)
   }
+  }
+
+  
   // 15. Log the upload
   const totalQty = (await pool.request()
     .input("StockCode", newTcode)
     .query(`USE [z_scope]; SELECT SUM(qty) AS currentQuantSum FROM currentStock2 WHERE stockCode = @StockCode`)
   ).recordset[0].currentQuantSum;
+
+   if (formattedDate == formattedToday) {
+     let updateWorkshopMasterQuery=`use [z_scope] update dealer_workshop_master set LATESTSTOCKDATE =CAST(getdate() as smalldatetime) 
+     where dealerid=@dealerId and bigid=@locationId`;
+    
+        await pool.request().input('dealerId',dealerId).input('locationId',locationId).query(updateWorkshopMasterQuery)
+   }
+
 
   await pool.request()
     .input("locationId", locationId)
@@ -882,6 +912,84 @@ if (missingFields.length > 0) {
   };
 };
 
+
+async function updateMaxCountDaysStockZero(dealerId,previousStockDate,stockDate) {
+  try {
+    const pool = await getPool2();
+
+    // Get the current month column, e.g., "jul_2025"
+    const now = new Date();
+    const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];;
+    const currentMonthCol = `${monthNames[now.getMonth()]}_${now.getFullYear()}`.toLowerCase();
+
+    // Use table names with dealerId
+    const stockUploadTable = `stock_upload_spm_td001_${dealerId}`;
+    const maxCountTable = `max_CountDayStockZero_td001_${dealerId}`;
+
+    // 1. Check if stockdate and previousStockDate are the same
+    // const { recordset } = await pool.request().query(`
+    //   SELECT TOP 1 
+    //     CASE 
+    //       WHEN StockDate = PreviousStockDate THEN 1 
+    //       ELSE 0 
+    //     END AS isSameDate
+    //   FROM ${stockUploadTable}
+    // `);
+    
+    console.log("previous date ",previousStockDate,stockDate)
+    const isSameDate = previousStockDate.toDateString()==stockDate?1:0;
+
+    // Dynamic SQL parts
+    let sqlStatements = [];
+
+    // (a) Update existing part counts (+1)
+    // if(!isSameDate){
+      
+      //  CASE 
+      //         WHEN mc.[${currentMonthCol}] IS NULL THEN 1
+      //         ELSE mc.[${currentMonthCol}] + 1
+      //     END
+    sqlStatements.push(`use z_scope
+      UPDATE mc
+      SET [${currentMonthCol}] = 
+          mc.[${currentMonthCol}] + 1
+      FROM ${maxCountTable} mc
+      Inner JOIN ${stockUploadTable} su ON su.PartNumber = mc.PartNumber;
+    `);
+
+    // (b) Insert new parts in stock_upload_spm (if not exist in maxcount)
+    sqlStatements.push(`use z_scope
+      INSERT INTO ${maxCountTable} (PartNumber, [${currentMonthCol}])
+      SELECT su.PartNumber, 1
+      FROM ${stockUploadTable} su
+      LEFT JOIN ${maxCountTable} mc ON su.PartNumber = mc.PartNumber
+      WHERE mc.PartNumber IS NULL;
+    `);
+  //  }
+    if (isSameDate) {
+      // (c) If same date: decrement for parts missing in stock_upload_spm
+      // CASE 
+      //           WHEN mc.[${currentMonthCol}] IS NULL THEN -1
+      //           ELSE mc.[${currentMonthCol}] - 1
+      //       END
+      sqlStatements.push(`use z_scope
+        UPDATE mc
+        SET [${currentMonthCol}] = 
+             mc.[${currentMonthCol}] - 1
+        FROM ${maxCountTable} mc
+        LEFT JOIN ${stockUploadTable} su ON su.PartNumber = mc.PartNumber
+        WHERE su.PartNumber IS NULL;
+      `);
+    }
+
+    // Execute combined SQL
+    await pool.request().batch(sqlStatements.join('\n'));
+
+    console.log('Stock count update completed successfully.');
+  } catch (err) {
+    console.error('Error updating stock count:', err);
+  }
+}
 
 const getPartNotInMasterSingleUploadInService = async (req, res) => {
   try {
@@ -913,7 +1021,8 @@ const getAllRecords = async (req, res) => {
     const pool = await getPool2();
     let locationId = req.location_id;
    // let userId = req.added_by;
-    let getQuery = `use [z_scope] select added_on,added_by,StockUploadCount,quantitySum,prevQuantitySum,prevStockUploadCount from stock_upload_logs where location_id=@locationId`;
+    let getQuery = `use [z_scope] select added_on,added_by,stockUploadCount,quantitySum,prevQuantitySum,
+    prevStockUploadCount from stock_upload_logs where location_id=@locationId order by added_on desc`;
 
     const result = await pool
       .request()
@@ -1624,10 +1733,10 @@ const getAllRecords = async (req, res) => {
 const uploadBulkStock = async (req, res) => {
   try {
     const pool = await getPool2();
-    let addedBy = req.body.user_id;
+    let addedBy = parseInt(req.body.user_id,10);
     let rowData;
     let brandId = parseInt(req.body.brand_id,10);
-    let dealerId = req.body.dealer_id;
+    let dealerId = parseInt(req.body.dealer_id,10);
     let currentDate = new Date();
     let StockCodes;
     let wrongDealerLocationInFile = [];
@@ -1783,52 +1892,6 @@ if (missingFields.length > 0) {
  return {headerNotPresent:true,missingFields:missingFields}
 }
     let result567;
-
-  //   rowData = rowDataArray.map((rowData1) => {
-  //     // Find the correct keys dynamically (case insensitive)
-  //     const availabilityKey = Object.keys(rowData1).find(
-  //         (key) => key.toLowerCase() === "availability"
-  //     );
-      
-  //     const statusKey = Object.keys(rowData1).find(
-  //         (key) => key.toLowerCase() === "status"
-  //     );
-  
-  //     return {
-  //         part_number: rowData1[mappedData.part_number] != null 
-  //             ? rowData1[mappedData.part_number].toString().replace(/[^a-zA-Z0-9]/g, "").trim()
-  //             : "", 
-          
-  //         qty: rowData1[mappedData.stock_qty] != null 
-  //             ? parseFloat(rowData1[mappedData.stock_qty]) || 0 
-  //             : 0, 
-  //         location: rowData1[mappedData.loc] != null ? rowData1[mappedData.loc] : "",
-
-  //         availability: availabilityKey && rowData1[availabilityKey] != null 
-  //             ? rowData1[availabilityKey].toString().trim() 
-  //             : "", 
-          
-  //         status: statusKey && rowData1[statusKey] != null 
-  //             ? rowData1[statusKey].toString().trim() 
-  //             : "",
-  //     };
-  // });
-
-    // 5. Format data
-    // let normalizedData = rowDataArray.map(row => {
-    //   let getVal = (key) => {
-    //     let match = Object.keys(row).find(k => k.toLowerCase() == key.toLowerCase());
-    //     return match ? row[match]?.toString().trim() : "";
-    //   };
-  
-    //   return {
-    //     part_number: getVal(mappedData.part_number).replace(/[^a-zA-Z0-9]/g, ""),
-    //     qty: parseFloat(getVal(mappedData.stock_qty)) || 0,
-    //     availability: getVal("availability"),
-    //     status: getVal("status"),
-    //     location: getVal(mappedData.loc) != null ? getVal(mappedData.loc) : "",
-    //   };
-    // });
 
     let normalizedData = rowDataArray.map(row => {
       const getVal = (key) => {
@@ -2171,104 +2234,99 @@ updatedFilteredRowData = Array.from(partCountMap.values());
     //console.log("updated filtered row 918 ",partCountMap);
  //console.log("updated filtered data 922 ",updatedFilteredRowData)
   
-    if (insertedDataResult.length != 0) {
-   //   console.log("updated filtered ",updatedFilteredRowData);
-  //    console.log("combined filtered ",combinedExistedData)
-      if (updatedFilteredRowData.length > combinedExistedData.length) {
-        let missingRecords = [];
+  //   if (insertedDataResult.length != 0) {
+  //  //   console.log("updated filtered ",updatedFilteredRowData);
+  // //    console.log("combined filtered ",combinedExistedData)
+  //     if (updatedFilteredRowData.length > combinedExistedData.length) {
+  //       let missingRecords = [];
       
-        updatedFilteredRowData.forEach((item) => {
-          let partID = item.partId;
-          let qty = parseFloat(item.qty);
+  //       updatedFilteredRowData.forEach((item) => {
+  //         let partID = item.partId;
+  //         let qty = parseFloat(item.qty);
       
-          let match = combinedExistedData.find(
-            (el) => el.partId == partID && el.locationId == item.locationId
-          );
+  //         let match = combinedExistedData.find(
+  //           (el) => el.partId == partID && el.locationId == item.locationId
+  //         );
       
-          if (match) {
-          //  console.log("Matched element:", match);
-            item.qty = qty + parseFloat(match.qty);
-          } else {
-            // Only push missing record if not already in missingRecords
-            const potentialMissing = combinedExistedData.find(
-              (el) => el.locationId == item.locationId && el.partId != partID
-            );
+  //         if (match) {
+  //         //  console.log("Matched element:", match);
+  //           item.qty = qty + parseFloat(match.qty);
+  //         } else {
+  //           // Only push missing record if not already in missingRecords
+  //           const potentialMissing = combinedExistedData.find(
+  //             (el) => el.locationId == item.locationId && el.partId != partID
+  //           );
       
-            if (
-              potentialMissing &&
-              !missingRecords.some(
-                (rec) =>
-                  rec.partId == potentialMissing.partId &&
-                  rec.locationId == potentialMissing.locationId
-              )
-            ) {
-           //   console.log("Missing item:", potentialMissing);
-              missingRecords.push(potentialMissing);
-            }
-          }
-        });
-    //   console.log("missing records ",missingRecords)
-        // Only push missingRecords if they're truly missing
-        updatedFilteredRowData.push(
-          ...missingRecords.filter(
-            (missingItem) =>
-              !updatedFilteredRowData.some(
-                (item) =>
-                  item.partId == missingItem.partId &&
-                  item.locationId == missingItem.locationId
-              )
-          )
-        );
-      }
+  //           if (
+  //             potentialMissing &&
+  //             !missingRecords.some(
+  //               (rec) =>
+  //                 rec.partId == potentialMissing.partId &&
+  //                 rec.locationId == potentialMissing.locationId
+  //             )
+  //           ) {
+  //          //   console.log("Missing item:", potentialMissing);
+  //             missingRecords.push(potentialMissing);
+  //           }
+  //         }
+  //       });
+  //   //   console.log("missing records ",missingRecords)
+  //       // Only push missingRecords if they're truly missing
+  //       updatedFilteredRowData.push(
+  //         ...missingRecords.filter(
+  //           (missingItem) =>
+  //             !updatedFilteredRowData.some(
+  //               (item) =>
+  //                 item.partId == missingItem.partId &&
+  //                 item.locationId == missingItem.locationId
+  //             )
+  //         )
+  //       );
+  //     }
 
-      //console.log("updated filtered 974 ",updatedFilteredRowData)
+  //     //console.log("updated filtered 974 ",updatedFilteredRowData)
       
-      if (updatedFilteredRowData.length <= combinedExistedData.length) {
-        // Create a combined key map like "partId-locationId"
-        let updatedMap = new Map(
-          updatedFilteredRowData.map((item) => [`${item.partId}-${item.locationId}`, item])
-        );
+  //     if (updatedFilteredRowData.length <= combinedExistedData.length) {
+  //       // Create a combined key map like "partId-locationId"
+  //       let updatedMap = new Map(
+  //         updatedFilteredRowData.map((item) => [`${item.partId}-${item.locationId}`, item])
+  //       );
       
-      //  console.log("combined ", combinedExistedData);
+  //     //  console.log("combined ", combinedExistedData);
       
-        // Find missing records in updatedFilteredRowData
-        let missingRecords = combinedExistedData
-          .filter(
-            (item) => !updatedMap.has(`${item.partId}-${item.locationId}`)
-          )
-          .map((item) => ({
-            part_number: item.part_number,
-            partId: parseInt(item.partId, 10),
-            qty: parseFloat(item.qty),
-            locationId: parseInt(item.locationId, 10),
-          }));
+  //       // Find missing records in updatedFilteredRowData
+  //       let missingRecords = combinedExistedData
+  //         .filter(
+  //           (item) => !updatedMap.has(`${item.partId}-${item.locationId}`)
+  //         )
+  //         .map((item) => ({
+  //           part_number: item.part_number,
+  //           partId: parseInt(item.partId, 10),
+  //           qty: parseFloat(item.qty),
+  //           locationId: parseInt(item.locationId, 10),
+  //         }));
       
-       // console.log("updated map ", updatedMap);
+  //      // console.log("updated map ", updatedMap);
       
-        updatedFilteredRowData.forEach((item) => {
-          let key = `${item.partId}-${item.locationId}`;
-          if (updatedMap.has(key)) {
-            let existing = combinedExistedData.find(
-              (el) => el.partId == item.partId && el.locationId == item.locationId
-            );
+  //       updatedFilteredRowData.forEach((item) => {
+  //         let key = `${item.partId}-${item.locationId}`;
+  //         if (updatedMap.has(key)) {
+  //           let existing = combinedExistedData.find(
+  //             (el) => el.partId == item.partId && el.locationId == item.locationId
+  //           );
       
-            if (existing) {
-              item.qty = parseFloat(item.qty) + parseFloat(existing.qty);
-            } 
-          }
-        });
+  //           if (existing) {
+  //             item.qty = parseFloat(item.qty) + parseFloat(existing.qty);
+  //           } 
+  //         }
+  //       });
       
-        // Add missing records
-        updatedFilteredRowData.push(...missingRecords);
-      }
+  //       // Add missing records
+  //       updatedFilteredRowData.push(...missingRecords);
+  //     }
       
-    }
+  //   }
 
-  //  console.log("updated filtered row ",updatedFilteredRowData,updatedFilteredRowData.length);
-   // console.log("previous data ",combinedExistedData,combinedExistedData.length)
-  
-   // console.log("filtered 982 ",updatedFilteredRowData)
-   //  console.log("updatedFiltered 828 ",updatedFilteredRowData)
     const uniqueLocationIds = [
       ...new Set(updatedFilteredRowData.map((item) => item.locationId)),
     ];
@@ -2394,6 +2452,13 @@ updatedFilteredRowData = Array.from(partCountMap.values());
         currentQuantSum = result678?.recordset[0]?.currentQuantSum;
       }
       //  console.log("currentquant ",currentQuantSum)
+       if (formattedDate == formattedToday) {
+     let updateWorkshopMasterQuery=`use [z_scope] update dealer_workshop_master set LATESTSTOCKDATE =CAST(getdate() as smalldatetime) 
+     where dealerid=@dealerId and bigid=@locationId`;
+    
+        await pool.request().input('dealerId',dealerId).input('locationId',locId).query(updateWorkshopMasterQuery)
+   }
+
       let logQuery = `use [z_scope] insert into Stock_Upload_Logs(Stockcode,location_id,dealer_id,added_by,brand_id, StockUploadCount,operation_type,quantitySum,
      prevStockUploadCount,prevQuantitySum) values(@currentStockCode,@locId,@dealerId,@addedBy,@brandId,@rowCount,'bulk stock upload ',@currentQuantSum,@countPrevRecords,@quantitySumPrev)`;
       await pool
@@ -2466,9 +2531,9 @@ const getBulkRecordsInService = async (req, res) => {
     
 
     let getQuery = ` use [z_scope]
-  SELECT added_on, added_by, StockUploadCount, location_id,quantitySum, prevQuantitySum, prevStockUploadCount 
+  SELECT added_on, added_by, stockUploadCount, location_id,quantitySum, prevQuantitySum, prevStockUploadCount 
   FROM stock_upload_logs
-  WHERE dealer_id =@dealerId
+  WHERE dealer_id =@dealerId order by added_on desc
 `;
 
     const request = await pool.request();

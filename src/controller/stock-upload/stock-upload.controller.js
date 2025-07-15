@@ -30,7 +30,7 @@ const allRecordsSingleLocation=async (req,res)=>{
 
 const getPartNotInMasterSingleLocation=async (req,res)=>{
     try{
-
+      //  console.log("req ",req)
         const result=await getPartNotInMasterSingleLocationInService(req.body);
         res.status(200).json({data:result});
     }
