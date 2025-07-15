@@ -326,9 +326,11 @@ const partDetails = async (req, res) => {
       } else {
         return res.status(400).json({ message: 'PartNumbers must be an array or string' });
       }
-
+    
+      
       // Convert to SQL-safe string
       partnumberString = partnumberArray.map(p => `'${p}'`).join(",");
+        // console.log(partnumberString);
     }
 
     // Option 2: Read from uploaded Excel file
@@ -339,6 +341,7 @@ const partDetails = async (req, res) => {
 
       const { path } = req.file;
       const {headers,data} = await readExcel(path);
+      fs.unlinkSync(path); // Clean up file
  
       const REQUIRED_HEADERS = [
            "PartNumber"
@@ -352,7 +355,6 @@ const partDetails = async (req, res) => {
                 missingHeaders
               });
             }
-      fs.unlinkSync(path); // Clean up file
 
       if (data.length === 0) {
         return res.status(400).json({ message: 'No part numbers found in Excel' });
@@ -368,7 +370,8 @@ const partDetails = async (req, res) => {
             .toUpperCase();
         }
       });
-
+      // console.log(data);
+      
       // Check if all parts are mapped to brand
       const unmatchedParts = await partBrandMappingCheck(Brandid, data);
       if (unmatchedParts.length > 0) {
