@@ -326,9 +326,11 @@ const partDetails = async (req, res) => {
       } else {
         return res.status(400).json({ message: 'PartNumbers must be an array or string' });
       }
-
+    
+      
       // Convert to SQL-safe string
       partnumberString = partnumberArray.map(p => `'${p}'`).join(",");
+        // console.log(partnumberString);
     }
 
     // Option 2: Read from uploaded Excel file
@@ -338,19 +340,40 @@ const partDetails = async (req, res) => {
       }
 
       const { path } = req.file;
-      const Data = await readExcel(path);
+      const {headers,data} = await readExcel(path);
       fs.unlinkSync(path); // Clean up file
+ 
+      const REQUIRED_HEADERS = [
+           "PartNumber"
+          ];
+           const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
+            // console.log(missingHeaders);
+            
+            if (missingHeaders.length > 0) {
+              return res.status(400).json({
+                message: `Missing Header "PartNumber"`,
+                missingHeaders
+              });
+            }
 
-      if (Data.length === 0) {
+      if (data.length === 0) {
         return res.status(400).json({ message: 'No part numbers found in Excel' });
       }
 
-      if (Data.length >= 1000) {
+      if (data.length >= 1000) {
         return res.status(400).json({ message: 'More than 1000 part numbers not allowed' });
       }
-
+           data.forEach(row => {
+        if (row.PartNumber != null) {
+          row.PartNumber = String(row.PartNumber)
+            .trim()
+            .toUpperCase();
+        }
+      });
+      // console.log(data);
+      
       // Check if all parts are mapped to brand
-      const unmatchedParts = await partBrandMappingCheck(Brandid, Data.data);
+      const unmatchedParts = await partBrandMappingCheck(Brandid, data);
       if (unmatchedParts.length > 0) {
         return res.status(400).json({
           message: 'Some parts are not mapped with the selected brand.',
@@ -358,7 +381,7 @@ const partDetails = async (req, res) => {
         });
       }
 
-      partnumberString = Data.data.map(item => `'${item.PartNumber}'`).join(",");
+      partnumberString = data.map(item => `'${item.PartNumber}'`).join(",");
     }
 
     // Build and run SQL query
@@ -404,10 +427,31 @@ const getLedger = async (req, res) => {
       if (req.file == undefined) {
         return res.status(400).json({ message: 'Must upload an Excel file' });
       }
-      const Data = await readExcel(req.file.path);
+      const {headers , data} = await readExcel(req.file.path);
       fs.unlinkSync(req.file.path); // Clean up
-
-      const unmatchedParts = await partBrandMappingCheck(Brandid, Data.data);
+       const REQUIRED_HEADERS = [
+           "PartNumber"
+          ];
+           const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
+            // console.log(missingHeaders);
+            
+            if (missingHeaders.length > 0) {
+              return res.status(400).json({
+                message: `Missing Header "PartNumber"`,
+                missingHeaders
+              });
+            }
+      
+      // Converting all partnumber to upper case
+      data.forEach(row => {
+        if (row.PartNumber != null) {
+          row.PartNumber = String(row.PartNumber)
+            .trim()
+            .toUpperCase();
+        }
+      });
+     
+      const unmatchedParts = await partBrandMappingCheck(Brandid, data);
       if (unmatchedParts.length > 0) {
         return res.status(400).json({
           message: 'Some parts are not mapped with the selected brand.',
@@ -415,7 +459,9 @@ const getLedger = async (req, res) => {
         });
       }
 
-      partnumbers = Data.data.map(item => item.PartNumber?.toString().trim()).filter(Boolean);
+      partnumbers = data.map(item => item.PartNumber?.toString().trim()).filter(Boolean);
+      // console.log(partnumbers);
+      
     }
 
     // Option 2: Read from body
@@ -428,18 +474,19 @@ const getLedger = async (req, res) => {
         const raw = PartNumber.trim();
         if (raw.startsWith('[') && raw.endsWith(']')) {
           try {
-            partnumbers = JSON.parse(raw).map(p => p.toString().trim());
+            partnumbers = JSON.parse(raw).map(p => p.toString().trim().toUpperCase());
           } catch {
             return res.status(400).json({ message: 'Invalid JSON array in PartNumber' });
           }
         } else {
-          partnumbers = raw.split(',').map(p => p.trim()).filter(Boolean);
+          partnumbers = raw.split(',').map(p => p.trim()).toUpperCase().filter(Boolean);
         }
       } else {
         return res.status(400).json({ message: 'PartNumber must be an array or string' });
       }
     }
-
+      // console.log(partnumbers);
+      
     if (partnumbers.length === 0) {
       return res.status(400).json({ message: 'No part numbers provided' });
     }
