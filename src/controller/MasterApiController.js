@@ -366,7 +366,7 @@ const latestDates = async (req, res) => {
     //   SELECT 'jobcard' AS source, Jobcardclosedate AS latest_date FROM latest_jobcard;
     // `;
     const query = `
-      select MAX(stockdate)as StockDate from z_scope..stock_upload_spm_td001_${dealerid} where locationid = ${locationid}
+      select StockDate from z_scope..currentstock1 where locationid = ${locationid}
       select MAX(joblineclosedate)as JoblineCloseDate from z_scope..create_order_request_td001_${dealerid} where locationid = ${locationid}
       select MAX(final_close_date)as JobCardCloseDate from z_scope..create_order_request_td001_${dealerid} where locationid = ${locationid}
     `

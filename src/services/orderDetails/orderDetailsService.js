@@ -36,12 +36,13 @@ const orderDetailsByPartnumberService = async(dealerid,locationid,partnumber,Uda
 
 const query = `
 SELECT DISTINCT 
-pm.partnumber1, pm.partdesc,pm.Category, pm.mrp,pm.landedcost,ooq, ogs.scsOrderno, cs2.Qty as StockQty, ogs.OrderQtyPlaced,ogs.DealerRemarks, ogs.addeddate, ito.transferfrombranch , ogs.FinalOrderQty
+pm.partnumber1, pm.partdesc,pm.Category, pm.mrp,pm.landedcost,ooq, ogs.scsOrderno, ogs.OpeningStock, 
+ogs.OrderQtyPlaced,ogs.DealerRemarks, ogs.addeddate, ito.transferfrombranch , ogs.FinalOrderQty
 FROM [10.10.152.17].[z_scope].dbo.OGS_OrderData_TD001_${dealerid} ogs
 left join [10.10.152.17].[z_scope].dbo.OGS_SOTD_IndentTransferOrder_TD001_8 ito on ogs.scsorderno = ito.scsorderno
 LEFT JOIN LocationInfo li ON li.LocationID = ogs.locationid 
-left join currentstock1 cs1 on cs1.LocationID = li.locationid
-left join CurrentStock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = ogs.partnumber
+--left join currentstock1 cs1 on cs1.LocationID = li.locationid
+--left join CurrentStock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = ogs.partnumber
 LEFT JOIN Part_Master pm ON pm.brandid = ogs.brandid AND pm.partnumber1 = ogs.partnumber
 WHERE ogs.partnumber = @partnumber AND ogs.locationid = @locationid
 AND ogs.addeddate >=  @Udate AND ogs.addeddate <= @Ldate
@@ -94,27 +95,28 @@ const result = await pool.request()
 
 //   return Object.values(grouped);
 // }
-function transformOrderData(response) {
-    // console.log(response);
+function transformOrderData(response1,response2) {
+    // console.log(response2[0].Qty);
     
-  if (!response || response.length === 0) return {};
+  if (!response1 || response1.length === 0) return {};
 
-  const sample = response[0]; // Assuming all rows share same static values
+  const sample = response1[0]; // Assuming all rows share same static values
   const result = {
     partnumber1: sample.partnumber1,
     partdesc: sample.partdesc,
     Category: sample.Category,
     mrp: sample.mrp,
     landedcost: sample.landedcost,
+    StockQty:response2[0].Qty,
     Data: []
   };
 
-  response.forEach(entry => {
+  response1.forEach(entry => {
     result.Data.push({
       scsOrderno: entry.scsOrderno,
       addeddate: entry.addeddate,
       transferfrombranch: entry.transferfrombranch || 0,
-      StockQty: entry.StockQty || 0,
+      OpeningStock: entry.OpeningStock || 0,
       ooq: entry.ooq,
       OrderQtyPlaced: entry.OrderQtyPlaced || 0,
       DealerRemarks: entry.DealerRemarks || "N/A",
