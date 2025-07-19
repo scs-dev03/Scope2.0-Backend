@@ -392,7 +392,7 @@ const readExcelFile = async (filePath) => {
         console.log("File deleted successfully:", filePath);
       }
     });
-       //console.log("header ",headers)
+      // console.log("header ",headers,resultData)
     return { headers: headers, data: resultData };
   } catch (error) {
     console.log("error in reading the excel file in utitlies service", error.message);

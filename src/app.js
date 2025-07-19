@@ -27,8 +27,6 @@ app.use("/api/v1/salesview", salesView)
 app.use("/api/v1/von",von)
 app.use("/api/v1/dm",dm)
 
-
-
 export  {app}
 
 
