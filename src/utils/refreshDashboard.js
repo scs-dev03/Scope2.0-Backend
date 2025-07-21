@@ -62,7 +62,7 @@ const refreshSI = async (dealerid, reqid) => {
     console.log(`Data Refreshing SI for reqid: ${reqid} at ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`);
 
     const record = result.recordset[0];
-    const Check = isDataRefreshed(record);
+    const Check = isSIDataRefreshed(record);
     console.log("SP Output:", record, "| isDataRefreshed:", Check);
 
     query = `use [UAD_BI] Update SBS_DBS_ScheduledDashboard set status = @status where reqid = @reqid`;
@@ -245,6 +245,14 @@ const refreshTOPS = async(dealerid,reqid)=>{
 
 function isDataRefreshed(result) {
    if(result || result.recordset === 'Success'){
+      return  true;
+   }
+   else{
+      return false;
+   }
+} 
+function isSIDataRefreshed(result) {
+   if(result === `{ '': 'Success' }`){
       return  true;
    }
    else{
