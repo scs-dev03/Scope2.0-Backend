@@ -44,18 +44,18 @@ async function start() {
 
     // ────────────────────────────────────────────────
     // Run `scheduleTask()` every minute:
-    cron.schedule('*/15 * * * *', async () => {
-      await connectDB().catch(err => console.error('connectDB error', err));
-      console.log('⚙️  Running scheduleTask at', new Date().toISOString());
-      scheduleTask().catch(err => console.error('scheduleTask error', err));
-    });
+    // cron.schedule('*/15 * * * *', async () => {
+    //   await connectDB().catch(err => console.error('connectDB error', err));
+    //   console.log('⚙️  Running scheduleTask at', new Date().toISOString());
+    //   scheduleTask().catch(err => console.error('scheduleTask error', err));
+    // });
 
-    // Run `siRefresh()` every 5 minutes:
-    cron.schedule('*/30 * * * *', async () => {
-      await connectDB().catch(err => console.error('connectDB error', err));
-      console.log('🔄 Running siRefresh at', new Date().toISOString());
-      siRefresh().catch(err => console.error('siRefresh error', err));
-    });
+    // // Run `siRefresh()` every 5 minutes:
+    // cron.schedule('*/30 * * * *', async () => {
+    //   await connectDB().catch(err => console.error('connectDB error', err));
+    //   console.log('🔄 Running siRefresh at', new Date().toISOString());
+    //   siRefresh().catch(err => console.error('siRefresh error', err));
+    // });
     // ────────────────────────────────────────────────
 
     // 3) Then start your HTTP server:
