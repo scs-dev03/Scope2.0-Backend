@@ -106,15 +106,23 @@ try {
                 message:`Invalid Partnumber`
             })
             }
-            const [data1 , data2] = await Promise.all([
-                orderDetailsByPartnumberService(dealerid,locationid,partnumber,Udate,Ldate),
-                singlePartMaxByLocationService(brandid,dealerid,locationid,partnumber)
+            // const [data1 , data2] = await Promise.all([
+            //     orderDetailsByPartnumberService(dealerid,locationid,partnumber,Udate,Ldate),
+            //     singlePartMaxByLocationService(brandid,dealerid,locationid,partnumber)
+            // ])
+            const [data1,data2,data3] = await Promise.all([
+                partInfo(brandid,partnumber),
+                singlePartMaxByLocationService(brandid,dealerid,locationid,partnumber),
+                orderDetailsByPartnumberService(brandid,dealerid,locationid,partnumber,Udate,Ldate)
             ])
             // const flatData = await formatOrderData(data.recordset)
-            const flatData = transformOrderData(data1.recordset,data2.recordsets[1])
+            // const flatData = transformOrderData(data1.recordset,data2.recordsets[1])
+            // console.log(data3);
+            
             res.status(200).json({
-                Data:flatData,
-                // Stock:data2.recordsets[1]
+                Details:data1.recordset,
+                Stock:data2.recordsets[1],
+                Orders:data3.recordset
             })
 
 } catch (error) {
@@ -124,7 +132,7 @@ try {
 }
 }
 
-const partStock = async(req,res)=>{
+const  partStock = async(req,res)=>{
 try {
         const {brandid,dealerid,locationid,partnumber} = req.body
         if(!brandid ||!dealerid || !locationid ||!partnumber){
@@ -141,16 +149,27 @@ try {
         const [data, data2, data3, data4] = await Promise.all([
             partInfo(brandid,partnumber),
             reservedForVehicle(dealerid, partnumber),
-            groupStock(brandid, locationid, partnumber),
+            groupStock(brandid,dealerid,locationid, partnumber),
             singlePartMaxByLocationService(brandid,dealerid,locationid,partnumber)
         ]);
-       
+//        const statusById = data3.recordsets[1].reduce((map, { locationid, partstatus }) => {
+//   map[locationid] = partstatus;
+//   return map;
+// }, {});
+
+// // 2) map over your group array and inject Partstatus
+// const merged = data3.recordsets[2].map(item => ({
+//   ...item,
+//   Partstatus: statusById[item.locationid] ?? null
+// }));
+
         
         res.status(200).json({
             Details:data.recordset,
             Reserved:data2.recordset,
             Substitutes:data3.recordsets[0],
             Group:data3.recordsets[1],
+            // StockColor:data3.recordsets[1],
             Norms:data4.recordsets[0],
             Stock:data4.recordsets[1]
             })
@@ -260,13 +279,13 @@ try {
 
 const locationwisePPNIValue = async(req,res)=>{
 try {
-        const {dealerid , nonstockable , jobcardstatus} = req.body
-        if(!dealerid || !nonstockable == null || !jobcardstatus == null){
+        const {dealerid , nonstockable , jobcardstatus, month} = req.body
+        if(!dealerid || !nonstockable == null || !jobcardstatus == null || !month == null){
             return res.status(400).json({
                 message:`dealerid , nonstockable and partstatus is required`
             })
         }
-       const data = await locationwisePPNIValueService(dealerid,jobcardstatus,nonstockable)
+       const data = await locationwisePPNIValueService(dealerid,jobcardstatus,nonstockable,month)
        res.status(200).json({
         Data: data.recordset
        })
@@ -279,13 +298,13 @@ try {
 
 const advisorwisePPNIValue = async(req,res)=>{
 try {
-        const {dealerid , locationid, nonstockable , jobcardstatus} = req.body
-        if(!dealerid || !locationid || !nonstockable == null || !jobcardstatus == null){
+        const {dealerid , locationid, nonstockable , jobcardstatus,month} = req.body
+        if(!dealerid || !locationid || !nonstockable == null || !jobcardstatus == null || !month ==null){
             return res.status(400).json({
                 message:`dealerid , nonstockable and partstatus is required`
             })
         }
-       const data = await advisorwisePPNIValueService(dealerid,locationid,jobcardstatus,nonstockable)
+       const data = await advisorwisePPNIValueService(dealerid,locationid,jobcardstatus,nonstockable,month)
        res.status(200).json({
         Data: data.recordset
        })
@@ -298,13 +317,13 @@ try {
 
 const vehiclewisePPNIValue = async(req,res)=>{
 try {
-        const {dealerid , locationid, nonstockable , jobcardstatus, advisor} = req.body
-        if(!dealerid || !locationid|| !nonstockable == null || !jobcardstatus == null){
+        const {dealerid , locationid, nonstockable , jobcardstatus, advisor , month} = req.body
+        if(!dealerid || !locationid|| !nonstockable == null || !jobcardstatus == null || !month == null){
             return res.status(400).json({
                 message:`dealerid , nonstockable and partstatus is required`
             })
         }
-       const data = await vehiclewisePPNIValueService(dealerid,locationid,jobcardstatus,nonstockable,advisor)
+       const data = await vehiclewisePPNIValueService(dealerid,locationid,jobcardstatus,nonstockable,advisor,month)
     //    console.log(data.recordset);
        
        // Transform the flat data into grouped vehicle-wise structure
