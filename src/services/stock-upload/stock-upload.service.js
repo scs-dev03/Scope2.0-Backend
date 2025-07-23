@@ -47,7 +47,7 @@ const stockUploadSingleLocation = async (req, res) => {
   //console.log("mapped datda ",mappedData)
   const isValid = Object.entries(mappedData)
       .filter(([key]) => key != 'stock_type' && key != 'loc' && key!='calculativeField' && key!='stock_qty') // Exclude stock_type and loc
-      .every(([, value]) => headers.includes(value.trim().toLowerCase())); // Check if all values exist in headers
+      .every(([, value]) => normalizedHeaders.includes(value.trim().toLowerCase())); // Check if all values exist in headers
  // console.log("mapped data ",mappedData,headers,isValid)
   // If brandId is 17, 28, check for "availability" and "status" in headers
   if (requiredBrandIds.includes(brandId)) {
@@ -107,7 +107,7 @@ const stockUploadSingleLocation = async (req, res) => {
 
   let normalizedData = rowDataArray.map(row => {
     const getVal = (key) => {
-      const match = Object.keys(row).find(k => k.toLowerCase() === key.toLowerCase());
+      const match = Object.keys(row).find(k => k.trim().toLowerCase() == key.trim().toLowerCase());
       const value = match ? row[match] : "";
       return value != null ? value.toString().trim() : "";
     };
@@ -651,7 +651,7 @@ let partMasterMap=new Map();
       const normalizedHeaders = headers.map(header => header.trim().toLowerCase());
       const isValid = Object.entries(mappedData)
           .filter(([key]) => key != 'stock_type' && key != 'loc' && key!='calculativeField' && key!='stock_qty') // Exclude stock_type and loc
-          .every(([, value]) => headers.includes(value)); // Check if all values exist in headers
+          .every(([, value]) => normalizedHeaders.includes(value.trim().toLowerCase())); // Check if all values exist in headers
      // console.log("mapped data ",mappedData)
       // If brandId is 17, 28, check for "availability" and "status" in headers
       if (requiredBrandIds.includes(brandId)) {
@@ -698,7 +698,7 @@ let partMasterMap=new Map();
     
     let normalizedData = rowDataArray.map(row => {
       const getVal = (key) => {
-        const match = Object.keys(row).find(k => k.toLowerCase() === key.toLowerCase());
+        const match = Object.keys(row).find(k => k.trim().toLowerCase() == key.trim().toLowerCase());
         const value = match ? row[match] : "";
         return value != null ? value.toString().trim() : "";
       };
@@ -1396,14 +1396,14 @@ let notInMasterFalseItems;
     if (mappingResult.recordset.length == 0) {
       return { mappingNotPresent: true };
     }
-  //  console.log("mapping result ", mappingResult);
+  // console.log("mapping result ", mappingResult);
 
     let checkDealerLocationMappingQuery = `use [z_scope] select inventory_location,locationID as locationId from dealer_location_mapping where dealerId=@dealerId and status='active'`;
     const resDealerAndLoc = await pool
       .request()
       .input("dealerId", dealerId)
       .query(checkDealerLocationMappingQuery);
-     // console.log("res dealer loca ",resDealerAndLoc.recordset,dealerId)
+   //   console.log("res dealer loca ",resDealerAndLoc.recordset,dealerId)
     if (resDealerAndLoc.recordset.length == 0) {
       return { dealerLocationMappingNotPresent: true };
     }
@@ -1412,7 +1412,7 @@ let notInMasterFalseItems;
 
     let mappedData = mappingResult.recordset[0];
     let fileData;
-    let headers;
+    let headers;6
     let rowDataArray;
     let filteredRowData;
     let combinedExistedData = [];
@@ -1433,11 +1433,17 @@ let notInMasterFalseItems;
     const normalizedHeaders = headers.map((header) =>
       header.trim().toLowerCase()
     );
-  //  console.log("headers ",headers,mappedData)
-    const isValid = Object.entries(mappedData)
-      .filter(([key]) => key != 'stock_type'  && key!= 'calculativeField' && key!='stock_qty') // Exclude stock_type and loc
-      .every(([, value]) => headers.includes(value)); // Check if all values exist in headers
-    
+  //  console.log("headers ",mappedData,brandId)
+    // const isValid = Object.entries(mappedData)
+    //   .filter(([key]) => key != 'stock_type'  && key!= 'calculativeField' && key!='stock_qty') // Exclude stock_type and loc
+    //   .every(([, value]) => headers.includes(value)); // Check if all values exist in headers
+   const unmatchedHeaders = Object.entries(mappedData)
+  .filter(([key]) => key !== 'stock_type' && key !== 'calculativeField')
+  .map(([, value]) => value.trim().toLowerCase())
+  .filter(value => !normalizedHeaders.includes(value));
+
+ // console.log("unmatched ",unmatchedHeaders)
+const isValid = unmatchedHeaders.length === 0
     // If brandId is 17, 28 check for "availability" and "status" in headers
     if (requiredBrandIds.includes(brandId)) {
       const requiredFields = ["availability", "status"];
@@ -1484,12 +1490,15 @@ if (missingFields.length > 0) {
  return {headerNotPresent:true,missingFields:missingFields}
 }
     let result567;
+ //   console.log("row ",rowDataArray)
     let normalizedData = rowDataArray.map(row => {
       const getVal = (key) => {
-        const match = Object.keys(row).find(k => k.toLowerCase() === key.toLowerCase());
+        const match = Object.keys(row).find(k => k.trim().toLowerCase() == key.trim().toLowerCase());
         const value = match ? row[match] : "";
         // return value != null ? value.toString().trim() : "";
+     //   console.log("value ",value)
         return (value != null && value !== undefined) ? value.toString().trim() : "";
+
       };
     
       const computeQty = () => {
@@ -1538,11 +1547,12 @@ if (missingFields.length > 0) {
             availability: getVal("availability"),
             status: getVal("status"),
             // location: getVal(mappedData.loc) != null ? getVal(mappedData.loc) : "",
+            
             location: getVal(mappedData.loc)?.trim() || "",
           };
     });
   
- //  console.log("normalized data ",normalizedData)
+  /// console.log("normalized data -------------- ",normalizedData)
     filteredRowData = normalizedData.filter((row) => {
       let stockQty = parseFloat(row.qty);
       let hasPartNumber = row.part_number && row.part_number.trim() !== "";
@@ -1557,6 +1567,7 @@ if (missingFields.length > 0) {
       if (brandId == 22) {
         return hasPartNumber && stockQty > 0 && availability == "on hand" && hasLocation;
       }
+    //  console.log(row.part_number,stockQty,row.location)
     
       return hasPartNumber && stockQty > 0 && hasLocation;
     });
@@ -1656,7 +1667,7 @@ let stockCodes = tCodeFromStock1;
           }))
       );
 
-   //  console.log("combined existed data 716", combinedExistedData);
+    // console.log("combined existed data 716", combinedExistedData);
     }
 
  
@@ -1669,7 +1680,7 @@ let dealerLocationMap = new Map(
 );
 
 let seenPartNumbers = new Set(); // For tracking duplicates in partNotInMasterArray
-// console.log("partnot in masrter ",partNotInMasterArray)
+//console.log("partnot in masrter ",filteredRowData)
 for (let item of filteredRowData) {
   let normalizedPartNumber = item.part_number.trim().toLowerCase();
   let partId = partMasterMap.get(normalizedPartNumber);
@@ -1736,7 +1747,7 @@ updatedFilteredRowData = Array.from(partCountMap.values());
       ...new Set(updatedFilteredRowData.map((item) => item.locationId)),
     ];
 
-    // console.log("updatedFiltered row ",updatedFilteredRowData)
+   //  console.log("updatedFiltered row ",updatedFilteredRowData)
     //  console.log("unique location ids ", uniqueLocationIds);
     let rowCount;
 
@@ -1744,10 +1755,10 @@ updatedFilteredRowData = Array.from(partCountMap.values());
     let combinedLogsLocationWise = [];
     let currentStockCode;
     //  console.log("unique ids ",uniqueLocationIds,updatedFilteredRowData[0])
-   
     for (let i = 0; i < uniqueLocationIds.length; i++) {
       let locId = uniqueLocationIds[i];
       
+     // console.log("locationId ",locId);
       let prevCountRecords=0;
       let quantitySumPrev = 0;
     //   console.log("unique ids  ",uniqueLocationIds)
