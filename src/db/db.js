@@ -110,7 +110,22 @@ const config4 = {
     connectionTimeout: 30000,
 };
 
-let pool1, pool2 , pool3,leadTimePool , pool4;
+const ogysConfig = {
+    server: process.env.OGYS_SERVER,
+    database: process.env.OGYS_DATABASE,
+    user: process.env.OGYS_USER,
+    password: process.env.OGYS_PASSWORD,
+    // port: Number(process.env.DB_PORT3),
+    options: {
+        encrypt: false,
+        enableArithAbort: true,
+        trustServerCertificate: true,
+    },
+    requestTimeout: 6000000,
+    connectionTimeout: 30000,
+};
+
+let pool1, pool2 , pool3,leadTimePool , pool4,ogysPool;
 
 const connectDB = async () => {
     try {
@@ -122,11 +137,14 @@ const connectDB = async () => {
 
         // pool3 = await new sql.ConnectionPool(config3).connect();
         // console.log(`Connected to DB3: ${process.env.SERVER3} using ${process.env.USER3}`);
-        pool4 = await new sql.ConnectionPool(config2).connect()
+        pool4 = await new sql.ConnectionPool(config1).connect()
         console.log(`Ds Connected to Live: ${process.env.SERVER2} using ${process.env.USER2}`);
 
-        leadTimePool=await new sql.ConnectionPool(config4).connect();
+        leadTimePool=await new sql.ConnectionPool(config1).connect();
          console.log(`Connected to ${process.env.DATABASE4}: ${process.env.SERVER2} using ${process.env.USER2}`);
+
+          ogysPool= await new sql.ConnectionPool(config1).connect()
+        console.log(`Ds Connected to Live: ${process.env.OGYS_SERVER} using ${process.env.OGYS_USER}`);
     } catch (err) {
         console.error("Database connection failed!", err);
         throw err;
@@ -148,6 +166,11 @@ const DSpool = () => {
     return pool4;
 };
 
+const OgysPool = () => {
+    if (!ogysPool) throw new Error("OGYS SERVER not connected");
+    return ogysPool;
+};
+
 const getLeadTimePool=()=>{
 
     if(!leadTimePool)
@@ -159,4 +182,4 @@ const getLeadTimePool=()=>{
 // getPool2 -> for Live Connection
 // getPool3 -> for OGS Server Connection
 
-export { connectDB, getPool1, getPool2 ,getLeadTimePool ,DSpool };
+export { connectDB, getPool1, getPool2 ,getLeadTimePool ,DSpool ,OgysPool};

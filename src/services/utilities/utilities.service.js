@@ -538,4 +538,21 @@ export const  getLocationsBasedOnBrand= async function (req) {
     return err;
   } 
 }
+
+export const getUploadTypesInService=async function(req){
+
+  try{
+    const pool=await getPool2();
+
+    let query='select id,description from uploadTypeMaster';
+    const result=await pool.request().query(query);
+    
+    return result.recordset;
+
+  }
+  catch(error){
+     console.log("error in fetching data for upload types in utilities service", error.message);
+    return error;
+  }
+}
 export { readExcelFile, readExcelFileWithSubColumns,readExcelFileWithSubColumnsForBulk };

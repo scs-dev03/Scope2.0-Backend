@@ -13,6 +13,7 @@ import roleRoutes from '../routes/role-based-access-management/role-based.route.
 import updatePasswordRoutes from '../routes/update-password/update-password.route.js';
 import sidebarRoutes from '../routes/sidebar/sidebar.route.js'
 import mappingRoutes from '../routes/mapping/mapping.route.js'
+import tocRoutes from './TOC-Upload/toc-upload.route.js'
 router.use('/utilities',utilitesRoutes)
 router.use('/st-mapping',stockUploadMappingRoutes);
 router.use('/dl-mapping',dealerLocationRoutes);
@@ -30,4 +31,6 @@ router.use('/roles',roleRoutes)
 router.use('/update-pass',updatePasswordRoutes)
 router.use('/sidebar',sidebarRoutes)
 router.use('/mapping',mappingRoutes)
+
+router.use('/toc',tocRoutes)
 export default router;

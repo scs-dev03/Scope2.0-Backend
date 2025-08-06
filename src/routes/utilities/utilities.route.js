@@ -2,7 +2,7 @@ import express from 'express';
 const router=express.Router();
 import {getBrandsInController,uploadFileInController,getDealers
   ,getLocations,getLocationsBasedOnBrandInController,
-   getDesignationsInController, getRolesInController, getBusinessVerticalInController} from '../../controller/utilities/utilities.controller.js';
+   getDesignationsInController, getRolesInController, getBusinessVerticalInController,getUploadTypesInController} from '../../controller/utilities/utilities.controller.js';
 import fs from 'fs'
 import multer from 'multer';
 // import {multer} from 'multer';
@@ -31,4 +31,5 @@ router.post('/selected-locations',getLocationsBasedOnBrandInController)
 router.get('/designations',getDesignationsInController)
 router.get('/roles',getRolesInController)
 router.get('/business-vertical',getBusinessVerticalInController)
+router.get('/uploadTypes',getUploadTypesInController)
 export default router;

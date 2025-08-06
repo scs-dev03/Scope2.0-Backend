@@ -3,17 +3,26 @@ import moment from 'moment-timezone';
 export const addMapping=async (req,res)=>{
 
     try{
-    //    let stockType=req.stockType;
-    //    let  brandColumns=JSON.stringify(req.brandColumns);
-    //    let  brandId=req.brandId;
-    //    let  userId=req.userId;
-    //    let partNumber=req.values.partNumber;
-    //    let location=req.values.location;
-    //    let stockQty=req.values.stockQty;
-      const pool=await getPool2();
-      let query=`use [z_scope] Insert into Stock_Upload_Mapping(part_number,stock_qty,loc,added_by,brand_id,stock_type,brandColumns,operation,calculativeField) 
+     const pool=await getPool2();
+
+      let isExist=false;
+      let existedMappingQuery=`select part_number from stock_Upload_Mapping 
+      where uploadTypeId=@uploadTypeId and brand_id=@brandId and stock_type=@stockType`;
+
+      const result45=await pool.request()
+      .input('brandId',req.brandId)
+      .input('uploadTypeId',req.uploadTypeId)
+      .input('stockType',req.stockType).query(existedMappingQuery);
+      // console.log("result45 ",result45.recordset)
+      if(result45.recordset[0].part_number){
+        isExist=true;
+       // console.log(isExist)
+        return {alreadyExist:isExist};
+      }
+     
+      let query=`use [z_scope] Insert into Stock_Upload_Mapping(part_number,stock_qty,loc,added_by,brand_id,stock_type,brandColumns,operation,calculativeField,uploadTypeId) 
       output inserted.id
-       values(@partNumber,@stockQty,@location,@userId,@brandId,@stockType,@brandColumns,'create',@calculativeField)`;
+       values(@partNumber,@stockQty,@location,@userId,@brandId,@stockType,@brandColumns,'create',@calculativeField,@updateTypeId)`;
    //  console.log("stock qty ",JSON.stringify(req.values.stockQty),req.calculativeField)
      const result= await pool.request()
      .input('partNumber',req.values.partNumber)
@@ -24,18 +33,20 @@ export const addMapping=async (req,res)=>{
      .input('calculativeField',req.calculativeField)
      .input('brandColumns',JSON.stringify(req.brandColumns))
      .input('stockType',req.stockType)
+     .input('updateTypeId',req.uploadTypeId)
       .query(query);
 
       let insertedId=result.recordset[0]?.id;
     //   console.log("result ",result,insertedId)
-      let logQuery=`use [z_scope] Insert into Stock_Upload_Logs(added_by,operation_type,part_number,stock_qty,location,calculativeField) 
-      values(@userId,'create stock upload mapping',@partNumber,@stockQty,@location,@calculativeField)`
+      let logQuery=`use [z_scope] Insert into Stock_Upload_Logs(added_by,operation_type,part_number,stock_qty,location,calculativeField,uploadTypeId) 
+      values(@userId,'create stock upload mapping',@partNumber,@stockQty,@location,@calculativeField,@updateTypeId)`
     await pool.request()
     .input('userId',req.userId)
     .input('partNumber',req.values.partNumber)
     .input('stockQty',req.values.stockQty.join(','))
     .input('location',req.values.location)
     .input('calculativeField',req.calculativeField)
+    .input('updateTypeId',req.uploadTypeId)
     .query(logQuery);
 
 
@@ -50,8 +61,8 @@ export const viewMapping=async (req,res)=>{
     try{
         const pool=await getPool2();
         let brandId=req.brand_id;
-        let query='use [z_scope] Select * from Stock_Upload_Mapping where brand_id=@brandId';
-        const result=await pool.request().input('brandId',brandId).query(query);
+        let query='use [z_scope] Select * from Stock_Upload_Mapping where brand_id=@brandId and uploadTypeId=@uploadTypeId';
+        const result=await pool.request().input('brandId',brandId).input('uploadTypeId',req.uploadTypeId).query(query);
   
         return result.recordset;
       }
@@ -75,8 +86,8 @@ export const editMapping=async(req,res)=>{
        brandColumns=@brandColumns,
        calculativeField=@calculativeField,
        added_on=@currentDateInIST,
-       operation='update'
-
+       operation='update',
+       uploadTypeId=@uploadTypeId
        where id=@mappedId
         `;
  
@@ -92,6 +103,7 @@ export const editMapping=async(req,res)=>{
        .input('mappedId',req.id)
        .input('calculativeField',req?.calculativeField)
        .input('currentDateInIST',currentDateInIST)
+       .input('uploadTypeId',req?.uploadTypeId)
        .query(query);
  
       

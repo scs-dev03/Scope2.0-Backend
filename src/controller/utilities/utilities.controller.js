@@ -1,7 +1,7 @@
 
 import {getBrands,uploadFile,getDealersBasedOnBrandIDInService,
     getLocationsInService,getLocationsBasedOnBrand,getDesignations,
-    getRoles,getBusinessVertical
+    getRoles,getBusinessVertical,getUploadTypesInService
 } from '../../services/utilities/utilities.service.js'
 export const getBrandsInController=async (req,res)=>{
 
@@ -97,6 +97,16 @@ export const getBusinessVerticalInController=async function(req,res){
     try{
         const result=await getBusinessVertical(req);
         res.send({status:200,data:result.recordset})
+    }
+    catch(error){
+        res.send(201).json({error:error.message})
+    }
+}
+
+export const getUploadTypesInController=async function(req,res){
+    try{
+         const result=await getUploadTypesInService(req);
+        res.send({status:200,data:result})
     }
     catch(error){
         res.send(201).json({error:error.message})
