@@ -1,6 +1,6 @@
 import Router from 'express'
 const router = Router()
-import { getBrands,getDashboard,getDealers,getLocation, getWorkspace, homePageData, latestDates, model, partNature, partType, seasonal, userInfo } from '../controller/MasterApiController.js'
+import { getBrands,getDashboard,getDealers,getLocation, getWorkspace, homePageData, latestDates, model, pagination, partNature, partType, seasonal, userInfo } from '../controller/MasterApiController.js'
 
 
 router.route('/brands').get(getBrands)
@@ -19,6 +19,6 @@ router.route('/dates').post(latestDates)
 
 
 
-
+router.route('/test/:pageno/:pagelimit').post(pagination)
 
 export default router

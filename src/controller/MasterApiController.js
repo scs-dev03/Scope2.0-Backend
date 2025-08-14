@@ -97,70 +97,42 @@ try {
     res.status(500).json({Error:error.message})
 }
 }
-// const getMAX = async (req, res) => {
-//     try {
-//         const pool = await getPool1(); // Ensure the connection is awaited
+const pagination = async (req, res) => {
+    try {
+        const pool = await getPool1(); // Ensure the connection is awaited
+        const {pageno , pagelimit} = req.params
+        const page = parseInt(req.query.page) || pageno
+        const pageSize = parseInt(req.query.pageSize) || pagelimit;
+        const offset = (page - 1) * pageSize;
 
-//         const page = parseInt(req.query.page) || 1;
-//         const pageSize = parseInt(req.query.pageSize) || 10;
-//         const offset = (page - 1) * pageSize;
+        const totalRecordsQuery = await pool.request().query(`select count(locationid)count from locationinfo`);
+        const totalRecords = totalRecordsQuery.recordset[0].count;
+        const totalPages = Math.ceil(totalRecords / pageSize);
+        // console.log(totalRecords,totalPages);
+        
 
-//         const totalRecordsQuery = await pool.request().query(`
-//             SELECT COUNT(*) AS count FROM (
-//                 SELECT DISTINCT 
-//                     sn.Brandid, 
-//                     sn.Dealerid, 
-//                     sn.locationid, 
-//                     sn.partnumber, 
-//                     pm.partdesc, 
-//                     pm.category, 
-//                     pm.mrp, 
-//                     pm.moq, 
-//                     sn.Maxvalue
-//                 FROM stockable_nonstockable_td001_20208 sn
-//                 JOIN Part_Master pm ON pm.partnumber = sn.partnumber
-//                 WHERE stockdate = '2025-02-01 00:00:00'  
-//                  -- AND sn.locationid = 40744
-//             ) AS SubQuery;
-//         `);
-//         const totalRecords = totalRecordsQuery.recordset[0].count;
-//         const totalPages = Math.ceil(totalRecords / pageSize);
+        // 🟢 Fix pagination query (ORDER BY before OFFSET)
+        const dataQuery = await pool.request().query(`
+            select * from locationinfo 
+            order by locationid
+            OFFSET ${offset} ROWS
+            FETCH NEXT ${pageSize} ROWS ONLY;
+        `);
 
-//         // 🟢 Fix pagination query (ORDER BY before OFFSET)
-//         const dataQuery = await pool.request().query(`
-//             SELECT DISTINCT 
-//                 sn.Brandid, 
-//                 sn.Dealerid, 
-//                 sn.locationid, 
-//                 sn.partnumber, 
-//                 pm.partdesc, 
-//                 pm.category, 
-//                 pm.mrp, 
-//                 pm.moq, 
-//                 sn.Maxvalue
-//             FROM stockable_nonstockable_td001_20208 sn
-//             JOIN Part_Master pm ON pm.partnumber = sn.partnumber
-//             WHERE stockdate = '2025-02-01 00:00:00'  
-//               --AND sn.locationid = 40744
-//             ORDER BY sn.partnumber -- Ensure ordering before pagination
-//             OFFSET ${offset} ROWS
-//             FETCH NEXT ${pageSize} ROWS ONLY;
-//         `);
+        res.json({
+            currentPage: page,
+            pageSize,
+            totalRecords,
+            totalPages,
+            hasMore: page < totalPages,
+            data: dataQuery.recordset
+        });
 
-//         res.json({
-//             currentPage: page,
-//             pageSize,
-//             totalRecords,
-//             totalPages,
-//             hasMore: page < totalPages,
-//             data: dataQuery.recordset
-//         });
-
-//     } catch (error) {
-//         console.error(error);
-//         res.status(500).json({ error: "Internal Server Error", details: error.message });
-//     }
-// };
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Internal Server Error", details: error.message });
+    }
+};
 
 const userInfo = async(req,res)=>{
 try {
@@ -226,24 +198,49 @@ const homePageData = async (req, res) => {
                               join z_scope..Part_Master pm on pm.brandid = li.brandid and ppni.PartNumber = pm.partnumber1
                               WHERE ppni.locationid = ${locationId} and pm.PartTypeID = 1`;
   
-      const snstockvaluequery = `use [z_scope] ;WITH LatestSN AS (
-                                  SELECT sn.partnumber1 , sn.Locationid , sn.Maxvalue FROM stockable_nonstockable_td001_${dealerid} sn
-								                  join Part_Master pm on pm.brandid = sn.Brandid and sn.partnumber1 = pm.partnumber1 
-                                  WHERE sn.locationid = ${locationId} and pm.PartTypeID = 1
-                                  AND sn.stockdate = (SELECT MAX(stockdate) FROM stockable_nonstockable_td001_${dealerid} WHERE locationid = ${locationId})
-                                )
-                                SELECT  
-                                    SUM(CASE WHEN sn.MaxValue IS NULL OR sn.MaxValue = 0 THEN 1 ELSE 0 END) AS NonStockable,
-                                    SUM(CASE WHEN sn.MaxValue IS NOT NULL AND sn.MaxValue > 0 THEN 1 ELSE 0 END) AS Stockable,
-                                    SUM(CASE WHEN sn.MaxValue IS NOT NULL AND sn.MaxValue > 0 THEN ISNULL(cs2.Qty, 0) * ISNULL(pm.landedcost, 0) ELSE 0 END) AS StockableValue,
-                                    SUM(CASE WHEN sn.MaxValue IS NULL OR sn.MaxValue = 0 THEN ISNULL(cs2.Qty, 0) * ISNULL(pm.landedcost, 0) ELSE 0 END) AS NonStockableValue
-                                FROM CurrentStock2 cs2
-                                INNER JOIN CurrentStock1 cs1 ON cs2.StockCode = cs1.tCode
-                                LEFT JOIN LatestSN sn ON cs1.LocationID = sn.LocationID AND cs2.PartNumber = sn.partnumber1
-                                INNER JOIN Dealer_Workshop_Master li ON cs1.LocationID = li.bigid
-                                LEFT JOIN Part_Master pm ON pm.brandid = li.BrandID AND cs2.PartNumber = pm.partnumber
-                                WHERE cs1.LocationID = ${locationId}`;
+      // const snstockvaluequery = `use [z_scope] ;WITH LatestSN AS (
+      //                             SELECT sn.partnumber1 , sn.Locationid , sn.Maxvalue FROM stockable_nonstockable_td001_${dealerid} sn
+			// 					                  join Part_Master pm on pm.brandid = sn.Brandid and sn.partnumber1 = pm.partnumber1 
+      //                             WHERE sn.locationid = ${locationId} and pm.PartTypeID = 1
+      //                             AND sn.stockdate = (SELECT MAX(stockdate) FROM stockable_nonstockable_td001_${dealerid} WHERE locationid = ${locationId})
+      //                           )
+      //                           SELECT  
+      //                               SUM(CASE WHEN sn.MaxValue IS NULL OR sn.MaxValue = 0 THEN 1 ELSE 0 END) AS NonStockable,
+      //                               SUM(CASE WHEN sn.MaxValue IS NOT NULL AND sn.MaxValue > 0 THEN 1 ELSE 0 END) AS Stockable,
+      //                               SUM(CASE WHEN sn.MaxValue IS NOT NULL AND sn.MaxValue > 0 THEN ISNULL(cs2.Qty, 0) * ISNULL(pm.landedcost, 0) ELSE 0 END) AS StockableValue,
+      //                               SUM(CASE WHEN sn.MaxValue IS NULL OR sn.MaxValue = 0 THEN ISNULL(cs2.Qty, 0) * ISNULL(pm.landedcost, 0) ELSE 0 END) AS NonStockableValue
+      //                           FROM CurrentStock2 cs2
+      //                           INNER JOIN CurrentStock1 cs1 ON cs2.StockCode = cs1.tCode
+      //                           LEFT JOIN LatestSN sn ON cs1.LocationID = sn.LocationID AND cs2.PartNumber = sn.partnumber1
+      //                           INNER JOIN Dealer_Workshop_Master li ON cs1.LocationID = li.bigid
+      //                           LEFT JOIN Part_Master pm ON pm.brandid = li.BrandID AND cs2.PartNumber = pm.partnumber
+      //                           WHERE cs1.LocationID = ${locationId}`;
   
+      const snstockvaluequery = `
+                          use [z_scope] 
+declare @date datetime = (select MAX(Stockdate) from Stockable_Nonstockable_TD001_${dealerid} where Locationid = ${locationId})
+;WITH Stock AS (
+SELECT  pm.brandid,cs1.LocationID, cs2.PartNumber ,
+CASE when cs2.PartNumber = sm.partnumber1 then sm.subpartnumber1 else cs2.PartNumber end as Latest, cs2.Qty , pm.landedcost
+FROM [z_scope].dbo.CurrentStock1(NOLOCK) cs1
+JOIN [z_scope].dbo.CurrentStock2(NOLOCK) cs2 ON cs2.StockCode = cs1.tCode
+JOIN [z_scope].dbo.locationinfo(NOLOCK) li ON li.LocationID = cs1.LocationID
+left join Substitution_Master(NOLOCK) sm on sm.brandid = li.BrandID and sm.partnumber1 = cs2.PartNumber
+JOIN Part_Master(NOLOCK) pm ON pm.brandid = li.BrandID AND cs2.PartNumber = pm.partnumber and pm.PartTypeID = 1
+WHERE cs1.locationid = ${locationId} 
+),
+sn as (
+select sn.Locationid , sn.partnumber1 ,sn.Maxvalue, CASE when sn.partnumber1 = sm.partnumber1 then sm.subpartnumber1 else sn.partnumber1 end as Latest
+from Stockable_Nonstockable_TD001_${dealerid}(NOLOCK) sn
+--join Dealer_Workshop_Master(NOLOCK) dwm on dwm.bigid = sn.Locationid and sn.Stockdate = dwm.MaxDate
+left join Substitution_Master(NOLOCK) sm on sm.brandid = sn.BrandID and sm.partnumber1 = sn.partnumber1
+JOIN Part_Master(NOLOCK) pm ON pm.brandid = sn.BrandID AND sn.PartNumber1 = pm.partnumber1 and pm.PartTypeID = 1
+where sn.Locationid = ${locationId} and sn.Stockdate = @date and Maxvalue >0
+)
+SELECT  SUM(s.Qty * s.landedcost)as StockableValue
+FROM Stock s 
+JOIN sn on sn.latest = s.latest
+      `
       const lastorderValuequery = `SELECT scsorderno, SUM(finalorderqty) AS QTY, SUM(finalorderval) AS Value, addeddate
                                   FROM [10.10.152.17].[z_scope].dbo.ogs_orderdata_td001_${dealerid}
                                   WHERE addeddate = (
@@ -273,7 +270,9 @@ const homePageData = async (req, res) => {
         pool.request().query(lastorderValuequery),
         pool.request().query(jobcardDatequery)
       ]);
-  
+      const a = snstockvalue.recordset[0].StockableValue
+      const b = stockValue.recordset[0].stockvalue
+      
       // Run dynamic SQL separately (not safe to include in Promise.all)
       const SixMonthLocationwiseSaleValueQuery = `
         DECLARE @ls INT = 6, @st INT = 1, @Columnsold NVARCHAR(MAX) = '', @SumColumns NVARCHAR(MAX) = '',
@@ -311,7 +310,7 @@ const homePageData = async (req, res) => {
         StockQty: stock.recordset,
         StockValue: stockValue.recordset,
         PPNIValue: ppniValue.recordset,
-        SNStockValue: snstockvalue.recordset,
+        SNStockValue: {Stockable:a,NonStockable:b-a},
         lastOrderDetails: lastOrderValue.recordset,
         JobCardDate: lastjobcard.recordset,
         SixMonthSaleValue: SixMonthLocationwiseSaleValue.recordset
@@ -385,4 +384,4 @@ const latestDates = async (req, res) => {
 };
 
 
-export {homePageData,getBrands,getDealers,getLocation,getWorkspace,getDashboard,partNature,model,seasonal,partType,userInfo,latestDates}
+export {pagination,homePageData,getBrands,getDealers,getLocation,getWorkspace,getDashboard,partNature,model,seasonal,partType,userInfo,latestDates}

@@ -1,10 +1,11 @@
 import { partBrandMapping, partfamilySaleservice, partFamilyService, singlePartMaxByLocationService } from "../../services/norms-management/utils.service.js";
 import { orderDetailsByPartnumberService, transformOrderData } from "../../services/orderDetails/orderDetailsService.js";
 import { partDetailsservice } from "../../services/salesview/salesviewservices.js";
-import {advisorwisePPNIValueService, groupStock,gainerListingService, jobCardByVehicleService, locationwisePPNIValueService, partInfo,  partsByJobCardService,  partSubstituteDetailService,  partwisePPNIValueService,  PPNIVALUE12MonthsService,  reservedForVehicle, userroleService, vehicleSearchService, vehiclewisePPNIValueService, predictiveVehicleSearchService ,vehicledealercheck, groupNorms, partfamilywiseStockColor, vehicleScore} from  "../../services/dealerMonitoring/dealerMonitoringService.js";
+import {advisorwisePPNIValueService, groupStock,gainerListingService, jobCardByVehicleService, locationwisePPNIValueService, partInfo,  partsByJobCardService,  partSubstituteDetailService,  partwisePPNIValueService,  PPNIVALUE12MonthsService,  reservedForVehicle, userroleService, vehicleSearchService, vehiclewisePPNIValueService, predictiveVehicleSearchService ,vehicledealercheck, groupNorms, partfamilywiseStockColor, vehicleScore, vehicleSearchPagination} from  "../../services/dealerMonitoring/dealerMonitoringService.js";
 import { getPool2 } from "../../db/db.js";
 import { partFamily } from "../vonController.js";
 import { partBrandCheck } from "../../utils/vonHelper.js";
+
 // import { transformOrderData } from "../../services/orderDetails/orderDetailsService.js";
 
 const partSale = async (req,res)=>{
@@ -26,6 +27,8 @@ const partSale = async (req,res)=>{
             partInfo(brandid,partnumber),
             partfamilywiseStockColor(brandid,dealerid,locationid,partnumber)
         ])  
+        // console.log(data5.recordset);
+        
         res.status(200).json({
             Details:data4.recordset,
             Sales:data1.recordset,
@@ -152,24 +155,25 @@ try {
             groupStock(brandid,dealerid,locationid, partnumber),
             singlePartMaxByLocationService(brandid,dealerid,locationid,partnumber)
         ]);
-//        const statusById = data3.recordsets[1].reduce((map, { locationid, partstatus }) => {
-//   map[locationid] = partstatus;
-//   return map;
-// }, {});
+        // console.log(data3.recordsets);
+        const colorMap = new Map(
+  data3.recordsets[2].map(item => [item.locationid, item.PartStatus])
+);
 
-// // 2) map over your group array and inject Partstatus
-// const merged = data3.recordsets[2].map(item => ({
-//   ...item,
-//   Partstatus: statusById[item.locationid] ?? null
-// }));
+// Merge by matching LocationID
+const merged = data3.recordsets[0].map(item => ({
+  ...item,
+  Partstatus: colorMap.get(item.LocationID) || null
+}));
 
-        
+// console.log(merged);
+
         res.status(200).json({
             Details:data.recordset,
             Reserved:data2.recordset,
-            Substitutes:data3.recordsets[0],
-            Group:data3.recordsets[1],
-            // StockColor:data3.recordsets[1],
+            Substitutes:data3.recordsets[1],
+            Group:merged,
+            // StockColor:data3.recordsets[2],
             Norms:data4.recordsets[0],
             Stock:data4.recordsets[1]
             })
@@ -182,25 +186,53 @@ try {
 }
 
 const vehicleSearch = async (req,res)=>{
-    const {dealerid,vehicleno ,alltimestk, filter , issued} = req.body
-        const converted = filter === null
-          ? null
-          : (filter === 'Open' ? 'N' : filter);
+try {
+        // const pool = await getPool2()
+        const {dealerid,locationid,vehicleno ,alltimestk, filter , issued , pageno , pagesize} = req.body
+            const converted = filter === null
+              ? null
+              : (filter === 'Open' ? 'N' : filter);
+    
+            // console.log(dealerid,vehicleno ,alltimestk, converted , issued);
+        const check = await vehicledealercheck(vehicleno,dealerid)
+        if(check == 0){
+            return res.status(400).json({
+                message:`Invalid Vehicle Number`
+            })
+        }
+        const [data1 , data2 , data3] = await Promise.all([
+             vehicleSearchService(dealerid,locationid,vehicleno,alltimestk,converted,issued,pageno,pagesize),
+             vehicleScore(dealerid,vehicleno),
+            //  vehicleSearchPagination(pageno,pagesize,dealerid,vehicleno,alltimestk,issued,converted)
+        ])
 
-        // console.log(dealerid,vehicleno ,alltimestk, converted , issued);
-    const check = await vehicledealercheck(vehicleno,dealerid)
-    if(check == 0){
-        return res.status(400).json({
-            message:`Invalid Vehicle Number`
+function transformJobCardsArray(jobCards) {
+  if (!Array.isArray(jobCards) || jobCards.length === 0) {
+    return [{ Count: 0 }, []];
+  }
+
+  // Count is constant, so we just take it from the first row
+  const count = jobCards[0].Count;
+
+  // Remove Count from each row for the details array
+  const details = jobCards.map(({ Count, ...rest }) => rest);
+
+  return [{ Count: count }, details];
+}
+
+const Data = transformJobCardsArray(data1.recordset)
+// console.log(Data);
+
+
+
+        res.status(200).json({
+            Data:Data,
+            Score:data2.recordset,
+            // pageInfo:data3
         })
-    }
-    const data = await vehicleSearchService(dealerid,vehicleno,alltimestk,converted,issued)
-    const data2 = await vehicleScore(dealerid,vehicleno)
-    res.status(200).json({
-        JobCards:data.recordset,
-        Score:data2.recordset
-
-    })
+} catch (error) {
+    res.status(500).json(error)
+}
 }
 
 const partSearch = async (req,res)=>{
@@ -227,16 +259,17 @@ try {
                 message:`Invalid Partnumber`
             })
         }
-        const dataResult = await partSubstituteDetailService(brandid,partnumber)
-        const colorResult = await partfamilywiseStockColor(brandid,dealerid,locationid,partnumber)
-        // console.log(data1);
+        const [data1 , data2] = await Promise.all([
+            partSubstituteDetailService(brandid,dealerid,locationid,partnumber),
+            partfamilywiseStockColor(brandid,dealerid,locationid,partnumber)
+        ])
         const statusMap = {};
-    for (const { Part, Partstatus } of colorResult.recordset) {
+    for (const { Part, Partstatus } of data2.recordset) {
       statusMap[Part] = Partstatus;
     }
 
     // 2️⃣ Enrich each data row with its Partstatus
-    const enriched = dataResult.recordset.map(row => ({
+    const enriched = data1.recordset.map(row => ({
       ...row,
       PartStatus: statusMap[row.PartNumber1] ?? 'Unknown'
     }));
@@ -305,6 +338,8 @@ try {
             })
         }
        const data = await advisorwisePPNIValueService(dealerid,locationid,jobcardstatus,nonstockable,month)
+    //    console.log(data);
+       
        res.status(200).json({
         Data: data.recordset
        })
@@ -317,52 +352,93 @@ try {
 
 const vehiclewisePPNIValue = async(req,res)=>{
 try {
-        const {dealerid , locationid, nonstockable , jobcardstatus, advisor , month} = req.body
+        const {dealerid , locationid, nonstockable , jobcardstatus, advisor , month , pageno , pagesize} = req.body
         if(!dealerid || !locationid|| !nonstockable == null || !jobcardstatus == null || !month == null){
             return res.status(400).json({
                 message:`dealerid , nonstockable and partstatus is required`
             })
         }
-       const data = await vehiclewisePPNIValueService(dealerid,locationid,jobcardstatus,nonstockable,advisor,month)
-    //    console.log(data.recordset);
+       const data = await vehiclewisePPNIValueService(dealerid,locationid,jobcardstatus,nonstockable,advisor,month,pageno,pagesize)
+    //    console.log(data);
        
        // Transform the flat data into grouped vehicle-wise structure
+// function transformVehiclePartsData(rawData) {
+//   const groupedData = {};
+
+//   // const data = item.TotalCount;
+
+//   // if (!groupedData[TotalCount]) {
+//   //   groupedData[TotalCount] = {
+//   //     TotalCount: TotalCount,
+//   //     Vehicle:[]
+//   //   }
+//   // }
+
+//   // // groupedData[vehicle].ppniValue += item.PPNI_Value;
+//   // // groupedData[vehicle].InStockCount = item.InStockCount;
+//   // // groupedData[vehicle].NotIssued = item.NotIssued;
+
+//   // // groupedData[vehicle].parts.push({
+//   // //   partNumber: item.PartNumber,
+//   // //   description: item.PartDesc,
+//   // //   category: item.part_category,
+//   // //   ndp: item.price,
+//   // //   DemandedQty: item.DemandedQty,
+//   // //   StockQty: item.StockQty,
+//   // //   value: item.PPNI_Value,
+//   // //   alltimestk : item.All_Time_NonStck
+//   // // //   type:item.Partnature
+//   // // });
+
+
+//   rawData.forEach(row => {
+//      const key = row.TotalCount;
+//   if (!groupedData[key]) {
+//     groupedData[key] = [];
+//   }
+//   groupedData[key].push({
+//     Vehiclenumber: row.Vehiclenumber,
+//     PPNI_Value: row.PPNI_Value,
+//     NotIssued: row.NotIssued,
+//     InstockCount: row.InstockCount
+//   });
+// });
+
+// // If you want it as an array of objects:
+// const output = Object.entries(groupedData).map(([totalCount, items]) => ({
+//   TotalCount: Number(totalCount),
+//   Data: items
+// }));
+
+//   return Object.values(groupedData);
+// }
+
 function transformVehiclePartsData(rawData) {
-  const groupedData = {};
+  if (!Array.isArray(rawData) || rawData.length === 0) {
+    return [{ TotalCount: 0 }, []];
+  }
 
-  rawData.forEach(item => {
-    const vehicle = item.Vehiclenumber;
+  // take the first row's TotalCount (or max if multiple different)
+  const totalCount = Math.max(...rawData.map(row => Number(row.TotalCount || 0)));
 
-    if (!groupedData[vehicle]) {
-      groupedData[vehicle] = {
-        vehicleNumber: vehicle,
-        ppniValue: 0,
-        parts: []
-      };
-    }
+  // strip TotalCount from each row
+  const vehicleList = rawData.map(row => ({
+    Vehiclenumber: row.Vehiclenumber,
+    PPNI_Value: row.PPNI_Value,
+    NotIssued: row.NotIssued,
+    InstockCount: row.InstockCount
+  }));
 
-    groupedData[vehicle].ppniValue += item.PPNI_Value;
-
-    groupedData[vehicle].parts.push({
-      partNumber: item.PartNumber,
-      description: item.PartDesc,
-      category: item.part_category,
-      ndp: item.price,
-      DemandedQty: item.DemandedQty,
-      StockQty: item.StockQty,
-      value: item.PPNI_Value,
-      alltimestk : item.All_Time_NonStck
-    //   type:item.Partnature
-    });
-  });
-
-  return Object.values(groupedData);
+  // return in the desired shape
+  return [{ TotalCount: totalCount }, vehicleList];
 }
+
 
 const transformedData = transformVehiclePartsData(data.recordset);
 
        res.status(200).json({
         Data: transformedData
+        // Data:data.recordset
        })
 } catch (error) {
     res.status(500).json({
@@ -373,13 +449,13 @@ const transformedData = transformVehiclePartsData(data.recordset);
 
 const partwisePPNIValue = async(req,res)=>{
 try {
-        const {dealerid , locationid, nonstockable , jobcardstatus, advisor, vehicleno} = req.body
-        if(!dealerid || !locationid|| !nonstockable || !jobcardstatus || !vehicleno){
+        const {dealerid , locationid, nonstockable , jobcardstatus, advisor, vehicleno , month} = req.body
+        if(!dealerid || !locationid|| !nonstockable == null || !jobcardstatus == null || !vehicleno || !month == null){
             return res.status(400).json({
-                message:`dealerid , nonstockable and partstatus is required`
+                message:`dealerid , locationid  and vehicleno is required`
             })
         }
-       const data = await partwisePPNIValueService(dealerid,locationid,jobcardstatus , nonstockable , advisor , vehicleno)
+       const data = await partwisePPNIValueService(dealerid,locationid,jobcardstatus , nonstockable , advisor , vehicleno , month)
        res.status(200).json({
         Data: data.recordset
        })

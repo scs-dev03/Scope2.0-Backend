@@ -18,96 +18,124 @@ const partfamilySaleservice = async (brandid,dealerid,locationid,partnumber) => 
 const singlePartMaxByLocationService = async (brandid,dealerid,locationid,partnumber)=>{
 try {
         const pool = getPool2()
-        // const query = `use [z_scope] select distinct li.location , li.locationid, sn.maxvalue 
-        //                 from stockable_nonstockable_td001_${dealerid} sn
-        //                 join locationinfo li on li.LocationID = sn.locationid
-        //                 where sn.partnumber = '${partnumber}' and sn.stockdate = (select max(stockdate) from stockable_nonstockable_td001_${dealerid}) 
-        //                 group by li.location ,li.locationid, sn.Maxvalue`
-        const query = 
-        ` use z_scope DECLARE  
-         @InputPart    VARCHAR(40) = '${partnumber}',      -- ←  input part 
-         @InputBrandID INT         =${brandid};           -- ←  input brand 
+//         const query = 
+//         ` use z_scope DECLARE  
+//          @InputPart    VARCHAR(40) = '${partnumber}',      -- ←  input part 
+//          @InputBrandID INT         =${brandid};           -- ←  input brand 
      
-        DECLARE @RowsInserted INT; 
+//         DECLARE @RowsInserted INT; 
      
-        -- 0) Drop any old temp-table 
-        IF OBJECT_ID('tempdb..#PartFamily','U') IS NOT NULL 
-         DROP TABLE #PartFamily; 
+//         -- 0) Drop any old temp-table 
+//         IF OBJECT_ID('tempdb..#PartFamily','U') IS NOT NULL 
+//          DROP TABLE #PartFamily; 
      
-        -- 1) Create a holding table: one row per (Part, BrandID) 
-        CREATE TABLE #PartFamily ( 
-         Part    VARCHAR(40), 
-         BrandID INT, 
-         --CONSTRAINT PK_PartFamily PRIMARY KEY (Part, BrandID) 
-        ); 
+//         -- 1) Create a holding table: one row per (Part, BrandID) 
+//         CREATE TABLE #PartFamily ( 
+//          Part    VARCHAR(40), 
+//          BrandID INT, 
+//          --CONSTRAINT PK_PartFamily PRIMARY KEY (Part, BrandID) 
+//         ); 
      
-        -- 2) Seed it with exactly your input (part, brand) 
-        INSERT INTO #PartFamily(Part, BrandID) 
-        VALUES (@InputPart, @InputBrandID); 
+//         -- 2) Seed it with exactly your input (part, brand) 
+//         INSERT INTO #PartFamily(Part, BrandID) 
+//         VALUES (@InputPart, @InputBrandID); 
      
-        -- 3) Iteratively grow the family within that brand 
-        SET @RowsInserted = 1; 
-        WHILE @RowsInserted > 0 
-        BEGIN 
-            INSERT INTO #PartFamily(Part, BrandID) 
-            SELECT DISTINCT 
-                sm.SubPartNumber1, 
-                sm.BrandID 
-            FROM z_scope..Substitution_Master AS sm 
-            JOIN #PartFamily AS f 
-              ON sm.PartNumber1 = f.Part 
-             AND sm.BrandID    = f.BrandID 
-            WHERE NOT EXISTS ( 
-               SELECT 1 
-               FROM #PartFamily x 
-               WHERE x.Part    = sm.SubPartNumber1 
-                 AND x.BrandID = sm.BrandID 
-            ) 
+//         -- 3) Iteratively grow the family within that brand 
+//         SET @RowsInserted = 1; 
+//         WHILE @RowsInserted > 0 
+//         BEGIN 
+//             INSERT INTO #PartFamily(Part, BrandID) 
+//             SELECT DISTINCT 
+//                 sm.SubPartNumber1, 
+//                 sm.BrandID 
+//             FROM z_scope..Substitution_Master AS sm 
+//             JOIN #PartFamily AS f 
+//               ON sm.PartNumber1 = f.Part 
+//              AND sm.BrandID    = f.BrandID 
+//             WHERE NOT EXISTS ( 
+//                SELECT 1 
+//                FROM #PartFamily x 
+//                WHERE x.Part    = sm.SubPartNumber1 
+//                  AND x.BrandID = sm.BrandID 
+//             ) 
         
-            UNION 
+//             UNION 
         
-            SELECT DISTINCT 
-                sm.PartNumber1, 
-                sm.BrandID 
-            FROM z_scope..Substitution_Master AS sm 
-            JOIN #PartFamily AS f 
-              ON sm.SubPartNumber1 = f.Part 
-             AND sm.BrandID        = f.BrandID 
-            WHERE NOT EXISTS ( 
-               SELECT 1 
-               FROM #PartFamily x 
-               WHERE x.Part    = sm.PartNumber1 
-                 AND x.BrandID = sm.BrandID 
-            ); 
+//             SELECT DISTINCT 
+//                 sm.PartNumber1, 
+//                 sm.BrandID 
+//             FROM z_scope..Substitution_Master AS sm 
+//             JOIN #PartFamily AS f 
+//               ON sm.SubPartNumber1 = f.Part 
+//              AND sm.BrandID        = f.BrandID 
+//             WHERE NOT EXISTS ( 
+//                SELECT 1 
+//                FROM #PartFamily x 
+//                WHERE x.Part    = sm.PartNumber1 
+//                  AND x.BrandID = sm.BrandID 
+//             ); 
         
-            SET @RowsInserted = @@ROWCOUNT; 
-        END 
+//             SET @RowsInserted = @@ROWCOUNT; 
+//         END 
         
 
---select * from #PartFamily
---select li.locationid , li.location , sum(maxvalue)as Max ,sum(cs2.Qty)as Stock ,sn.partnumber1 as maxpart, cs2.PartNumber as stockpart from Stockable_Nonstockable_TD001_${dealerid} sn
---join LocationInfo li on li.LocationID = sn.Locationid
---join #PartFamily pf on pf.Part = sn.partnumber1
---join CurrentStock1 cs1 on cs1.LocationID = li.LocationID 
---join CurrentStock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = pf.Part
---where sn.Stockdate = (select MAX(stockdate) from Stockable_Nonstockable_TD001_${dealerid})
---group by li.locationid , li.location , cs2.partnumber , sn.partnumber1
+// --select * from #PartFamily
+// --select li.locationid , li.location , sum(maxvalue)as Max ,sum(cs2.Qty)as Stock ,sn.partnumber1 as maxpart, cs2.PartNumber as stockpart from Stockable_Nonstockable_TD001_${dealerid} sn
+// --join LocationInfo li on li.LocationID = sn.Locationid
+// --join #PartFamily pf on pf.Part = sn.partnumber1
+// --join CurrentStock1 cs1 on cs1.LocationID = li.LocationID 
+// --join CurrentStock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = pf.Part
+// --where sn.Stockdate = (select MAX(stockdate) from Stockable_Nonstockable_TD001_${dealerid})
+// --group by li.locationid , li.location , cs2.partnumber , sn.partnumber1
+
+// select sn.Maxvalue , sn.partnumber1 
+// --, case when sn.partnumber1 = sm.partnumber1 then sm.subpartnumber1 else sm.partnumber1 end as latest 
+// from z_scope..Stockable_Nonstockable_TD001_${dealerid} sn
+// join #PartFamily pf on pf.Part = sn.partnumber1 
+// --left join Substitution_Master sm on sm.brandid = sn.BrandID and sm.partnumber1 = sn.partnumber1
+// where sn.Stockdate = (select MAX(stockdate) from Stockable_Nonstockable_TD001_${dealerid}) and sn.locationid = ${locationid}
+// group by  sn.Maxvalue , sn.partnumber1 --, sm.subpartnumber1 , sm.partnumber1
+
+// select cs2.Qty,cs2.PartNumber  from #PartFamily pf 
+// join z_scope..LocationInfo li on li.BrandID = pf.BrandID
+// join z_scope..CurrentStock1 cs1 on li.LocationID = cs1.LocationID
+// join z_scope..CurrentStock2 cs2 on cs1.tCode = cs2.StockCode and pf.Part = cs2.PartNumber
+// where li.LocationID = ${locationid}
+// `
+const query = `
+        use z_scope 
+	  DECLARE 
+        @InputPart VARCHAR(40) = '${partnumber}',
+        @InputBrandID INT = ${brandid},
+        @InputLocationID INT = ${locationid},
+		@InputDealerid int = ${dealerid},
+		@latestpart varchar(20);
+     
+	   IF OBJECT_ID('tempdb..#Part','U') IS NOT NULL
+            DROP TABLE #Part;
+
+create table #part(
+part varchar(40)
+)
+select @latestpart = subpartnumber1 from Substitution_Master 
+where brandid = @InputBrandID and (partnumber1 = @InputPart or subpartnumber1 = @InputPart)
+
+insert into #part
+select partnumber1 from substitution_master where brandid = @InputBrandID and subpartnumber1= @latestpart
+union 
+select @latestpart
+
 
 select sn.Maxvalue , sn.partnumber1 
---, case when sn.partnumber1 = sm.partnumber1 then sm.subpartnumber1 else sm.partnumber1 end as latest 
 from z_scope..Stockable_Nonstockable_TD001_${dealerid} sn
-join #PartFamily pf on pf.Part = sn.partnumber1 
---left join Substitution_Master sm on sm.brandid = sn.BrandID and sm.partnumber1 = sn.partnumber1
-where sn.Stockdate = (select MAX(stockdate) from Stockable_Nonstockable_TD001_${dealerid}) and sn.locationid = ${locationid}
-group by  sn.Maxvalue , sn.partnumber1 --, sm.subpartnumber1 , sm.partnumber1
+join #part pf on pf.part = sn.partnumber1 
+where sn.Stockdate = (select MAX(stockdate) from Stockable_Nonstockable_TD001_${dealerid} where locationid = @InputLocationID) and sn.locationid = @InputLocationID
+group by  sn.Maxvalue , sn.partnumber1
 
-select cs2.Qty,cs2.PartNumber  from #PartFamily pf 
-join z_scope..LocationInfo li on li.BrandID = pf.BrandID
-join z_scope..CurrentStock1 cs1 on li.LocationID = cs1.LocationID
-join z_scope..CurrentStock2 cs2 on cs1.tCode = cs2.StockCode and pf.Part = cs2.PartNumber
-where li.LocationID = ${locationid}
-`
-
+select cs2.Qty,cs2.PartNumber  from #part pf 
+join z_scope..CurrentStock1 cs1 on  cs1.LocationID  = @InputLocationID
+join z_scope..CurrentStock2 cs2 on cs1.tCode = cs2.StockCode and pf.part = cs2.PartNumber
+    `
         const result = await pool.request().query(query)
         return result
 } catch (error) {

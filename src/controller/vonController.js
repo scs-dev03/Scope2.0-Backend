@@ -292,25 +292,28 @@ const viewLog = async (req, res) => {
 }
 const adminView = async (req, res) => {
     try {
-        const pool = await getPool1()
-        const { brandid, dealerid, r1, r2, l1, l2, partnumber, locationid, flag, seasonalid, modelid, natureid, status, parttype } = req.body
+        const pool = await getPool2()
+        const { brandid, dealerid, r1, r2, l1, l2, partnumber, locationid, flag, seasonalid, modelid, natureid, status, parttype, pageno, pagesize } = req.body
         // console.log(brandid, dealerid, r1, r2 ,l1,l2, partnumber , locationid , flag, seasonalid, modelid, natureid, status,parttype);
 
-        if (!brandid || !dealerid) {
+        if (!brandid || !dealerid || !pageno || !pagesize) {
             return res.status(400).json({ Error: `Brandid and Dealerid are required Parameter` })
         }
-        const query = `exec [z_scope].dbo.GetMAXDataAdmin @brandid,@dealerid , @r1, @r2,@l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@status,@parttype;`
+        // const query = `exec [z_scope].dbo.GetMAXDataAdmin @brandid,@dealerid , @r1, @r2,@l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@status,@parttype;`
         // console.log(query);
+        const query = `use z_scope EXEC sp_MAXAdminView @brandid ,@dealerid ,@locationid ,@seasonalid ,@natureid ,@modelid,@PartNumber,@r1 ,@r2,@l1,@l2 ,@MaxValueFlag,@parttype,@pageno,@pagesize;`
 
-        if (!partnumber && !locationid) {
-            return res.status(400).json({ Error: `partnumber or locationid is required` })
-        }
+        // if (!partnumber && !locationid) {
+        //     return res.status(400).json({ Error: `partnumber or locationid is required` })
+        // }
 
         const request = pool.request();
 
         // Handle potential NULL values correctly
         request.input('brandid', sql.Int, brandid)
         request.input('dealerid', sql.Int, dealerid)
+        request.input('pageno', sql.Int, pageno)
+        request.input('pagesize', sql.Int, pagesize)
         request.input('r1', sql.Int, r1 ?? null);
         request.input('r2', sql.Int, r2 ?? null);
         request.input('l1', sql.Int, l1 ?? null);

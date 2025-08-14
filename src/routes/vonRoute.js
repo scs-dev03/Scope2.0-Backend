@@ -19,6 +19,8 @@ router.route('/countpending').get(countPending)
 router.route('/partfamilysale').post(partFamilySale)
 
 router.route('/adminpendingview').post(adminPendingView)
+// router.route('/adminview').post(adminview)
+
 router.route('/upload').post(upload.single('file'),dealerUpload);
 router.route('/aupload').post(upload.single('file2'),adminUpload);
 // router.post('/upload', (req, res, next) => {
