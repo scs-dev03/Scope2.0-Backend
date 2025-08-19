@@ -913,6 +913,7 @@ AND
     ),
   data2 as (
   select 
+  co.bigid,
   ppni.Vehiclenumber,
           ppni.PartNumber, 
           CASE WHEN ppni.PartNumber = sm.partnumber1 then sm.subpartnumber1 else ppni.PartNumber end as Latest,
@@ -948,7 +949,7 @@ AND
           )
           AND ppni.locationid = @locationid
         GROUP BY 
-          ppni.PartNumber, ppni.Vehiclenumber, ppni.PartDesc, part_category, ppni.price, ppni.Qty , All_Time_NonStck , sm.partnumber1 , sm.subpartnumber1  , ppni.PPNI_Val
+            co.bigid,ppni.PartNumber, ppni.Vehiclenumber, ppni.PartDesc, part_category, ppni.price, ppni.Qty , All_Time_NonStck , sm.partnumber1 , sm.subpartnumber1  , ppni.PPNI_Val
         HAVING 
           SUM(ppni_val) > 0
   )
@@ -1088,6 +1089,7 @@ DECLARE @offset INT = (@pageno - 1) * @pagesize;
 
 data2 AS (
     SELECT DISTINCT
+        co.bigid,
         co.jobcard_number,
         co.part_number1,
         CASE 
