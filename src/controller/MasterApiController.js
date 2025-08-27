@@ -310,7 +310,7 @@ JOIN sn on sn.latest = s.latest
         StockQty: stock.recordset,
         StockValue: stockValue.recordset,
         PPNIValue: ppniValue.recordset,
-        SNStockValue: {Stockable:a,NonStockable:b-a},
+        SNStockValue: [{StockableValue:a,NonStockableValue:b-a}],
         lastOrderDetails: lastOrderValue.recordset,
         JobCardDate: lastjobcard.recordset,
         SixMonthSaleValue: SixMonthLocationwiseSaleValue.recordset

@@ -23,12 +23,6 @@ router.route('/adminpendingview').post(adminPendingView)
 
 router.route('/upload').post(upload.single('file'),dealerUpload);
 router.route('/aupload').post(upload.single('file2'),adminUpload);
-// router.post('/upload', (req, res, next) => {
-//     // console.log("Headers:", req.headers);
-//     console.log("Body:", req.body);
-//     console.log("Files:", req.files);
-//     next();
-// }, upload.single('file'), dealerUpload);
-
+// router.post('/upload', (req, res, next) => 
 
 export default router
