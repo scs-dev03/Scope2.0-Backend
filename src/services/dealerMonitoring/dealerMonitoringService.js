@@ -77,7 +77,7 @@ try {
         ;with part as (
         select partnumber1 from substitution_master where brandid = @InputBrandID and subpartnumber1= @latestpart
         union 
-        select @latestpart
+        select ISNULL(@latestpart,@InputPart) 
         ),
         loc as (
         select locationid , Location from LocationInfo where DealerID  = @InputDealerid
@@ -433,7 +433,7 @@ ORDER BY pm.PartNumber1, pm.BrandID;
 
 const userroleService = async(userid)=>{
 try {
-        const pool = await getPool1()
+        const pool = await getPool2()
         const query = `select rm.Role,concat(amg.vcFirstName,' ',amg.vcLastName)as Name from adminmaster_gen amg 
                         join Role_Master rm on rm.bigid = amg.Designation
                         where bintId_Pk = ${userid}`
@@ -559,7 +559,7 @@ DECLARE @lastDate DATE = EOMONTH(@firstDate);
 	  join z_scope..currentstock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = p.PartNumber
       WHERE  
 	  	co.JobLineCloseDate is null and
-	  cs2.Qty > 0  
+	  cs2.Qty = 0  
 	  and 
           (
               (@All_Time_NonStck IS NULL AND All_Time_NonStck IN ('Y', 'N')) 
@@ -616,7 +616,7 @@ DECLARE @lastDate DATE = EOMONTH(@firstDate);
 	  join z_scope..currentstock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = p.PartNumber
 	  WHERE 
 	 co.JobLineCloseDate is null and
-	  cs2.Qty > 0
+	  cs2.Qty = 0
 and
   (@All_Time_NonStck IS NULL OR All_Time_NonStck = @All_Time_NonStck)
 	AND
@@ -744,7 +744,7 @@ declare @JobCardStatus varchar(50) = ${jobcardstatusSQL};
 declare @All_Time_NonStck varchar(50) = ${nonstockableSQL};
 
 
-select count(ppni.Vehiclenumber) over() as TotalCount ,ppni.Vehiclenumber , SUM(PPNI_Val)PPNI_Value  , b.NotIssued , a.InstockCount 
+select count(ppni.Vehiclenumber) over() as TotalCount ,ppni.DealerId,ppni.LocationId,ppni.Vehiclenumber , SUM(PPNI_Val)PPNI_Value  , b.NotIssued , a.InstockCount 
 from UAD_BI_PPNI..PPNI_report_${dealerid} ppni
 	  outer apply(
 			 SELECT
@@ -774,7 +774,7 @@ from UAD_BI_PPNI..PPNI_report_${dealerid} ppni
 where ppni.Locationid = ${locationid}
 AND
 	 co.JobLineCloseDate is null and
-		  cs2.Qty > 0
+		  cs2.Qty = 0
    AND (
        @All_Time_NonStck IS NULL
        OR ppni.All_Time_NonStck = @All_Time_NonStck
@@ -793,7 +793,7 @@ AND
         @advisor IS NULL
         OR ppni.Advisor = @advisor
     )
-        group by ppni.Vehiclenumber   , b.NotIssued , a.InstockCount
+        group by ppni.Vehiclenumber   , b.NotIssued , a.InstockCount ,ppni.Dealerid,ppni.LocationId
 		  HAVING 
 			  SUM(ppni_val) > 0
 			  order by PPNI_Value desc
@@ -914,6 +914,8 @@ AND
   data2 as (
   select 
   co.bigid,
+  co.DealerId,
+  co.LocationId,
   ppni.Vehiclenumber,
           ppni.PartNumber, 
           CASE WHEN ppni.PartNumber = sm.partnumber1 then sm.subpartnumber1 else ppni.PartNumber end as Latest,
@@ -931,7 +933,7 @@ AND
         LEFT  join z_scope..currentstock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = ppni.PartNumber
         WHERE 
         co.joblineclosedate is  null 
-          and	  cs2.Qty > 0
+          and	  cs2.Qty = 0
         and ppni.Vehiclenumber = '${vehicleno}'
         and
           (
@@ -949,7 +951,7 @@ AND
           )
           AND ppni.locationid = @locationid
         GROUP BY 
-            co.bigid,ppni.PartNumber, ppni.Vehiclenumber, ppni.PartDesc, part_category, ppni.price, ppni.Qty , All_Time_NonStck , sm.partnumber1 , sm.subpartnumber1  , ppni.PPNI_Val
+            co.bigid,  co.DealerId,co.LocationId,ppni.PartNumber, ppni.Vehiclenumber, ppni.PartDesc, part_category, ppni.price, ppni.Qty , All_Time_NonStck , sm.partnumber1 , sm.subpartnumber1  , ppni.PPNI_Val
         HAVING 
           SUM(ppni_val) > 0
   )
@@ -1090,6 +1092,9 @@ DECLARE @offset INT = (@pageno - 1) * @pagesize;
 data2 AS (
     SELECT DISTINCT
         co.bigid,
+        co.DealerId,
+        co.LocationId,
+        co.Vehiclenumber,
         co.jobcard_number,
         co.part_number1,
         CASE 
@@ -1415,4 +1420,35 @@ const vehicleSearchPagination = async (page, pageSize, dealerId, vehicleNo, allT
   }
 };
 
-export {vehicleSearchPagination,vehicleScore,partfamilywiseStockColor,groupNorms,vehicledealercheck,PPNIVALUE12MonthsService,userroleService,partInfo,reservedForVehicle,groupStock,jobCardByVehicleService,partsByJobCardService,partSubstituteDetailService,locationwisePPNIValueService,advisorwisePPNIValueService,vehiclewisePPNIValueService,partwisePPNIValueService,vehicleSearchService,gainerListingService,predictiveVehicleSearchService}
+const vehicleSearchlogsService = async(moduleName,event,details,userid)=>{
+try {
+    const pool = await getPool1()
+    const query = `use z_scope Insert into App_Logging(ModuleName,Event,Details,CreatedBy)
+                    OUTPUT inserted.ModuleName, inserted.Event, inserted.Details, inserted.CreatedBy
+                    values(@ModuleName,@Event,@Details,@CreatedBy)`
+    const result = await pool.request()
+    .input('ModuleName',sql.VarChar,moduleName)
+    .input('Event',sql.VarChar,event)
+    .input('Details',sql.VarChar,details)
+    .input('CreatedBy',sql.Int,userid)
+    .query(query)  
+    return result
+
+    } catch (error) {
+      throw new Error(`vehicleSearchlogsService failed : ${error.message}`);  
+    }              
+}
+const viewLogService = async(type,partnumber,vehiclenumber , from , to)=>{
+  const pool = await getPool1()
+  const query = `use [UAD_BI_PPNI] EXEC dbo.sp_dealerapplogsView @type,@partnumber,@vehiclenumber,@from,@to`
+  const result = await pool.request()
+    .input('type',sql.VarChar,type)
+    .input('partnumber',sql.VarChar,partnumber ?? null)
+    .input('vehiclenumber',sql.VarChar,vehiclenumber ?? null)
+    .input('from',sql.DateTime,from ?? null)
+    .input('to',sql.DateTime,to ?? null)
+    .query(query)  
+    return result
+
+}
+export {vehicleSearchPagination,vehicleScore,partfamilywiseStockColor,groupNorms,vehicledealercheck,PPNIVALUE12MonthsService,userroleService,partInfo,reservedForVehicle,groupStock,jobCardByVehicleService,partsByJobCardService,partSubstituteDetailService,locationwisePPNIValueService,advisorwisePPNIValueService,vehiclewisePPNIValueService,partwisePPNIValueService,vehicleSearchService,gainerListingService,predictiveVehicleSearchService,vehicleSearchlogsService,viewLogService}

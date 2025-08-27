@@ -123,7 +123,7 @@ where brandid = @InputBrandID and (partnumber1 = @InputPart or subpartnumber1 = 
 insert into #part
 select partnumber1 from substitution_master where brandid = @InputBrandID and subpartnumber1= @latestpart
 union 
-select @latestpart
+select ISNULL(@latestpart,@InputPart)  
 
 
 select sn.Maxvalue , sn.partnumber1 

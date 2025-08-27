@@ -27,9 +27,9 @@ try {
         }
         
         const file = req.file
-        if(req.file == undefined && !remark){
-            return res.status(400).json({message:`remark or file are required`})
-        }
+        // if(req.file == undefined){
+        //     return res.status(400).json({message:`file are required`})
+        // }
         // let url = `https://scs-onboard-docs.s3.ap-south-1.amazonaws.com/WhatsApp%20Image%202025-03-19%20at%202.41.24%20PM.jpeg`    
         let url, key;
         if(file)
@@ -101,9 +101,9 @@ try {
         }
         
         const file = req.file
-        if(req.file == undefined && !remark){
-            return res.status(400).json({message:`remark or file are required`})
-        }
+        // if(req.file == undefined){
+        //     return res.status(400).json({message:`file are required`})
+        // }
         // let url = `https://scs-onboard-docs.s3.ap-south-1.amazonaws.com/WhatsApp%20Image%202025-03-19%20at%202.41.24%20PM.jpeg`    
         let url, key;
         if(file)
@@ -139,9 +139,9 @@ try {
         }
         
         const file = req.file
-        if(req.file == undefined && !remark){
-            return res.status(400).json({message:`remark or file is required`})
-        }
+        // if(req.file == undefined){
+        //     return res.status(400).json({message:`file is required`})
+        // }
         // let url = `https://scs-onboard-docs.s3.ap-south-1.amazonaws.com/WhatsApp%20Image%202025-03-19%20at%202.41.24%20PM.jpeg`    
         let url, key;
         if(file)

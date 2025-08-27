@@ -1,7 +1,7 @@
 import { partBrandMapping, partfamilySaleservice, partFamilyService, singlePartMaxByLocationService } from "../../services/norms-management/utils.service.js";
 import { orderDetailsByPartnumberService, transformOrderData } from "../../services/orderDetails/orderDetailsService.js";
 import { partDetailsservice } from "../../services/salesview/salesviewservices.js";
-import {advisorwisePPNIValueService, groupStock,gainerListingService, jobCardByVehicleService, locationwisePPNIValueService, partInfo,  partsByJobCardService,  partSubstituteDetailService,  partwisePPNIValueService,  PPNIVALUE12MonthsService,  reservedForVehicle, userroleService, vehicleSearchService, vehiclewisePPNIValueService, predictiveVehicleSearchService ,vehicledealercheck, groupNorms, partfamilywiseStockColor, vehicleScore, vehicleSearchPagination} from  "../../services/dealerMonitoring/dealerMonitoringService.js";
+import {advisorwisePPNIValueService, groupStock,gainerListingService, jobCardByVehicleService, locationwisePPNIValueService, partInfo,  partsByJobCardService,  partSubstituteDetailService,  partwisePPNIValueService,  PPNIVALUE12MonthsService,  reservedForVehicle, userroleService, vehicleSearchService, vehiclewisePPNIValueService, predictiveVehicleSearchService ,vehicledealercheck, groupNorms, partfamilywiseStockColor, vehicleScore, vehicleSearchPagination, vehicleSearchlogsService, viewLogService} from  "../../services/dealerMonitoring/dealerMonitoringService.js";
 import { getPool2 } from "../../db/db.js";
 import { partFamily } from "../vonController.js";
 import { partBrandCheck } from "../../utils/vonHelper.js";
@@ -424,6 +424,8 @@ function transformVehiclePartsData(rawData) {
   // strip TotalCount from each row
   const vehicleList = rawData.map(row => ({
     Vehiclenumber: row.Vehiclenumber,
+    DealerID:row.DealerId,
+    LocationID:row.LocationId,
     PPNI_Value: row.PPNI_Value,
     NotIssued: row.NotIssued,
     InstockCount: row.InstockCount
@@ -510,5 +512,25 @@ const predictiveVehicleSearch = async(req,res)=>{
     res.status(200).json({Data:data})
 }
 
+const vehicleSearchLogs = async (req,res)=>{
+try {
+        const {moduleName,event,details,userid} = req.body
+        const result = await vehicleSearchlogsService(moduleName,event,details,userid)
+        res.status(200).send({Data:result.recordset})
+        
+} catch (error) {
+    res.status(500).json({Error:error.message})
+}
 
-export {gainerListing,partSale,partDetails,singlePartMaxByLocation,orderDetailsByPartnumber,partStock,vehicleSearch,partSearch,substituteParts,userRole,locationwisePPNIValue,advisorwisePPNIValue,vehiclewisePPNIValue,partwisePPNIValue,PPNIVALUE12Months,predictiveVehicleSearch}
+}
+
+const viewLog = async(req,res)=>{
+try {
+        const {type,partnumber,vehiclenumber , from , to} = req.body
+        const result = await viewLogService(type,partnumber,vehiclenumber , from , to)
+        res.status(200).json({Data:result.recordset})
+} catch (error) {
+    res.status(500).json({Error:error.message})
+}
+}
+export {gainerListing,partSale,partDetails,singlePartMaxByLocation,orderDetailsByPartnumber,partStock,vehicleSearch,partSearch,substituteParts,userRole,locationwisePPNIValue,advisorwisePPNIValue,vehiclewisePPNIValue,partwisePPNIValue,PPNIVALUE12Months,predictiveVehicleSearch,vehicleSearchLogs,viewLog}

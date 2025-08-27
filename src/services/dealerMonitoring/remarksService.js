@@ -4,7 +4,7 @@ import sql from 'mssql'
 const remarkmasterService = async(type)=>{
 try {
         const pool = await getPool1()
-        const query = `select Remark from uad_bi_ppni..PPNIRemarkMaster where RemarkFor = @type`
+        const query = `select Id,Remark from uad_bi_ppni..PPNIRemarkMaster where RemarkFor = @type`
         const result = await pool.request()
                                 .input('type',sql.VarChar,type)
                                 .query(query)
@@ -23,12 +23,14 @@ const partremarkInsertion = async(Dealerid,Locationid,bigid,remarkid,remark,adva
                       Insert into PartRemark(Dealerid,Locationid,Approvalid,partnumber,vehicleno,Image,advancevalue,remarkid,details,Createdby)
                       Values(@Dealerid,@Locationid,@bigid,@partnumber,@vehiclenumber,@url,@advancevalue,@remarkid,@remark,@userid) `
   
+      const normalize = (val) => (val === "" || val === undefined ? null : val);
+
       const result = await pool.request()
                               .input('Dealerid',sql.Int,Dealerid)
                               .input('Locationid',sql.Int,Locationid)
                               .input('bigid',sql.Int,bigid)
                               .input('remarkid',sql.Int,remarkid)
-                              .input('remark',sql.VarChar,remark ?? null)
+                              .input('remark',sql.VarChar,normalize(remark) ?? null)
                               .input('advancevalue',sql.Int,advancevalue ?? null)
                               .input('url',sql.NVarChar, url ?? null)
                               .input('vehiclenumber',sql.VarChar,vehiclenumber)
@@ -74,13 +76,15 @@ const ppnipartremarkInsertion = async(Dealerid,Locationid,bigid,remarkid,remark,
         const query = `use [UAD_BI_PPNI] 
                       Insert into PPNIPartRemark(Dealerid,Locationid,Approvalid,partnumber,vehicleno,Image,advancevalue,remarkid,details,Createdby)
                       Values(@Dealerid,@Locationid,@bigid,@partnumber,@vehiclenumber,@url,@advancevalue,@remarkid,@remark,@userid) `
-  
+
+      const normalize = (val) => (val === "" || val === undefined ? null : val);
+
       const result = await pool.request()
                               .input('Dealerid',sql.Int,Dealerid)
                               .input('Locationid',sql.Int,Locationid)
                               .input('bigid',sql.Int,bigid)
                               .input('remarkid',sql.Int,remarkid)
-                              .input('remark',sql.VarChar,remark ?? null)
+                              .input('remark',sql.VarChar,normalize(remark) ?? null)
                               .input('advancevalue',sql.Int,advancevalue ?? null)
                               .input('url',sql.NVarChar, url ?? null)
                               .input('vehiclenumber',sql.VarChar,vehiclenumber)
@@ -101,12 +105,12 @@ const ppnivehicleremarkInsertion = async(Dealerid,Locationid,remarkid,remark,adv
         const query = `use [UAD_BI_PPNI] 
                       Insert into PPNIVehicleRemark(Dealerid,Locationid,vehicleno,Image,advancevalue,remarkid,details,Createdby)
                       Values(@Dealerid,@Locationid,@vehiclenumber,@url,@advancevalue,@remarkid,@remark,@userid) `
-  
+      const normalize = (val) => (val === "" || val === undefined ? null : val);
       const result = await pool.request()
                               .input('Dealerid',sql.Int,Dealerid)
                               .input('Locationid',sql.Int,Locationid)
                               .input('remarkid',sql.Int,remarkid)
-                              .input('remark',sql.VarChar,remark ?? null)
+                              .input('remark',sql.VarChar,normalize(remark) ?? null)
                               .input('advancevalue',sql.Int,advancevalue ?? null)
                               .input('url',sql.NVarChar,url ?? null)
                               .input('vehiclenumber',sql.VarChar,vehiclenumber)
