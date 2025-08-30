@@ -1,185 +1,187 @@
 import sql from 'mssql'
-import { getPool1 ,getPool2} from '../db/db.js'
+import { getPool1, getPool2 } from '../db/db.js'
 
-const getBrands = async(req,res)=>{
-    try {
-        const pool = getPool2();
-        const result = await pool
-        .request()
-        .query('use z_scope select bigid , vcbrand from Brand_master')
-        res.status(200).json(result.recordset)
-    } catch (error) {
-        res.status(500).json(error)
-    }
+const getBrands = async (req, res) => {
+  try {
+    const pool = getPool2();
+    const result = await pool
+      .request()
+      .query('use z_scope select bigid , vcbrand from Brand_master')
+    res.status(200).json(result.recordset)
+  } catch (error) {
+    res.status(500).json(error)
+  }
 }
-const getDealers =  async(req,res)=>{
-    try {
-        const pool = getPool2();
-        const {brandid} = req.body;
-        const result = await pool.request().input('brandid',sql.Int,brandid).query(`select distinct(dealerid),dealer from locationinfo where brandid = @brandid and dealerStatus = 1 `)
-        res.status(200).json(result.recordset)
-    } catch (error) {
-        res.status(500).json(error)
-        console.log(error);
-    }
+const getDealers = async (req, res) => {
+  try {
+    const pool = getPool2();
+    const { brandid } = req.body;
+    const result = await pool.request().input('brandid', sql.Int, brandid).query(`select distinct(dealerid),dealer from locationinfo where brandid = @brandid and dealerStatus = 1 `)
+    res.status(200).json(result.recordset)
+  } catch (error) {
+    res.status(500).json(error)
+    console.log(error);
+  }
 }
-const getLocation = async(req,res)=>{
-    try {
-        const pool = getPool2();
-        const {dealerid} = req.body;
-        const result = await pool.request().input('dealerid',sql.Int,dealerid).query(`use z_scope select locationid,location from locationinfo where dealerid = @dealerid and status = 1 and ogsStatus = 1 order by location`)
-        res.status(200).json(result.recordset)
-    } catch (error) {
-        res.status(500).json(error)
-        console.log(error);
-    }
+const getLocation = async (req, res) => {
+  try {
+    const pool = getPool2();
+    const { dealerid } = req.body;
+    const result = await pool.request().input('dealerid', sql.Int, dealerid).query(`use z_scope select locationid,location from locationinfo where dealerid = @dealerid and status = 1 and ogsStatus = 1 order by location`)
+    res.status(200).json(result.recordset)
+  } catch (error) {
+    res.status(500).json(error)
+    console.log(error);
+  }
 }
-const getWorkspace = async(req,res)=>{
-    try {
-        const pool = getPool1();
-        // const {dealerid} = req.body;
-        const result = await pool.request().query(`select WorkspaceID, Workspace from UAD_BI..SBS_DBS_WorkspaceMaster`)
-        res.status(200).json(result.recordset)
-    } catch (error) {
-        res.status(500).json(error)
-        console.log(error);
-    }
+const getWorkspace = async (req, res) => {
+  try {
+    const pool = getPool1();
+    // const {dealerid} = req.body;
+    const result = await pool.request().query(`select WorkspaceID, Workspace from UAD_BI..SBS_DBS_WorkspaceMaster`)
+    res.status(200).json(result.recordset)
+  } catch (error) {
+    res.status(500).json(error)
+    console.log(error);
+  }
 }
-const getDashboard = async(req,res)=>{
-    try {
-        const pool = getPool2();
-        // const {dealerid} = req.body;
-        const result = await pool.request().query(`select tcode , Dashboard from DB_DASHboardmaster where status = 1`)
-        res.status(200).json(result.recordset)
-    } catch (error) {
-        res.status(500).json(error)
-        console.log(error);
-    }
+const getDashboard = async (req, res) => {
+  try {
+    const pool = getPool2();
+    // const {dealerid} = req.body;
+    const result = await pool.request().query(`select tcode , Dashboard from DB_DASHboardmaster where status = 1`)
+    res.status(200).json(result.recordset)
+  } catch (error) {
+    res.status(500).json(error)
+    console.log(error);
+  }
 }
-const partNature = async(req,res)=>{
-    try {
-         const pool = await getPool2()
-         const query = `select  tCode , Description  from PartNatureMaster`
-         const result = await pool.request().query(query)
-         res.status(200).json({Data:result.recordset})
-    } catch (error) {
-        res.status(500).json({Error:error.message})
-    }
-    }
-const seasonal = async(req,res)=>{
-    try {
-         const pool = await getPool2()
-         const query = `use [z_scope] select tCode , Description  from seasonalmaster`
-         const result = await pool.request().query(query)
-         res.status(200).json({Data:result.recordset})
-    } catch (error) {
-        res.status(500).json({Error:error.message})
-    }
-    }
-const model = async(req,res)=>{
-    try {
-         const pool = await getPool2()
-         const {brandid} = req.body
-         const query = `select ModelID , Model  from ModelMaster where Brandid = ${brandid}`
-         const result = await pool.request().query(query)
-         res.status(200).json({Data:result.recordset})
-    } catch (error) {
-        res.status(500).json({Error:error.message})
-    }
-    }
-const partType = async(req,res)=>{
-try {
-        const pool = await getPool2()
-        const query = `select parttypeid , Description from parttypemaster`
-        const result = await pool.request().query(query)
-        res.status(200).json({Data:result.recordset})
-} catch (error) {
-    res.status(500).json({Error:error.message})
+const partNature = async (req, res) => {
+  try {
+    const pool = await getPool2()
+    const query = `select  tCode , Description  from PartNatureMaster`
+    const result = await pool.request().query(query)
+    res.status(200).json({ Data: result.recordset })
+  } catch (error) {
+    res.status(500).json({ Error: error.message })
+  }
 }
+const seasonal = async (req, res) => {
+  try {
+    const pool = await getPool2()
+    const query = `use [z_scope] select tCode , Description  from seasonalmaster`
+    const result = await pool.request().query(query)
+    res.status(200).json({ Data: result.recordset })
+  } catch (error) {
+    res.status(500).json({ Error: error.message })
+  }
+}
+const model = async (req, res) => {
+  try {
+    const pool = await getPool2()
+    const { brandid } = req.body
+    const query = `select ModelID , Model  from ModelMaster where Brandid = ${brandid}`
+    const result = await pool.request().query(query)
+    res.status(200).json({ Data: result.recordset })
+  } catch (error) {
+    res.status(500).json({ Error: error.message })
+  }
+}
+const partType = async (req, res) => {
+  try {
+    const pool = await getPool2()
+    const query = `select parttypeid , Description from parttypemaster`
+    const result = await pool.request().query(query)
+    res.status(200).json({ Data: result.recordset })
+  } catch (error) {
+    res.status(500).json({ Error: error.message })
+  }
 }
 const pagination = async (req, res) => {
-    try {
-        const pool = await getPool1(); // Ensure the connection is awaited
-        const {pageno , pagelimit} = req.params
-        const page = parseInt(req.query.page) || pageno
-        const pageSize = parseInt(req.query.pageSize) || pagelimit;
-        const offset = (page - 1) * pageSize;
+  try {
+    const pool = await getPool1(); // Ensure the connection is awaited
+    const { pageno, pagelimit } = req.params
+    const page = parseInt(req.query.page) || pageno
+    const pageSize = parseInt(req.query.pageSize) || pagelimit;
+    const offset = (page - 1) * pageSize;
 
-        const totalRecordsQuery = await pool.request().query(`select count(locationid)count from locationinfo`);
-        const totalRecords = totalRecordsQuery.recordset[0].count;
-        const totalPages = Math.ceil(totalRecords / pageSize);
-        // console.log(totalRecords,totalPages);
-        
+    const totalRecordsQuery = await pool.request().query(`select count(locationid)count from locationinfo`);
+    const totalRecords = totalRecordsQuery.recordset[0].count;
+    const totalPages = Math.ceil(totalRecords / pageSize);
+    // console.log(totalRecords,totalPages);
 
-        // 🟢 Fix pagination query (ORDER BY before OFFSET)
-        const dataQuery = await pool.request().query(`
+
+    // 🟢 Fix pagination query (ORDER BY before OFFSET)
+    const dataQuery = await pool.request().query(`
             select * from locationinfo 
             order by locationid
             OFFSET ${offset} ROWS
             FETCH NEXT ${pageSize} ROWS ONLY;
         `);
 
-        res.json({
-            currentPage: page,
-            pageSize,
-            totalRecords,
-            totalPages,
-            hasMore: page < totalPages,
-            data: dataQuery.recordset
-        });
+    res.json({
+      currentPage: page,
+      pageSize,
+      totalRecords,
+      totalPages,
+      hasMore: page < totalPages,
+      data: dataQuery.recordset
+    });
 
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Internal Server Error", details: error.message });
-    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error", details: error.message });
+  }
 };
 
-const userInfo = async(req,res)=>{
-try {
-      const pool = await getPool2()
-      const {token , usertype} = req.body
-      
+const userInfo = async (req, res) => {
+  try {
+    const pool = await getPool2()
+    const { token, usertype } = req.body
+
     //   console.log(token , usertypehj);
-      
-      if(!token || !usertype){
-        return res.status(400).json({message:`token and usertype both are required`})
-      }
-      if(usertype === 'a'){
-      const query = `use [z_scope] select bintid_pk , concat(vcfirstname , ' ', vcLastname)as username , designation from adminmaster_gen where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `
-      
+
+    if (!token || !usertype) {
+      return res.status(400).json({ message: `token and usertype both are required` })
+    }
+    if (usertype === 'a') {
+      const query = `use [z_scope] select bintid_pk , concat(vcfirstname , ' ', vcLastname)as username , designation,vcphoto from adminmaster_gen where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `
+
       const result = await pool.request().query(query)
-      res.status(200).json({Data:result.recordset})
-      }
-      else{
-        const query = `use [z_scope] SELECT distinct li.BrandID, dur.dealerid , dur.locationid , concat(amg.vcfirstname , ' ', amg.vcLastname)as username ,li.location,amg.bintId_pk as userId  FROM AdminMaster_GEN amg
+      res.status(200).json({ Data: result.recordset })
+    }
+    else {
+      const query = `use [z_scope] SELECT distinct li.BrandID, dur.dealerid , dur.locationid , concat(amg.vcfirstname , ' ', amg.vcLastname)as username ,li.location,amg.bintId_pk as userId,vcphoto FROM AdminMaster_GEN amg
     join Dealer_User_Relation dur on amg.bintid_pk = dur.userid
     join locationinfo li on dur.locationid = li.LocationID
     where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `
-    const result = await pool.request().query(query)
-    res.status(200).json({Data:result.recordset})
-      }
-} catch (error) {
-    res.status(500).json({Error:error.message})
-}
-
+      const result = await pool.request().query(query);
+      const completedata = result.recordset;
+      const vcphoto = completedata.length > 0 ? completedata[0].vcphoto : null;
+      const data = completedata.map(({ vcphoto, ...rest }) => rest);
+      res.status(200).json({vcphoto,data: data});
+    }
+  } catch (error) {
+    res.status(500).json({ Error: error.message })
+  }
 }
 
 const homePageData = async (req, res) => {
-    const { locationId, dealerid } = req.body;
-    if (!locationId || !dealerid) {
-      return res.status(400).json({ message: `locationId and dealerid are required` });
-    }
-  
-    try {
-      const pool = await getPool2();
-  
-      // Define all static queries
-      // const stockquery = `SELECT SUM(qty) AS StockQty, AddedDate FROM [z_scope].dbo.CurrentStock1 cs1
-      //                     JOIN CurrentStock2 cs2 ON cs1.tCode = cs2.StockCode
-      //                     WHERE LocationID = ${locationId}
-      //                     GROUP BY AddedDate`;
-      
-      const stockquery = ` use [z_scope]
+  const { locationId, dealerid } = req.body;
+  if (!locationId || !dealerid) {
+    return res.status(400).json({ message: `locationId and dealerid are required` });
+  }
+
+  try {
+    const pool = await getPool2();
+
+    // Define all static queries
+    // const stockquery = `SELECT SUM(qty) AS StockQty, AddedDate FROM [z_scope].dbo.CurrentStock1 cs1
+    //                     JOIN CurrentStock2 cs2 ON cs1.tCode = cs2.StockCode
+    //                     WHERE LocationID = ${locationId}
+    //                     GROUP BY AddedDate`;
+
+    const stockquery = ` use [z_scope]
                           SELECT SUM(qty) AS StockQty, AddedDate FROM [z_scope].dbo.CurrentStock1 cs1
                           JOIN CurrentStock2 cs2 ON cs1.tCode = cs2.StockCode
                           join LocationInfo li on cs1.LocationID = li.LocationID
@@ -187,36 +189,36 @@ const homePageData = async (req, res) => {
                           WHERE cs1.LocationID = ${locationId} and pm.PartTypeID = 1 --Sparepart
                           GROUP BY AddedDate`
 
-      const stockvaluequery = `SELECT SUM((cs2.Qty * pm.landedcost)) AS stockvalue FROM [z_scope].dbo.CurrentStock1 cs1
+    const stockvaluequery = `SELECT SUM((cs2.Qty * pm.landedcost)) AS stockvalue FROM [z_scope].dbo.CurrentStock1 cs1
                                JOIN [z_scope].dbo.CurrentStock2 cs2 ON cs2.StockCode = cs1.tCode
                                JOIN [z_scope].dbo.locationinfo li ON li.LocationID = cs1.LocationID
                                JOIN [z_scope].dbo.Part_Master pm ON pm.brandid = li.BrandID AND cs2.PartNumber = pm.partnumber
                                WHERE cs1.locationid = ${locationId} and pm.PartTypeID = 1`;
-  
-      const ppnivaluequery = `SELECT SUM(PPNI_Val) AS PPNIValue FROM [UAD_BI_PPNI].dbo.PPNI_report_${dealerid} ppni
+
+    const ppnivaluequery = `SELECT SUM(PPNI_Val) AS PPNIValue FROM [UAD_BI_PPNI].dbo.PPNI_report_${dealerid} ppni
                               join z_scope..LocationInfo li on ppni.LocationID = li.LocationID
                               join z_scope..Part_Master pm on pm.brandid = li.brandid and ppni.PartNumber = pm.partnumber1
                               WHERE ppni.locationid = ${locationId} and pm.PartTypeID = 1`;
-  
-      // const snstockvaluequery = `use [z_scope] ;WITH LatestSN AS (
-      //                             SELECT sn.partnumber1 , sn.Locationid , sn.Maxvalue FROM stockable_nonstockable_td001_${dealerid} sn
-			// 					                  join Part_Master pm on pm.brandid = sn.Brandid and sn.partnumber1 = pm.partnumber1 
-      //                             WHERE sn.locationid = ${locationId} and pm.PartTypeID = 1
-      //                             AND sn.stockdate = (SELECT MAX(stockdate) FROM stockable_nonstockable_td001_${dealerid} WHERE locationid = ${locationId})
-      //                           )
-      //                           SELECT  
-      //                               SUM(CASE WHEN sn.MaxValue IS NULL OR sn.MaxValue = 0 THEN 1 ELSE 0 END) AS NonStockable,
-      //                               SUM(CASE WHEN sn.MaxValue IS NOT NULL AND sn.MaxValue > 0 THEN 1 ELSE 0 END) AS Stockable,
-      //                               SUM(CASE WHEN sn.MaxValue IS NOT NULL AND sn.MaxValue > 0 THEN ISNULL(cs2.Qty, 0) * ISNULL(pm.landedcost, 0) ELSE 0 END) AS StockableValue,
-      //                               SUM(CASE WHEN sn.MaxValue IS NULL OR sn.MaxValue = 0 THEN ISNULL(cs2.Qty, 0) * ISNULL(pm.landedcost, 0) ELSE 0 END) AS NonStockableValue
-      //                           FROM CurrentStock2 cs2
-      //                           INNER JOIN CurrentStock1 cs1 ON cs2.StockCode = cs1.tCode
-      //                           LEFT JOIN LatestSN sn ON cs1.LocationID = sn.LocationID AND cs2.PartNumber = sn.partnumber1
-      //                           INNER JOIN Dealer_Workshop_Master li ON cs1.LocationID = li.bigid
-      //                           LEFT JOIN Part_Master pm ON pm.brandid = li.BrandID AND cs2.PartNumber = pm.partnumber
-      //                           WHERE cs1.LocationID = ${locationId}`;
-  
-      const snstockvaluequery = `
+
+    // const snstockvaluequery = `use [z_scope] ;WITH LatestSN AS (
+    //                             SELECT sn.partnumber1 , sn.Locationid , sn.Maxvalue FROM stockable_nonstockable_td001_${dealerid} sn
+    // 					                  join Part_Master pm on pm.brandid = sn.Brandid and sn.partnumber1 = pm.partnumber1 
+    //                             WHERE sn.locationid = ${locationId} and pm.PartTypeID = 1
+    //                             AND sn.stockdate = (SELECT MAX(stockdate) FROM stockable_nonstockable_td001_${dealerid} WHERE locationid = ${locationId})
+    //                           )
+    //                           SELECT  
+    //                               SUM(CASE WHEN sn.MaxValue IS NULL OR sn.MaxValue = 0 THEN 1 ELSE 0 END) AS NonStockable,
+    //                               SUM(CASE WHEN sn.MaxValue IS NOT NULL AND sn.MaxValue > 0 THEN 1 ELSE 0 END) AS Stockable,
+    //                               SUM(CASE WHEN sn.MaxValue IS NOT NULL AND sn.MaxValue > 0 THEN ISNULL(cs2.Qty, 0) * ISNULL(pm.landedcost, 0) ELSE 0 END) AS StockableValue,
+    //                               SUM(CASE WHEN sn.MaxValue IS NULL OR sn.MaxValue = 0 THEN ISNULL(cs2.Qty, 0) * ISNULL(pm.landedcost, 0) ELSE 0 END) AS NonStockableValue
+    //                           FROM CurrentStock2 cs2
+    //                           INNER JOIN CurrentStock1 cs1 ON cs2.StockCode = cs1.tCode
+    //                           LEFT JOIN LatestSN sn ON cs1.LocationID = sn.LocationID AND cs2.PartNumber = sn.partnumber1
+    //                           INNER JOIN Dealer_Workshop_Master li ON cs1.LocationID = li.bigid
+    //                           LEFT JOIN Part_Master pm ON pm.brandid = li.BrandID AND cs2.PartNumber = pm.partnumber
+    //                           WHERE cs1.LocationID = ${locationId}`;
+
+    const snstockvaluequery = `
                           use [z_scope] 
 declare @date datetime = (select MAX(Stockdate) from Stockable_Nonstockable_TD001_${dealerid} where Locationid = ${locationId})
 ;WITH Stock AS (
@@ -241,7 +243,7 @@ SELECT  SUM(s.Qty * s.landedcost)as StockableValue
 FROM Stock s 
 JOIN sn on sn.latest = s.latest
       `
-      const lastorderValuequery = `SELECT scsorderno, SUM(finalorderqty) AS QTY, SUM(finalorderval) AS Value, addeddate
+    const lastorderValuequery = `SELECT scsorderno, SUM(finalorderqty) AS QTY, SUM(finalorderval) AS Value, addeddate
                                   FROM [10.10.152.17].[z_scope].dbo.ogs_orderdata_td001_${dealerid}
                                   WHERE addeddate = (
                                     SELECT MAX(addeddate) FROM [10.10.152.17].[z_scope].dbo.ogs_orderdata_td001_${dealerid}
@@ -249,32 +251,32 @@ JOIN sn on sn.latest = s.latest
                                   )
                                   AND locationid = ${locationId}
                                   GROUP BY scsorderno, addeddate`;
-  
-      const jobcardDatequery = `SELECT MAX(Close_Date) joblineupdatedate, MAX(Final_Close_Date) jobcardcloseddate
+
+    const jobcardDatequery = `SELECT MAX(Close_Date) joblineupdatedate, MAX(Final_Close_Date) jobcardcloseddate
                                 FROM [z_scope].dbo.create_order_request_td001_${dealerid} 
                                 WHERE locationid = ${locationId}`;
-  
-      // Run all static queries in parallel
-      const [
-        stock,
-        stockValue,
-        ppniValue,
-        snstockvalue,
-        lastOrderValue,
-        lastjobcard
-      ] = await Promise.all([
-        pool.request().query(stockquery),
-        pool.request().query(stockvaluequery),
-        pool.request().query(ppnivaluequery),
-        pool.request().query(snstockvaluequery),
-        pool.request().query(lastorderValuequery),
-        pool.request().query(jobcardDatequery)
-      ]);
-      const a = snstockvalue.recordset[0].StockableValue
-      const b = stockValue.recordset[0].stockvalue
-      
-      // Run dynamic SQL separately (not safe to include in Promise.all)
-      const SixMonthLocationwiseSaleValueQuery = `
+
+    // Run all static queries in parallel
+    const [
+      stock,
+      stockValue,
+      ppniValue,
+      snstockvalue,
+      lastOrderValue,
+      lastjobcard
+    ] = await Promise.all([
+      pool.request().query(stockquery),
+      pool.request().query(stockvaluequery),
+      pool.request().query(ppnivaluequery),
+      pool.request().query(snstockvaluequery),
+      pool.request().query(lastorderValuequery),
+      pool.request().query(jobcardDatequery)
+    ]);
+    const a = snstockvalue.recordset[0].StockableValue
+    const b = stockValue.recordset[0].stockvalue
+
+    // Run dynamic SQL separately (not safe to include in Promise.all)
+    const SixMonthLocationwiseSaleValueQuery = `
         DECLARE @ls INT = 6, @st INT = 1, @Columnsold NVARCHAR(MAX) = '', @SumColumns NVARCHAR(MAX) = '',
                 @d1 VARCHAR(50), @d2 VARCHAR(50), @d3 VARCHAR(50), @Dealerid INT, @Dealerold NVARCHAR(MAX), @sql NVARCHAR(MAX);
   
@@ -303,25 +305,25 @@ JOIN sn on sn.latest = s.latest
         WHERE li.locationid = ${locationId}';
         EXEC sp_executesql @sql;
       `;
-  
-      const SixMonthLocationwiseSaleValue = await pool.request().query(SixMonthLocationwiseSaleValueQuery);
-  
-      res.status(200).json({
-        StockQty: stock.recordset,
-        StockValue: stockValue.recordset,
-        PPNIValue: ppniValue.recordset,
-        SNStockValue: [{StockableValue:a,NonStockableValue:b-a}],
-        lastOrderDetails: lastOrderValue.recordset,
-        JobCardDate: lastjobcard.recordset,
-        SixMonthSaleValue: SixMonthLocationwiseSaleValue.recordset
-      });
-  
-    } catch (error) {
-      console.error("Error in homePageData:", error);
-      res.status(500).json({ message: error.message });
-    }
+
+    const SixMonthLocationwiseSaleValue = await pool.request().query(SixMonthLocationwiseSaleValueQuery);
+
+    res.status(200).json({
+      StockQty: stock.recordset,
+      StockValue: stockValue.recordset,
+      PPNIValue: ppniValue.recordset,
+      SNStockValue: [{ StockableValue: a, NonStockableValue: b - a }],
+      lastOrderDetails: lastOrderValue.recordset,
+      JobCardDate: lastjobcard.recordset,
+      SixMonthSaleValue: SixMonthLocationwiseSaleValue.recordset
+    });
+
+  } catch (error) {
+    console.error("Error in homePageData:", error);
+    res.status(500).json({ message: error.message });
+  }
 };
-  
+
 
 const latestDates = async (req, res) => {
   try {
@@ -373,9 +375,9 @@ const latestDates = async (req, res) => {
       .input('locationid', sql.Int, locationid)
       .query(query);
     // console.log(result.recordsets);
-    
+
     res.status(200).json({
-     Data:result.recordsets
+      Data: result.recordsets
     });
 
   } catch (error) {
@@ -383,5 +385,77 @@ const latestDates = async (req, res) => {
   }
 };
 
+//helper to build nested hierarchy
+function buildModuleHierarchy(modules) {
+  const moduleMap = {};
 
-export {pagination,homePageData,getBrands,getDealers,getLocation,getWorkspace,getDashboard,partNature,model,seasonal,partType,userInfo,latestDates}
+  modules.forEach(m => {
+    moduleMap[m.moduleId] = {
+      ...m,
+      children: []
+    };
+  });
+
+  const rootModules = [];
+
+  modules.forEach(m => {
+    if (m.parentId && moduleMap[m.parentId]) {
+      moduleMap[m.parentId].children.push(moduleMap[m.moduleId]);
+    } else {
+      rootModules.push(moduleMap[m.moduleId]);
+    }
+  });
+
+  return rootModules;
+}
+
+//new API: getUserModules
+const getUserModules = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    const pool = await getPool2(); 
+    const result = await pool.request()
+      .input("userId", userId)
+      .query(`
+        WITH ModuleTree AS (
+            SELECT 
+                mm.id AS moduleId,
+                mm.parentId,
+                mm.module_name,
+                mm.module_route
+            FROM AdminMaster_GEN ag
+            INNER JOIN role_module_mapping rm ON ag.roleID = rm.role_id
+            INNER JOIN module_master mm ON rm.module_id = mm.id
+            WHERE ag.bintId_Pk = @userId
+
+            UNION ALL
+
+            SELECT 
+                m.id AS moduleId,
+                m.parentId,
+                m.module_name,
+                m.module_route
+            FROM module_master m
+            INNER JOIN ModuleTree mt ON m.parentId = mt.moduleId
+        )
+        SELECT * FROM ModuleTree;
+      `);
+
+    const modules = result.recordset;
+    const hierarchy = buildModuleHierarchy(modules);
+
+    res.json({
+      userId,
+      modules: hierarchy
+    });
+  } catch (error) {
+    console.error("Error in getUserModules:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export { pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules }

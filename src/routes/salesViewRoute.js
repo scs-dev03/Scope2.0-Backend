@@ -1,5 +1,5 @@
 import Router from 'express'
-import {  getLedger,  partDetails } from '../controller/salesViewController.js'
+import {  getLedger,  partDetails, getPartsAndLedger } from '../controller/salesViewController.js'
 import { upload } from '../middlewares/multer.middleware.js'
 const router = Router()
 
@@ -8,6 +8,6 @@ const router = Router()
 // router.route('/location').post(getLocation)
 router.route('/partdetails').post(upload.single('file'),partDetails)
 router.route('/ledger').post(upload.single('file'),getLedger)
-
+router.route('/parts-with-ledger').post(upload.single('file'), getPartsAndLedger)
 
 export default router

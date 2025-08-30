@@ -282,7 +282,7 @@
 
 // export {partDetails,getLedger}
 
-import { getPool1  , getPool2 } from '../db/db.js';
+import { getPool1, getPool2 } from '../db/db.js';
 import { readExcel } from '../utils/vonHelper.js';
 import fs from 'fs';
 
@@ -292,9 +292,9 @@ import fs from 'fs';
  */
 const partDetails = async (req, res) => {
   try {
-    const pool = getPool2();
+    const pool = getPool1();
     const { Brandid, Partnumber, excel } = req.body;
-    
+
     if (!Brandid || !excel) {
       return res.status(400).json({ error: 'Brandid and Excel flag are required' });
     }
@@ -326,11 +326,11 @@ const partDetails = async (req, res) => {
       } else {
         return res.status(400).json({ message: 'PartNumbers must be an array or string' });
       }
-    
-      
+
+
       // Convert to SQL-safe string
       partnumberString = partnumberArray.map(p => `'${p}'`).join(",");
-        // console.log(partnumberString);
+      // console.log(partnumberString);
     }
 
     // Option 2: Read from uploaded Excel file
@@ -342,19 +342,19 @@ const partDetails = async (req, res) => {
       const { path } = req.file;
       const {headers,data} = await readExcel(path);
       fs.unlinkSync(path); // Clean up file
- 
+
       const REQUIRED_HEADERS = [
-           "PartNumber"
-          ];
-           const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
-            // console.log(missingHeaders);
-            
-            if (missingHeaders.length > 0) {
-              return res.status(400).json({
-                message: `Missing Header "PartNumber"`,
-                missingHeaders
-              });
-            }
+        "PartNumber"
+      ];
+      const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
+      // console.log(missingHeaders);
+
+      if (missingHeaders.length > 0) {
+        return res.status(400).json({
+          message: `Missing Header "PartNumber"`,
+          missingHeaders
+        });
+      }
 
       if (data.length === 0) {
         return res.status(400).json({ message: 'No part numbers found in Excel' });
@@ -363,7 +363,7 @@ const partDetails = async (req, res) => {
       if (data.length >= 1000) {
         return res.status(400).json({ message: 'More than 1000 part numbers not allowed' });
       }
-           data.forEach(row => {
+      data.forEach(row => {
         if (row.PartNumber != null) {
           row.PartNumber = String(row.PartNumber)
             .trim()
@@ -371,7 +371,7 @@ const partDetails = async (req, res) => {
         }
       });
       // console.log(data);
-      
+
       // Check if all parts are mapped to brand
       const unmatchedParts = await partBrandMappingCheck(Brandid, data);
       if (unmatchedParts.length > 0) {
@@ -414,7 +414,7 @@ const partDetails = async (req, res) => {
  * Supports reading from body or Excel file
  */
 const getLedger = async (req, res) => {
-  const pool = await getPool2();
+  const pool = await getPool1();
   const { Brandid, Dealerid, Locationid, PartNumber, from, to, excel } = req.body;
   if(!Brandid || !Dealerid || !Locationid == null || !from || !to || !excel){
     return res.status(400).json({message:`All Fields are required`})
@@ -429,19 +429,19 @@ const getLedger = async (req, res) => {
       }
       const {headers , data} = await readExcel(req.file.path);
       fs.unlinkSync(req.file.path); // Clean up
-       const REQUIRED_HEADERS = [
-           "PartNumber"
-          ];
-           const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
+      const REQUIRED_HEADERS = [
+        "PartNumber"
+      ];
+      const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
             // console.log(missingHeaders);
-            
-            if (missingHeaders.length > 0) {
-              return res.status(400).json({
-                message: `Missing Header "PartNumber"`,
-                missingHeaders
-              });
-            }
-      
+
+      if (missingHeaders.length > 0) {
+        return res.status(400).json({
+          message: `Missing Header "PartNumber"`,
+          missingHeaders
+        });
+      }
+
       // Converting all partnumber to upper case
       data.forEach(row => {
         if (row.PartNumber != null) {
@@ -450,7 +450,7 @@ const getLedger = async (req, res) => {
             .toUpperCase();
         }
       });
-     
+
       const unmatchedParts = await partBrandMappingCheck(Brandid, data);
       if (unmatchedParts.length > 0) {
         return res.status(400).json({
@@ -461,7 +461,7 @@ const getLedger = async (req, res) => {
 
       partnumbers = data.map(item => item.PartNumber?.toString().trim()).filter(Boolean);
       // console.log(partnumbers);
-      
+
     }
 
     // Option 2: Read from body
@@ -485,8 +485,8 @@ const getLedger = async (req, res) => {
         return res.status(400).json({ message: 'PartNumber must be an array or string' });
       }
     }
-      // console.log(partnumbers);
-      
+    // console.log(partnumbers);
+
     if (partnumbers.length === 0) {
       return res.status(400).json({ message: 'No part numbers provided' });
     }
@@ -525,21 +525,163 @@ const getLedger = async (req, res) => {
     res.status(200).json({ Data: result.recordsets });
 
   } catch (error) {
-    // console.log(error.message);
-    
-    res.status(500).json({Error: error.message,
-      Api : `Error in /ledger`});
+    res.status(500).json({
+      Error: error.message,
+      Api: `Error in /ledger`
+    });
   }
 };
+const getPartsAndLedger = async (req, res) => {
+  const pool = await getPool1();
+  const {
+    Brandid,
+    Dealerid,
+    Locationid,
+    PartNumber,
+    from,
+    to,
+    excel
+  } = req.body;
 
+  try {
+    if (!Brandid || !excel) {
+      return res.status(400).json({ message: "Brandid and Excel flag are required" });
+    }
+
+    if (Dealerid == null || Locationid == null || !from || !to) {
+      return res.status(400).json({ message: "Dealerid, Locationid, from, to are required" });
+    }
+
+    let partnumbers = [];
+    if (excel == 1) {
+      if (!req.file) {
+        return res.status(400).json({ message: "Must upload an Excel file" });
+      }
+
+      const { headers, data } = await readExcel(req.file.path);
+      fs.unlinkSync(req.file.path);
+
+      const REQUIRED_HEADERS = ["PartNumber"];
+      const missingHeaders = REQUIRED_HEADERS.filter(h => !headers.includes(h));
+      if (missingHeaders.length > 0) {
+        return res.status(400).json({ message: `Missing Header "PartNumber"`, missingHeaders });
+      }
+
+      data.forEach(row => {
+        if (row.PartNumber != null) {
+          row.PartNumber = String(row.PartNumber).trim().toUpperCase();
+        }
+      });
+
+      if (data.length === 0) {
+        return res.status(400).json({ message: "No part numbers found in Excel" });
+      }
+      if (data.length >= 1000) {
+        return res.status(400).json({ message: "More than 1000 part numbers not allowed" });
+      }
+
+      const unmatchedParts = await partBrandMappingCheck(Brandid, data);
+      if (unmatchedParts.length > 0) {
+        return res.status(400).json({
+          message: "Some parts are not mapped with the selected brand.",
+          unmatchedParts: unmatchedParts.map(item => String(item.PartNumber).trim())
+        });
+      }
+
+      partnumbers = data.map(item => item.PartNumber);
+    } else {
+      if (!PartNumber) {
+        return res.status(400).json({ message: "PartNumber is required" });
+      }
+
+      if (Array.isArray(PartNumber)) {
+        partnumbers = PartNumber.map(p => p.toString().trim().toUpperCase());
+      } else if (typeof PartNumber === "string") {
+        const raw = PartNumber.trim();
+        try {
+          if (raw.startsWith("[") && raw.endsWith("]")) {
+            partnumbers = JSON.parse(raw).map(p => p.toString().trim().toUpperCase());
+          } else {
+            partnumbers = raw.split(",").map(p => p.trim().toUpperCase()).filter(Boolean);
+          }
+        } catch {
+          return res.status(400).json({ message: "Invalid PartNumber format" });
+        }
+      } else {
+        return res.status(400).json({ message: "PartNumber must be an array or string" });
+      }
+
+      if (partnumbers.length === 0) {
+        return res.status(400).json({ message: "No part numbers provided" });
+      }
+      if (partnumbers.length >= 1000) {
+        return res.status(400).json({ message: "More than 1000 part numbers not allowed" });
+      }
+    }
+
+    const partnumberString = partnumbers.map(p => `'${p}'`).join(",");
+
+    const detailsQuery = `
+      USE z_scope;
+      SELECT 
+        pm.partnumber, pm.partid,
+        (CASE 
+          WHEN pm.partnumber = sm.partnumber THEN sm.subpartnumber 
+          ELSE pm.partnumber 
+        END) AS LatestPartno,
+        pm.partdesc, pm.moq, pm.category, 
+        pm.landedcost, pm.mrp, pm.dateadded, pm.lastupdated 
+      FROM z_scope.dbo.part_master pm
+      LEFT JOIN z_scope.dbo.substitution_master sm 
+        ON pm.brandid = sm.brandid AND pm.partnumber = sm.partnumber
+      WHERE pm.partnumber IN (${partnumberString}) AND pm.brandid = ${Brandid}
+    `;
+
+    const ledgerPromise = (async () => {
+      const mappingQuery = `use z_scope SELECT Partid, PartNumber FROM Dealer_Sale_Upload_Old_TD001_${Dealerid}`;
+      const mappingResult = await pool.request().query(mappingQuery);
+
+      const partNumberToPartid = {};
+      mappingResult.recordset.forEach(item => {
+        if (item.PartNumber) {
+          partNumberToPartid[item.PartNumber.trim()] = item.Partid;
+        }
+      });
+
+      const matchedPartids = partnumbers.map(pn => partNumberToPartid[pn]).filter(Boolean);
+      if (matchedPartids.length === 0) {
+        throw new Error("No matching Partids found for the provided part numbers.");
+      }
+
+      const partidString = matchedPartids.join(",");
+      const ledgerQuery = `EXEC [z_scope].dbo.SP_MonthwisemultiPartLedger ${Brandid}, ${Dealerid}, ${Locationid}, '${partidString}', ${from}, ${to}`;
+      const rawLedger = await pool.request().query(ledgerQuery);
+      return rawLedger.recordsets[0] || [];
+    })();
+
+    const [detailsResult, ledgerResult] = await Promise.allSettled([
+      pool.request().query(detailsQuery),
+      ledgerPromise
+    ]);
+
+    return res.status(200).json({
+      Parts: detailsResult.status === "fulfilled" ? detailsResult.value.recordset : { error: detailsResult.reason.message },
+      Ledger: ledgerResult.status === "fulfilled" ? ledgerResult.value : { error: ledgerResult.reason.message }
+    });
+
+  } catch (error) {
+    console.error("Error in getPartsAndLedger:", error);
+    return res.status(500).json({ Error: error.message, Api: "getPartsAndLedger" });
+  }
+};
 /**
  * Utility function: Validate if all part numbers in the data are mapped to the brand
  */
 const partBrandMappingCheck = async (Brandid, Data) => {
   try {
     // console.log(Data);
-    
-    const pool = await getPool2();
+
+    const pool = await getPool1();
     const query = `
       USE z_scope;
       SELECT brandid, partnumber FROM z_scope.dbo.Part_Master WHERE brandid = ${Brandid}
@@ -560,4 +702,4 @@ const partBrandMappingCheck = async (Brandid, Data) => {
   }
 };
 
-export { partDetails, getLedger };
+export { partDetails, getLedger, getPartsAndLedger };
