@@ -42,6 +42,7 @@ try {
         // group by Part_Number1`
 
         const query = `
+        use z_scope
         select 
         CASE WHEN cs2.qty < SUM(co.qty)  then cs2.Qty else SUM(co.qty)  end as ReservedforVehicle 
         from Create_Order_Request_TD001_${dealerid} co
@@ -559,7 +560,7 @@ DECLARE @lastDate DATE = EOMONTH(@firstDate);
 	  join z_scope..currentstock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = p.PartNumber
       WHERE  
 	  	co.JobLineCloseDate is null and
-	  cs2.Qty = 0  
+	  cs2.Qty != 0  
 	  and 
           (
               (@All_Time_NonStck IS NULL AND All_Time_NonStck IN ('Y', 'N')) 
@@ -616,7 +617,7 @@ DECLARE @lastDate DATE = EOMONTH(@firstDate);
 	  join z_scope..currentstock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = p.PartNumber
 	  WHERE 
 	 co.JobLineCloseDate is null and
-	  cs2.Qty = 0
+	  cs2.Qty != 0
 and
   (@All_Time_NonStck IS NULL OR All_Time_NonStck = @All_Time_NonStck)
 	AND
@@ -774,7 +775,7 @@ from UAD_BI_PPNI..PPNI_report_${dealerid} ppni
 where ppni.Locationid = ${locationid}
 AND
 	 co.JobLineCloseDate is null and
-		  cs2.Qty = 0
+		  cs2.Qty != 0
    AND (
        @All_Time_NonStck IS NULL
        OR ppni.All_Time_NonStck = @All_Time_NonStck
@@ -933,7 +934,7 @@ AND
         LEFT  join z_scope..currentstock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = ppni.PartNumber
         WHERE 
         co.joblineclosedate is  null 
-          and	  cs2.Qty = 0
+          and	  cs2.Qty != 0
         and ppni.Vehiclenumber = '${vehicleno}'
         and
           (
