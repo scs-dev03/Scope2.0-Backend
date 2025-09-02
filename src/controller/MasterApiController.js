@@ -382,6 +382,65 @@ const latestDates = async (req, res) => {
     res.status(500).json({ Error: error.message });
   }
 };
+const getUserModules = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+    const pool = await getPool1();
+    const result = await pool.request()
+      .input("userId", userId)
+      .query(`
+        WITH ModuleTree AS (
+            SELECT
+                mm.id AS moduleId,
+                mm.parentId,
+                mm.module_name,
+                mm.module_route
+            FROM AdminMaster_GEN ag
+            INNER JOIN role_module_mapping rm ON ag.roleID = rm.role_id
+            INNER JOIN module_master mm ON rm.module_id = mm.id
+            WHERE ag.bintId_Pk = @userId
+            UNION ALL
+            SELECT
+                m.id AS moduleId,
+                m.parentId,
+                m.module_name,
+                m.module_route
+            FROM module_master m
+            INNER JOIN ModuleTree mt ON m.parentId = mt.moduleId
+        )
+        SELECT * FROM ModuleTree;
+      `);
+    const modules = result.recordset;
+    const hierarchy = buildModuleHierarchy(modules);
+    res.json({
+      userId,
+      modules: hierarchy
+    });
+  } catch (error) {
+    console.error("Error in getUserModules:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+function buildModuleHierarchy(modules) {
+  const moduleMap = {};
+  modules.forEach(m => {
+    moduleMap[m.moduleId] = {
+      ...m,
+      children: []
+    };
+  });
+  const rootModules = [];
+  modules.forEach(m => {
+    if (m.parentId && moduleMap[m.parentId]) {
+      moduleMap[m.parentId].children.push(moduleMap[m.moduleId]);
+    } else {
+      rootModules.push(moduleMap[m.moduleId]);
+    }
+  });
+  return rootModules;
+}
 
-
-export {pagination,homePageData,getBrands,getDealers,getLocation,getWorkspace,getDashboard,partNature,model,seasonal,partType,userInfo,latestDates}
+export {getUserModules,pagination,homePageData,getBrands,getDealers,getLocation,getWorkspace,getDashboard,partNature,model,seasonal,partType,userInfo,latestDates}
