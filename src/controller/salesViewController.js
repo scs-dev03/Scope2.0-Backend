@@ -485,8 +485,7 @@ const getLedger = async (req, res) => {
         return res.status(400).json({ message: 'PartNumber must be an array or string' });
       }
     }
-      // console.log(partnumbers);
-      
+
     if (partnumbers.length === 0) {
       return res.status(400).json({ message: 'No part numbers provided' });
     }
@@ -495,11 +494,17 @@ const getLedger = async (req, res) => {
       return res.status(400).json({ message: 'More than 1000 part numbers not allowed' });
     }
 
+
+    ///*****PARTNUMBER ARE NOT TO BE CONVERTED TO PARTID BECAUSE OF OPTIMIZATION 
+    // 26 August 2025************/
+
     // Fetch mapping of PartNumber to Partid from DB
     const mappingQuery = `SELECT Partid, PartNumber FROM z_scope..Dealer_Sale_Upload_Old_TD001_${Dealerid}`;
     const mappingResult = await pool.request().query(mappingQuery);
     const mappingData = mappingResult.recordset;
 
+    // console.log(mappingData);
+    
     const partNumberToPartidMap = {};
     mappingData.forEach(item => {
       if (item.PartNumber) {
@@ -513,15 +518,25 @@ const getLedger = async (req, res) => {
       .filter(pid => pid !== undefined);
 
     if (matchedPartids.length === 0) {
-      return res.status(400).json({ message: 'No matching Partids found for the provided part numbers.' });
+      return res.status(400).json({ message: 'No sales for this Part'//'No matching Partids found for the provided part numbers.'
+       });
     }
 
+    // const partidString = partnumbers.join(',');
     const partidString = matchedPartids.join(',');
 
+    ///****END */
+
+
+    // console.log(`sp called`);
+    // console.log(partidString);
+    
     // Call stored procedure with mapped part IDs
     const query = `exec [z_scope].dbo.SP_MonthwisemultiPartLedger ${Brandid} ,${Dealerid}, ${Locationid}, '${partidString}', ${from}, ${to}`;
     const result = await pool.request().query(query);
 
+    // console.log(`Data aagya`);
+    
     res.status(200).json({ Data: result.recordsets });
 
   } catch (error) {

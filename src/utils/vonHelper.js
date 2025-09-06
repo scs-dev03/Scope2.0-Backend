@@ -163,7 +163,7 @@ formattedData.forEach(r => {
     r.PreviousFBID   != null ? parseInt(r.PreviousFBID, 10) : null
   );
 });
-console.log(formattedData);
+// console.log(formattedData);
 
     // 3. PROPER TRANSACTION HANDLING
     // ------------------------------
