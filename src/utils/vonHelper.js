@@ -5,24 +5,21 @@ import { getPool1, getPool2 } from '../db/db.js'
 const partBrandCheck = async(dealerid,locationid,partid)=>{
     try {
         const pool = await getPool2()
-        // const partCheck = `use [z_scope]  SELECT CASE 
-        //                   WHEN EXISTS (SELECT 1 FROM locationinfo WHERE brandid = (SELECT brandid FROM Part_Master WHERE partid = ${partid})
-        //                   AND dealerid = ${dealerid} 
-        //                   AND locationid = ${locationid}
-        //                   ) THEN 'YES' ELSE 'NO' END AS PartCheck;`
-        const partCheck = `use z_scope
-       SELECT 
-  CASE 
-    WHEN EXISTS (
-      SELECT 1 
-      FROM Stockable_Nonstockable_TD001_${dealerid} 
-      WHERE locationid = ${locationid} 
+        const partCheck = `
+        use z_scope
+        SELECT 
+        CASE 
+        WHEN EXISTS (
+        SELECT 1 
+        FROM Stockable_Nonstockable_TD001_${dealerid} 
+        WHERE locationid = ${locationid} 
         AND partid = ${partid} 
-        AND stockdate = (SELECT MAX(stockdate) FROM Stockable_Nonstockable_TD001_${dealerid})
-    ) 
-    THEN 'YES' 
-    ELSE 'NO' 
-  END AS Result`
+        AND addedby <> 7
+        AND stockdate = (SELECT MAX(stockdate) FROM Stockable_Nonstockable_TD001_${dealerid} where locationid = ${locationid} and addedby <> 7)
+        ) 
+        THEN 'YES' 
+        ELSE 'NO' 
+        END AS Result`
 
         const result = await pool.request().query(partCheck)                        
         if(result.recordset[0].Result === 'YES' ){
