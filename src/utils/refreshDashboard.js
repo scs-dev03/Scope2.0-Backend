@@ -99,7 +99,8 @@ const refreshSI = async (dealerid, reqid) => {
 const refreshBenchmarking = async(dealerid,reqid)=>{
    try {
      const pool = await getPool2()
-     let query = `exec [UAD_BI].[dbo].DRD_Adjustment_Dealer @dealerid`
+     let query = `exec [UAD_BI].[dbo].UAD_Bench_Compile_GT @dealerid`
+   //   let query = `exec [UAD_BI].[dbo].DRD_Adjustment_Dealer @dealerid`
      let result =  await pool.request().input('dealerid',sql.Int,dealerid).query(query)
       console.log(`Data Refreshing Benchmarking for reqid: ${reqid} at ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`);
 
