@@ -100,6 +100,12 @@ const userView = async (req, res) => {
         if (!dealerid && !brandid) {
             return res.status(400).json({ Error: `Dealerid and Brandid is a required Parameter` })
         }
+        if(partnumber){
+        const Check = await maxpartmapping(partnumber,dealerid,locationid)
+        if(Check == false){
+            return res.status(400).json({message:`No Sales in 12 Month for this part`})
+        }
+    }
         const query = `exec [z_scope].dbo.GetMAXData @brandid, @dealerid , @r1, @r2, @l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@parttype;`
 
         if (!partnumber && !locationid) {
@@ -132,15 +138,14 @@ const userView = async (req, res) => {
 }
 const userFeedbacklog = async (req, res) => {
     try {
-        // const pool = await getPool1()
         const pool = await getPool2()
         const { brandid, dealerid, locationid, partid, max, remarkid, customrem, proposedqty, addedby } = req.body
         if (!brandid || !dealerid || !locationid || !addedby || !partid || max == null || proposedqty == null || !remarkid) {
             return res.status(400).json({ Error: `All Fields are required` })
         }
-        const partCheck = await partBrandCheck(dealerid, locationid, partid)
+        const partCheck = await partBrandCheck(dealerid, locationid, partid)        
         if (!partCheck) {
-            return res.status(400).json({ Error: `PartID is Invalid` })
+            return res.status(400).json({ message: `PartID is Invalid Not in Max` })
         }
 
         const dynamicTable = `[UAD_VON]..UAD_VON_SPMFeedback_${brandid}`
@@ -299,6 +304,12 @@ const adminView = async (req, res) => {
         if (!brandid || !dealerid || !pageno || !pagesize) {
             return res.status(400).json({ Error: `Brandid and Dealerid are required Parameter` })
         }
+        if(partnumber){
+        const Check = await maxpartmapping(partnumber,dealerid,locationid)
+        if(Check == false){
+            return res.status(400).json({message:`No Sales in 12 Month for this part`})
+        }
+    }
         // const query = `exec [z_scope].dbo.GetMAXDataAdmin @brandid,@dealerid , @r1, @r2,@l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@status,@parttype;`
         // console.log(query);
         const query = `use z_scope EXEC sp_MAXAdminView @brandid ,@dealerid ,@locationid ,@seasonalid ,@natureid ,@modelid,@PartNumber,@r1 ,@r2,@l1,@l2 ,@MaxValueFlag,@parttype,@pageno,@pagesize;`
@@ -626,7 +637,12 @@ const adminPendingView = async (req, res) => {
         if (!brandid) {
             return res.status(400).json({ message: `Brandid is required` });
         }
-
+        if(partnumber){
+        const Check = await maxpartmapping(partnumber,dealerid,locationid)
+        if(Check == false){
+            return res.status(400).json({message:`No Sales in 12 Month for this part`})
+        }
+    }
         const query = `
             USE [UAD_VON]
             EXEC sp_GetAdminView 
@@ -1326,6 +1342,13 @@ try {
 
 }
 
-
+const maxpartmapping = async(partNumber , DealerId , LocationId)=>{
+    const pool = await getPool2()
+    const result = await pool.request().query(`select * from z_scope..stockable_nonstockable_td001_${DealerId} where locationid = ${LocationId} and partnumber1 = '${partNumber}' and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${DealerId} where locationid = ${LocationId})`)
+    if(result.recordset.length === 0){
+        return false
+    }
+    return true;
+}
 
 export { remarkMaster, userView, adminView, userFeedbacklog, viewLog, newRemark, viewRemark, adminFeedbackLog, partFamily, countPending, partFamilySale, adminPendingView, dealerUpload, adminUpload }

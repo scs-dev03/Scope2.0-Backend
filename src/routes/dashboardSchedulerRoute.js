@@ -1,5 +1,5 @@
 import Router from 'express'
-import { getDashboardbyDealer , uploadSchedule, getRequests,getBDM, editSchedule , deleteReq , changeLog, changelogView, requestNewDashboard, newDashboardSchedule, requestBy, newDashboardView,countView,statusTimelime, getBrandByUser, getDealerByUser} from '../controller/dashboardSchedulerController.js'
+import { getDashboardbyDealer , uploadSchedule, getRequests, editSchedule , deleteReq , changeLog, changelogView, requestNewDashboard, newDashboardSchedule, requestBy, newDashboardView,countView,statusTimelime, getBrandByUser, getDealerByUser} from '../controller/dashboardSchedulerController.js'
 const router = Router()
 
 router.route('/getdashboard').post(getDashboardbyDealer)
