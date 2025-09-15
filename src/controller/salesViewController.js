@@ -1,5 +1,5 @@
 // import sql from 'mssql'
-// import {getPool1} from '../db/db.js'
+// import {getPool2} from '../db/db.js'
 // import { readExcel } from '../utils/vonHelper.js'
 // import fs from 'fs'
 
@@ -8,7 +8,7 @@
 // const partDetails = async(req,res)=>{
 
 //     try {
-//         const pool =  getPool1()
+//         const pool =  getPool2()
 //         const {Brandid,Partnumber,excel}=req.body
 
 //         if (!Brandid || !excel) {
@@ -97,7 +97,7 @@
 // }
 // // const getLedgerbyPartid = async (req, res) => {
 // //     try {
-// //         const pool = getPool1();
+// //         const pool = getPool2();
 // //         const { Dealerid, Locationid, Partid, from, to , excel} = req.body;
 // //         // console.log(Partid);
 
@@ -157,7 +157,7 @@
 // // };
 
 // const getLedger = async (req, res) => {
-//     const pool = await getPool1();
+//     const pool = await getPool2();
 //     const {Brandid, Dealerid, Locationid, PartNumber, from, to, excel } = req.body;
 
 //     let partnumbers = [];
@@ -258,7 +258,7 @@
 
 //   const partBrandMappingCheck = async (Brandid, Data) => {
 //     try {
-//       const pool = await getPool1();
+//       const pool = await getPool2();
 //       const partBrandMappingQuery = `USE z_scope; SELECT brandid, partnumber FROM Part_Master WHERE brandid = ${Brandid}`;
 //       const partBrandMappingResult = await pool.request().query(partBrandMappingQuery);
 
@@ -292,7 +292,7 @@ import fs from 'fs';
  */
 const partDetails = async (req, res) => {
   try {
-    const pool = getPool1();
+    const pool = getPool2();
     const { Brandid, Partnumber, excel } = req.body;
 
     if (!Brandid || !excel) {
@@ -532,7 +532,7 @@ const getLedger = async (req, res) => {
   }
 };
 const getPartsAndLedger = async (req, res) => {
-  const pool = await getPool1();
+  const pool = await getPool2();
   const {
     Brandid,
     Dealerid,
@@ -544,17 +544,14 @@ const getPartsAndLedger = async (req, res) => {
   } = req.body;
 
   try {
-    if (!Brandid || !excel) {
-      return res.status(400).json({ message: "Brandid and Excel flag are required" });
-    }
-
-    if (Dealerid == null || Locationid == null || !from || !to) {
-      return res.status(400).json({ message: "Dealerid, Locationid, from, to are required" });
-    }
-
+     if(!Brandid || !Dealerid || !Locationid == null || !from || !to || !excel){
+    return res.status(400).json({message:`All Fields are required`})
+  }
     let partnumbers = [];
+
+    // Excel flow
     if (excel == 1) {
-      if (!req.file) {
+      if (req.file==undefined) {
         return res.status(400).json({ message: "Must upload an Excel file" });
       }
 
@@ -562,24 +559,16 @@ const getPartsAndLedger = async (req, res) => {
       fs.unlinkSync(req.file.path);
 
       const REQUIRED_HEADERS = ["PartNumber"];
-      const missingHeaders = REQUIRED_HEADERS.filter(h => !headers.includes(h));
+      const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
       if (missingHeaders.length > 0) {
         return res.status(400).json({ message: `Missing Header "PartNumber"`, missingHeaders });
       }
 
       data.forEach(row => {
         if (row.PartNumber != null) {
-          row.PartNumber = String(row.PartNumber).trim().toUpperCase();
+          row.PartNumber = String(row.PartNumber).trim().toUpperCase(); // keep like getLedger
         }
       });
-
-      if (data.length === 0) {
-        return res.status(400).json({ message: "No part numbers found in Excel" });
-      }
-      if (data.length >= 1000) {
-        return res.status(400).json({ message: "More than 1000 part numbers not allowed" });
-      }
-
       const unmatchedParts = await partBrandMappingCheck(Brandid, data);
       if (unmatchedParts.length > 0) {
         return res.status(400).json({
@@ -588,24 +577,27 @@ const getPartsAndLedger = async (req, res) => {
         });
       }
 
-      partnumbers = data.map(item => item.PartNumber);
+      partnumbers = data.map(item => item.PartNumber?.toString().trim()).filter(Boolean);
+      // console.log(partnumbers);
+
     } else {
+      // Body flow
       if (!PartNumber) {
         return res.status(400).json({ message: "PartNumber is required" });
       }
 
       if (Array.isArray(PartNumber)) {
-        partnumbers = PartNumber.map(p => p.toString().trim().toUpperCase());
+        partnumbers = PartNumber.map(p => p.toString().trim()); // no uppercase
       } else if (typeof PartNumber === "string") {
         const raw = PartNumber.trim();
-        try {
-          if (raw.startsWith("[") && raw.endsWith("]")) {
-            partnumbers = JSON.parse(raw).map(p => p.toString().trim().toUpperCase());
-          } else {
-            partnumbers = raw.split(",").map(p => p.trim().toUpperCase()).filter(Boolean);
+        if (raw.startsWith("[") && raw.endsWith("]")) {
+          try {
+            partnumbers = JSON.parse(raw).map(p => p.toString().trim().toUpperCase()); // only JSON array case uppercased
+          } catch {
+            return res.status(400).json({ message: "Invalid JSON array in PartNumber" });
           }
-        } catch {
-          return res.status(400).json({ message: "Invalid PartNumber format" });
+        } else {
+          partnumbers = raw.split(',').map(p => p.trim()).toUpperCase().filter(Boolean);
         }
       } else {
         return res.status(400).json({ message: "PartNumber must be an array or string" });
@@ -614,11 +606,12 @@ const getPartsAndLedger = async (req, res) => {
       if (partnumbers.length === 0) {
         return res.status(400).json({ message: "No part numbers provided" });
       }
-      if (partnumbers.length >= 1000) {
+      if (partnumbers.length >= 100) {
         return res.status(400).json({ message: "More than 1000 part numbers not allowed" });
       }
     }
 
+    // Build details query
     const partnumberString = partnumbers.map(p => `'${p}'`).join(",");
 
     const detailsQuery = `
@@ -637,28 +630,32 @@ const getPartsAndLedger = async (req, res) => {
       WHERE pm.partnumber IN (${partnumberString}) AND pm.brandid = ${Brandid}
     `;
 
+    // Ledger promise
     const ledgerPromise = (async () => {
-      const mappingQuery = `use z_scope SELECT Partid, PartNumber FROM Dealer_Sale_Upload_Old_TD001_${Dealerid}`;
+      const mappingQuery = `SELECT Partid, PartNumber FROM z_scope..Dealer_Sale_Upload_Old_TD001_${Dealerid}`;
       const mappingResult = await pool.request().query(mappingQuery);
-
-      const partNumberToPartid = {};
-      mappingResult.recordset.forEach(item => {
-        if (item.PartNumber) {
-          partNumberToPartid[item.PartNumber.trim()] = item.Partid;
-        }
+      const mappingData = mappingResult.recordset;
+      const partNumberToPartidMap = {};
+      mappingData.forEach(item => {
+      if (item.PartNumber) {
+        partNumberToPartidMap[item.PartNumber.trim()] = item.Partid;
+      }
       });
 
-      const matchedPartids = partnumbers.map(pn => partNumberToPartid[pn]).filter(Boolean);
+      const matchedPartids = partnumbers
+      .map(pn => partNumberToPartidMap[pn])
+      .filter(pid => pid !== undefined);
+
       if (matchedPartids.length === 0) {
         throw new Error("No matching Partids found for the provided part numbers.");
       }
-
       const partidString = matchedPartids.join(",");
       const ledgerQuery = `EXEC [z_scope].dbo.SP_MonthwisemultiPartLedger ${Brandid}, ${Dealerid}, ${Locationid}, '${partidString}', ${from}, ${to}`;
       const rawLedger = await pool.request().query(ledgerQuery);
-      return rawLedger.recordsets[0] || [];
+      return rawLedger.recordsets;
     })();
 
+    // Run both in parallel
     const [detailsResult, ledgerResult] = await Promise.allSettled([
       pool.request().query(detailsQuery),
       ledgerPromise
@@ -681,7 +678,7 @@ const partBrandMappingCheck = async (Brandid, Data) => {
   try {
     // console.log(Data);
 
-    const pool = await getPool1();
+    const pool = await getPool2();
     const query = `
       USE z_scope;
       SELECT brandid, partnumber FROM z_scope.dbo.Part_Master WHERE brandid = ${Brandid}
