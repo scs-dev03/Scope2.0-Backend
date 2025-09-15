@@ -384,78 +384,241 @@ const latestDates = async (req, res) => {
     res.status(500).json({ Error: error.message });
   }
 };
-
-//helper to build nested hierarchy
-function buildModuleHierarchy(modules) {
-  const moduleMap = {};
-
-  modules.forEach(m => {
-    moduleMap[m.moduleId] = {
-      ...m,
-      children: []
-    };
+function buildModuleHierarchy(rootModules, accessiblePages) {
+  const pageMap = {};
+  const roots = [];
+  accessiblePages.forEach(p => {
+    pageMap[p.moduleId] = { ...p, children: [] };
   });
-
-  const rootModules = [];
-
-  modules.forEach(m => {
-    if (m.parentId && moduleMap[m.parentId]) {
-      moduleMap[m.parentId].children.push(moduleMap[m.moduleId]);
-    } else {
-      rootModules.push(moduleMap[m.moduleId]);
+  const childTracker = {}; 
+  accessiblePages.forEach(p => {
+    if (p.parentId && pageMap[p.parentId]) {
+      if (!childTracker[p.parentId]) childTracker[p.parentId] = new Set();
+      if (!childTracker[p.parentId].has(p.moduleId)) {
+        pageMap[p.parentId].children.push(pageMap[p.moduleId]);
+        childTracker[p.parentId].add(p.moduleId);
+      }
     }
   });
+  rootModules.forEach(r => {
+    roots.push({
+      ...r,
+      children: accessiblePages
+        .filter(p => p.parentId === r.moduleId)
+        .filter((p, idx, arr) => arr.findIndex(x => x.moduleId === p.moduleId) === idx) // filter duplicates
+        .map(p => pageMap[p.moduleId])
+    });
+  });
 
-  return rootModules;
+  return roots;
 }
+// const getUserModules = async (req, res) => {
+//   try {
+//     const { userId } = req.body;
+//     if (!userId) {
+//       return res.status(400).json({ error: "userId is required" });
+//     }
 
-//new API: getUserModules
+//     const pool = await getPool2();
+
+//     // fetch root modules
+//     const rootResult = await pool.request().query(`
+//       SELECT id AS moduleId, parentId,parentModuleName, module_name, module_route, Sequence, Icon
+//       FROM module_master
+//       WHERE parentId = 0
+//     `);
+//     const rootModules = rootResult.recordset;
+
+//     // fetch accessible pages + their descendants
+//     const pageResult = await pool.request()
+//       .input("userId", userId)
+//       .query(`
+//         WITH AccessiblePages AS (
+//             SELECT 
+//                 mm.id AS moduleId,
+//                 mm.parentId,
+//                 mm.parentModuleName,
+//                 mm.module_name,
+//                 mm.module_route,
+//                 mm.Sequence,
+//                 mm.Icon
+//             FROM AdminMaster_GEN ag
+//             INNER JOIN role_module_mapping rm ON ag.roleID = rm.role_id
+//             INNER JOIN module_master mm ON rm.module_id = mm.id
+//             WHERE ag.bintId_Pk = @userId
+
+//             UNION ALL
+
+//             SELECT 
+//                 m.id AS moduleId,
+//                 m.parentId,
+//                 m.parentModuleName,
+//                 m.module_name,
+//                 m.module_route,
+//                 m.Sequence,
+//                 m.Icon
+//             FROM module_master m
+//             INNER JOIN AccessiblePages ap ON m.parentId = ap.moduleId
+//         )
+//         SELECT * FROM AccessiblePages;
+//       `);
+//     const accessiblePages = pageResult.recordset;
+
+//     // build hierarchy
+//     const hierarchy = buildModuleHierarchy(rootModules, accessiblePages);
+
+//     res.json({
+//       userId,
+//       modules: hierarchy
+//     });
+//   } catch (error) {
+//     console.error("Error in getUserModules:", error);
+//     res.status(500).json({ error: "Internal Server Error" });
+//   }
+// };
+
 const getUserModules = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { userId } = req.body;
     if (!userId) {
       return res.status(400).json({ error: "userId is required" });
     }
 
-    const pool = await getPool2(); 
+    const pool = await getPool2();
+
+    // Step 1: Get modules user has access to (with permissions + badge)
     const result = await pool.request()
-      .input("userId", userId)
+      .input("userId", sql.Int, userId)
       .query(`
-        WITH ModuleTree AS (
-            SELECT 
-                mm.id AS moduleId,
-                mm.parentId,
-                mm.module_name,
-                mm.module_route
-            FROM AdminMaster_GEN ag
-            INNER JOIN role_module_mapping rm ON ag.roleID = rm.role_id
-            INNER JOIN module_master mm ON rm.module_id = mm.id
-            WHERE ag.bintId_Pk = @userId
-
-            UNION ALL
-
-            SELECT 
-                m.id AS moduleId,
-                m.parentId,
-                m.module_name,
-                m.module_route
-            FROM module_master m
-            INNER JOIN ModuleTree mt ON m.parentId = mt.moduleId
-        )
-        SELECT * FROM ModuleTree;
+        select ad.bintId_Pk as userId,
+               ad.roleID as roleId,
+               rm.module_id as moduleId,
+               mm.parentId,
+               mm.module_name as label,
+               mm.module_route as route,
+               mm.Sequence as [order],
+               mm.Type as type,
+               mm.Icon as icon,
+               mm.badge,
+               mm.view1,
+               mm.edit1,
+               mm.add1,
+               mm.delete1,
+               mm.id
+        from AdminMaster_GEN ad
+        inner join role_module_mapping rm on ad.roleID = rm.role_id
+        inner join Module_Master mm on rm.module_id = mm.id
+        where ad.bintId_Pk = @userId
       `);
 
     const modules = result.recordset;
-    const hierarchy = buildModuleHierarchy(modules);
 
-    res.json({
-      userId,
-      modules: hierarchy
-    });
-  } catch (error) {
-    console.error("Error in getUserModules:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    // Step 2: Load all modules (for parent lookups)
+    const allModulesResult = await pool.request().query(`
+      select id, parentId, module_name as label, module_route as route,
+             Type as type,Icon as icon, Sequence as [order], badge,
+             view1, edit1, add1, delete1
+      from Module_Master
+    `);
+
+    const allModules = allModulesResult.recordset;
+    const moduleMap = new Map(allModules.map(m => [m.id, m]));
+
+    // Step 3: Collect user modules + their parents
+    const needed = new Map();
+    function addWithParents(moduleId) {
+      let current = moduleMap.get(moduleId);
+      while (current) {
+        needed.set(current.id, current);
+        if (current.parentId === 0) break; // stop at top-level
+        current = moduleMap.get(current.parentId);
+      }
+    }
+
+    for (const m of modules) {
+      addWithParents(m.moduleId);
+    }
+
+    // Step 4: Build sidebar tree
+    function buildTree(parentId = 0, visited = new Set()) {
+      const children = [...needed.values()].filter(m => m.parentId === parentId);
+
+      return children
+        .sort((a, b) => a.order - b.order)
+        .map(m => {
+          if (visited.has(m.id)) {
+            console.warn(`⚠️ Cycle detected at module ${m.id} (${m.label}), skipping`);
+            return { ...m, children: [] };
+          }
+
+          const newVisited = new Set(visited);
+          newVisited.add(m.id);
+
+          return {
+            id: m.id,
+            label: m.label,
+            type: m.type,
+            route: m.route,
+            icon:m.icon,
+            order: m.order,
+            badge: m.badge,
+            roles: {
+              view: m.view1,
+              add: m.add1,
+              edit: m.edit1,
+              delete: m.delete1
+            },
+            children: buildTree(m.id, newVisited)
+          };
+        });
+    }
+
+    const tree = buildTree(0);
+    console.log("✅ Final sidebar tree built with", tree.length, "top-level nodes");
+    return res.json(tree);
+
+  } catch (err) {
+    console.error("❌ Error in getUserModules:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
-export { pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules }
+// const getRawUserModules = async (req, res) => {
+//   try {
+//     const { userId } = req.body;
+//     if (!userId) {
+//       return res.status(400).json({ error: "userId is required" });
+//     }
+
+//     const pool = await getPool2();
+
+//     // Step 1: Get modules user has access to
+//     const result = await pool.request()
+//       .input("userId", sql.Int, userId)
+//       .query(`
+//         select ad.bintId_Pk as userId,
+//                ad.roleID as roleId,
+//                rm.module_id as moduleId,
+//                mm.parentId,
+//                mm.module_name as label,
+//                mm.module_route as route,
+//                mm.module_type as type,
+//                mm.id,
+//                mm.Sequence as [order]
+//         from AdminMaster_GEN ad
+//         inner join role_module_mapping rm on ad.roleID = rm.role_id
+//         inner join Module_Master mm on rm.module_id = mm.id
+//         where ad.bintId_Pk = @userId
+//       `);
+
+//     const modules = result.recordset;
+
+//     // Step 2: Load all modules for parent lookups
+//       return modules;
+//   } catch (err) {
+//     console.error("Error in getUserModules:", err);
+//     res.status(500).json({ error: "Internal server error" });
+//   }
+// };
+
+export { pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules, getRawUserModules }
