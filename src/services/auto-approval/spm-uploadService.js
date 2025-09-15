@@ -269,7 +269,7 @@ const spmBulkVehicleUpload = async (file, LocationId, userId) => {
 // if (invalidRows.length) {
 //   throw new ApiError(400, "Invalid OrderType", { allowed: ALLOWED, invalidRows });
 // }
-  
+
 const ALLOWED = ["Normal","Urgent","Co-Dealer","Transfer"];
 
 const norm = v =>
@@ -319,4 +319,4 @@ try {
 }
 }
 
-export {spmBulkCSUpload , spmMultiCSUpload , spmBulkWSUpload , spmBulkVehicleUpload}
+export {spmBulkCSUpload , spmMultiCSUpload , spmBulkWSUpload , spmBulkVehicleUpload,partyNameCodeMapping}

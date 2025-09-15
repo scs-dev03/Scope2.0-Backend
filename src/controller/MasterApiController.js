@@ -621,4 +621,4 @@ const getUserModules = async (req, res) => {
 //   }
 // };
 
-export { pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules, getRawUserModules }
+export { pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules }

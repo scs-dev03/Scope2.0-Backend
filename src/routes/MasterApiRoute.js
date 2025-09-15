@@ -1,6 +1,6 @@
 import Router from 'express'
 const router = Router()
-import { getBrands,getDashboard,getDealers,getLocation, getWorkspace, homePageData, latestDates, model, pagination, partNature, partType, seasonal, userInfo, getUserModules,getRawUserModules } from '../controller/MasterApiController.js'
+import { getBrands,getDashboard,getDealers,getLocation, getWorkspace, homePageData, latestDates, model, pagination, partNature, partType, seasonal, userInfo, getUserModules } from '../controller/MasterApiController.js'
 
 
 router.route('/brands').get(getBrands)
