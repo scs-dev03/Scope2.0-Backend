@@ -1,163 +1,322 @@
+import { readExcel } from "../../utils/vonHelper.js";
+import fs from 'fs'
 import { getPool1 } from "../../db/db.js";
-import sql from 'mssql'
 import { ApiError } from "../../utils/ApiError.js";
 
-const insertApprovals = async(data)=>{
-    try{
-    const pool = await getPool1()
-    const tableName = 'Temp_createorderrequest_VB'
-    const table = new sql.Table(tableName); // Use fully qualified name
-    table.create = false;
-data = data.map((row) => ({
-    ...row,
-    PartNumber: row.PartNumber ? row.PartNumber.toString() : null, // Ensure PartNumber is a string
-    Remarks: row.Remarks ? row.Remarks.toString() : null, // Ensure Remarks is a string
-    VehicleNumber: row.VehicleNumber ? row.VehicleNumber.toString() : null, // Ensure VehicleNumber is a string
-    VehicleModel: row.VehicleModel ? row.VehicleModel.toString() : null, // Ensure VehicleModel is a string
-    JobCardNumber: row.JobCardNumber ? row.JobCardNumber.toString() : null, // Ensure JobCardNumber is a string
-    JobType: row.JobType ? row.JobType.toString() : null, // Ensure JobType is a string
-    Advisor: row.Advisor ? row.Advisor.toString() : null, // Ensure Advisor is a string
-    OrderType: row.OrderType ? row.OrderType.toString() : null, // Ensure OrderType is a string
-    // Ensure numeric fields are passed as numbers (no strings)
-    LocationId: row.LocationId || null,
-    Qty: row.Qty || null,
-    PartyId: row.PartyId || null,
-    AdvanceValue: row.AdvanceValue || null,
-    Estimate: row.Estimate || null,
-    UploadedBy: row.UploadedBy || null
-}));
+const spmBulkCSUpload = async(LocationId,OrderType , file , userId)=>{
+        let {headers,data} = await readExcel(file); 
+        fs.unlinkSync(file); // Delete uploaded file after processing
+  
+        const REQUIRED_HEADERS = ["PartNumber", "Qty", "Remarks" , "PartyName"];
+        const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
+            
+        if (missingHeaders.length > 0) {
+            throw new ApiError(400,"Missing headers or data",[missingHeaders],'');
+        }
+        
+        const isBlank = v =>
+          v == null || (typeof v === "string" && v.trim() === "") || (typeof v === "number" && Number.isNaN(v));
 
-    
-    // 2) Define the 11 non-default columns, in exact ordinal order & types:
-    table.columns.add('LocationId',      sql.Int,             { nullable: true });  
-    table.columns.add('PartNumber',      sql.VarChar(50),     { nullable: true });  
-    table.columns.add('Qty',             sql.Int,             { nullable: true });  
-    table.columns.add('Remarks',         sql.VarChar(100),    { nullable: true });  
-    table.columns.add('VehicleNumber',   sql.VarChar(20),     { nullable: true });  
-    table.columns.add('VehicleModel',    sql.VarChar(30),     { nullable: true });  
-    table.columns.add('JobCardNumber',   sql.VarChar(40),     { nullable: true });  
-    table.columns.add('JobType',         sql.VarChar(15),     { nullable: true });  
-    table.columns.add('Advisor',         sql.VarChar(20),     { nullable: true });  
-    table.columns.add('OrderType',       sql.VarChar(10),     { nullable: true });  
-    table.columns.add('PartyId',         sql.Int,             { nullable: true });  
-    table.columns.add('AdvanceValue',    sql.Int,             { nullable: true });  
-    table.columns.add('Estimate',        sql.Int,             { nullable: true });  
-    table.columns.add('UploadedBy',      sql.Int,             { nullable: true });  
+        // objects where any required key is missing/blank
+        const missingRows = data.filter(row => REQUIRED_HEADERS.some(k => isBlank(row[k])));
 
-    // Add rows to the table for bulk insert
-        data.forEach((row) => {
-            table.rows.add(
-                row.LocationId,
-                row.PartNumber,
-                row.Qty,
-                row.Remarks,
-                row.VehicleNumber,
-                row.VehicleModel,
-                row.JobCardNumber,
-                row.JobType,
-                row.Advisor,
-                row.OrderType,
-                row.PartyId,
-                row.AdvanceValue,
-                row.Estimate,
-                row.UploadedBy
-            );
-        });
+        //  include which keys are missing
+        const issues = data
+          .map((row, i) => ({ index: i, missing: REQUIRED_HEADERS.filter(k => isBlank(row[k])), row }))
+          .filter(x => x.missing.length);
 
-// const request = new sql.Request(transaction); // Use transaction, not pool
-const request = pool.request(); // Use transaction, not pool
-    await request.bulk(table);
-    // await transaction.commit();
-    // console.log('Bulk insert successful');
-    return
+          if(missingRows.length != 0 || issues.length != 0){
+            throw new ApiError(400,`Data Incomplete`,{ missingRows, issues },'')
+          }
+        const formattedData = data.map((row)=>({
+            ...row,
+            LocationId:LocationId,
+            OrderType:OrderType,
+            Type:"S",
+            UploadedBy:userId
+        }))
+  
 
-  } catch (err) {
-    console.error('Error during bulk insert:', err );
-    // await transaction.rollback();
-    throw err; // Re-throw for upstream handling
-  } 
+        const partyMappingData = await partyNameCodeMapping(LocationId)
+        if(!Array.isArray(partyMappingData) || partyMappingData.length == 0){
+          throw new ApiError(400,`No Matching Party found for Your Location `)
+        }
+        
+        const norm = s => String(s ?? "").trim().toLowerCase();
+        const idByName = new Map(
+          partyMappingData.map(({ PartyName, Id }) => [norm(PartyName), Id])
+        );
+
+        const output = formattedData
+          .map(({ PartNumber, Qty, PartyName, LocationId, OrderType, Type , Remarks , UploadedBy}) => {
+            const PartyId = idByName.get(norm(PartyName));
+            return PartyId != null ? { PartNumber, Qty, PartyId, LocationId, OrderType, Type , Remarks , UploadedBy} : null;
+          })
+          .filter(Boolean);
+
+    return output
 }
 
-const insertSpmParty = async(data)=>{
+const spmMultiCSUpload = async(LocationId,OrderType , PartyName , file , userId)=>{
+    let {headers,data} = await readExcel(file); 
+    fs.unlinkSync(file); // Delete uploaded file after processing
+  
+    const REQUIRED_HEADERS = [ "PartNumber", "Qty", "Remarks" ];
+    const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
+        if (missingHeaders.length > 0) {
+            throw new ApiError(400,"Missing headers or data", missingHeaders,'');
+        }
+        const isBlank = v =>
+          v == null || (typeof v === "string" && v.trim() === "") || (typeof v === "number" && Number.isNaN(v));
+
+        // objects where any required key is missing/blank
+        const missingRows = data.filter(row => REQUIRED_HEADERS.some(k => isBlank(row[k])));
+
+        //  include which keys are missing
+        const issues = data
+          .map((row, i) => ({ index: i, missing: REQUIRED_HEADERS.filter(k => isBlank(row[k])), row }))
+          .filter(x => x.missing.length);
+
+          if(missingRows.length != 0 || issues.length != 0){
+            throw new ApiError(400,`Data Incomplete`,{ missingRows, issues },'')
+          }
+        const formattedData = data.map((row)=>({
+            ...row,
+            LocationId:LocationId,
+            OrderType:OrderType,
+            PartyName:PartyName,
+            Type:"S",
+            UploadedBy:userId
+        }))
+
+        
+        const partyMappingData = await partyNameCodeMapping(LocationId)
+                if(!Array.isArray(partyMappingData) || partyMappingData.length == 0){
+          throw new ApiError(400,`No Matching Party found for Your Location `)
+        }
+
+        const norm = s => String(s ?? "").trim().toLowerCase();
+        const idByName = new Map(
+          partyMappingData.map(({ PartyName, Id }) => [norm(PartyName), Id])
+        );
+
+        const output = formattedData
+          .map(({ PartNumber, Qty, PartyName, LocationId, OrderType, Type , Remarks , UploadedBy }) => {
+            const PartyId = idByName.get(norm(PartyName));
+            return PartyId != null ? { PartNumber, Qty, PartyId, LocationId, OrderType, Type  , Remarks , UploadedBy} : null;
+          })
+          .filter(Boolean);
+
+        return output
+}
+
+const spmBulkWSUpload = async(LocationId,OrderType , file , userId)=>{
+    let {headers,data} = await readExcel(file); 
+      fs.unlinkSync(file); // Delete uploaded file after processing
+  
+        const REQUIRED_HEADERS = ["PartNumber", "Qty", "Remarks" ];
+        const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
+            
+        if (missingHeaders.length > 0) {
+            throw new ApiError(400,"Missing headers or data", missingHeaders,'');
+        }
+        const isBlank = v =>
+          v == null || (typeof v === "string" && v.trim() === "") || (typeof v === "number" && Number.isNaN(v));
+
+        // objects where any required key is missing/blank
+        const missingRows = data.filter(row => REQUIRED_HEADERS.some(k => isBlank(row[k])));
+
+        //  include which keys are missing
+        const issues = data
+          .map((row, i) => ({ index: i, missing: REQUIRED_HEADERS.filter(k => isBlank(row[k])), row }))
+          .filter(x => x.missing.length);
+
+        if(missingRows.length != 0 || issues.length != 0){
+          throw new ApiError(400,`Data Incomplete`,{ missingRows, issues },'')
+        }
+        const formattedData = data.map((row)=>({
+            ...row,
+            LocationId:LocationId,
+            OrderType:OrderType,
+            Type:"S",
+            UploadedBy:userId
+        })) 
+        return formattedData
+}
+
+// const spmBulkVehicleUpload = async(file, LocationId , userId)=>{
+//   let {headers,data} = await readExcel(file); 
+//     fs.unlinkSync(file); // Delete uploaded file after processing
+    
+//         // const REQUIRED_HEADERS = ["VehicleNumber","VehicleModel","JobCardNumber","JobType","Advisor","OrderType","PartNumber","Qty","Remarks","AdvanceValue","Estimate"];
+//         // const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
+//         const H = headers.map(h => String(h).trim());
+
+
+//         const REQUIRED_ALWAYS = [
+//           "VehicleNumber","VehicleModel","JobCardNumber","JobType",
+//           "Advisor","OrderType","PartNumber","Qty","Remarks"
+//         ];
+
+//         // At least one from each group must be present
+//         const OR_HEADERS = [
+//           ["AdvanceValue","Estimate"]
+//         ];
+
+//         const missingHeaders = [
+//           // missing strict-required headers
+//           ...REQUIRED_ALWAYS.filter(h => !H.includes(h)),
+//           // missing any OR-group (if none of the group members exists)
+//           ...OR_HEADERS.flatMap(group =>
+//             group.some(h => H.includes(h)) ? [] : [`${group.join(" or ")}`]
+//           ),
+//         ];
+
+//         // If you want to fail on header issues:
+//         if (missingHeaders.length) {
+//           throw new ApiError(400, "Missing headers", { missingHeaders });
+//         }
+            
+//         // if (missingHeaders.length > 0) {
+//         //   return res.status(400).json({
+//         //     message: "Missing headers or data",
+//         //     missingHeaders
+//         //   });
+//         // }
+//         const isBlank = v =>
+//           v == null || (typeof v === "string" && v.trim() === "") || (typeof v === "number" && Number.isNaN(v));
+
+//         // objects where any required key is missing/blank
+//         const missingRows = data.filter(row => REQUIRED_HEADERS.some(k => isBlank(row[k])));
+
+//         //  include which keys are missing
+//         const issues = data
+//           .map((row, i) => ({ index: i, missing: REQUIRED_HEADERS.filter(k => isBlank(row[k])), row }))
+//           .filter(x => x.missing.length);
+
+//         if(missingRows.length != 0 || issues.length != 0){
+//           throw new ApiError(400,`Data Incomplete`,{ missingRows, issues },'')
+//         }
+        
+//         const formattedData = data.map((row)=>({
+//             ...row,
+//             LocationId:LocationId,
+//             Type:"V",
+//             UploadedBy:userId
+//         }))
+//         // console.log(`formattedData`,formattedData[0]);
+        
+//         return formattedData
+// }
+const spmBulkVehicleUpload = async (file, LocationId, userId) => {
+  let { headers, data } = await readExcel(file); // make sure readExcel uses defval:null
+  fs.unlinkSync(file);
+  
+  // --- Header-level checks ---
+  const H = headers.map(h => String(h).trim()); // normalize headers
+
+  const REQUIRED_ALWAYS = [
+    "VehicleNumber","VehicleModel","JobType",
+    "Advisor","OrderType","PartNumber","Qty","Remarks"
+  ];
+  const OR_HEADERS = [["AdvanceValue","Estimate","JobCardNumber"]]; // at least one must exist
+
+  const missingHeaders = [
+    ...REQUIRED_ALWAYS.filter(h => !H.includes(h)),
+    ...OR_HEADERS.flatMap(group => group.some(h => H.includes(h)) ? [] : [`${group.join(" or ")}`]),
+  ];
+
+  if (missingHeaders.length) {
+    throw new ApiError(400, "Missing headers", { missingHeaders });
+  }
+
+  // --- Row-level checks ---
+  const isBlank = v =>
+    v == null || (typeof v === "string" && v.trim() === "") || (typeof v === "number" && Number.isNaN(v));
+
+  const rowIssues = [];
+  data.forEach((row, i) => {
+    const idx = i + 2; // if row 1 is header
+    const missing = REQUIRED_ALWAYS.filter(k => isBlank(row[k]));
+    // Enforce: at least one of AdvanceValue or Estimate must be present
+    const bothMissing = isBlank(row.AdvanceValue) && isBlank(row.Estimate);
+    if (missing.length || bothMissing) {
+      const issues = [];
+      if (missing.length) issues.push(...missing.map(f => ({ field: f, message: "Required" })));
+      if (bothMissing) issues.push({ field: "AdvanceValue/Estimate", message: "At least one required" });
+      rowIssues.push({ row: idx, issues, rowData: row });
+    }
+  });
+
+  if (rowIssues.length) {
+    throw new ApiError(400, "Data Incomplete", { rowIssues });
+  }
+  
+// const ALLOWED = ["Normal","Urgent","Co-Dealer","Transfer"];
+// const norm = v => String(v ?? "").trim(); // add .toLowerCase() if case-insensitive
+
+// // distinct invalid values found in the sheet
+// const distinctInvalid = [...new Set(
+//   data.map(r => norm(r.OrderType)).filter(v => v && !ALLOWED.includes(v))
+// )];
+
+// // (optional) row-wise issues with row numbers
+// const invalidRows = data
+//   .map((r, i) => ({ row: i + 2, value: r.OrderType }))
+//   .filter(x => !x.norm || !ALLOWED.includes(x.norm));
+
+// // throw if any invalids
+// if (invalidRows.length) {
+//   throw new ApiError(400, "Invalid OrderType", { allowed: ALLOWED, invalidRows });
+// }
+  
+const ALLOWED = ["Normal","Urgent","Co-Dealer","Transfer"];
+
+const norm = v =>
+  String(v ?? "")
+    .normalize("NFKC")        // unify unicode
+    .replace(/\s+/g, " ")     // collapse internal spaces
+    .trim()
+    .toLowerCase();
+
+const allowedSet = new Set(ALLOWED.map(norm));
+
+const invalidRows = data
+  .map((r, i) => ({ row: i + 2, raw: r.OrderType, norm: norm(r.OrderType) }))
+  .filter(x => !x.norm || !allowedSet.has(x.norm));
+
+if (invalidRows.length) {
+  throw new ApiError(400, "Invalid OrderType", {
+    allowed: ALLOWED,
+    invalidRows
+  });
+}
+
+  // --- Format output ---
+  const formattedData = data.map(row => ({
+    ...row,
+    LocationId,
+    Type: "V",
+    UploadedBy: userId
+  }));
+
+  return formattedData;
+};
+
+const partyNameCodeMapping = async(LocationId)=>{
 try {
         const pool = await getPool1()
-        const tableName = 'AAP_SPMPartyMaster'
-        const table = new sql.Table(tableName)
-        table.create = false;
-    
-        data = data.map((row) => ({
-        ...row,
-        PartyName:row.PartyName,
-        LocationId:row.LocationId,
-        PartyCode:row.PartyCode,
-        CreatedBy:row.CreatedBy
-        }));
+        const query = `
+        use z_scope
+        select Id , PartyName , PartyCode from AAP_SPMPartyMaster
+        where LocationId = ${LocationId}`
+      
+        const result = await pool.request().query(query)
+        return result.recordset
 
-        table.columns.add('LocationId',      sql.Int,             { nullable: false });  
-        table.columns.add('PartyName',       sql.VarChar(30),     { nullable: false });  
-        table.columns.add('PartyCode',       sql.VarChar(30),     { nullable: false });  
-        table.columns.add('CreatedBy',       sql.Int,             { nullable: true });  
-        
-        data.forEach((row)=>{
-            table.rows.add(
-                row.LocationId,
-                row.PartyCode,
-                row.PartyName,
-                row.CreatedBy
-            )
-        })
-
-        const result = await pool.request().bulk(table)
-        return
-    } catch (error) {
-        throw new Error(error.message)    
-    }
-}
-
-const insertadvisorParty = async(data)=>{
-    try{    
-    const pool = await getPool1()
-    const tableName = 'AAP_SPMAdvisorMaster'
-    const table = new sql.Table(tableName)
-    table.create = false;
-    
-        // data = data.map((row) => ({
-        // ...row,
-        // Advisor:row.Advisor,
-        // LocationId:row.LocationId,
-        // PhoneNo:row.PhoneNo,
-        // Email:row.Email
-        // }));
-
-        table.columns.add('LocationId',    sql.Int,             { nullable: false });  
-        table.columns.add('Advisor',       sql.VarChar(30),     { nullable: false });  
-        table.columns.add('PhoneNo',       sql.VarChar(10),     { nullable: true });  
-        table.columns.add('Email',         sql.VarChar(50),     { nullable: true });  
-        table.columns.add('CreatedBy',     sql.Int,             { nullable: true });  
-        
-        const sanitizedData = data.map(row => ({
-            LocationId: row.LocationId || null,
-            Advisor: row.Advisor ? row.Advisor.toString() : null,
-            PhoneNo: row.PhoneNo ? row.PhoneNo.toString() : null,
-            Email: row.Email ? row.Email.toString() : null,
-            CreatedBy: row.userId || null
-        }));
-        
-        sanitizedData.forEach((row)=>{
-            table.rows.add(
-                row.LocationId,
-                row.Advisor,
-                row.PhoneNo,
-                row.Email,
-                row.CreatedBy
-            )
-        })
-
-        const result = await pool.request().bulk(table)
-        return
-    } catch (error) {
-       throw new Error(error.message)    
+} catch (error) {
+    throw new ApiError(500,`PartyMapping Error`,[error,error.message],'Error in PartyNameCodeMapping');
 }
 }
 
-export {insertApprovals,insertSpmParty , insertadvisorParty}
+export {spmBulkCSUpload , spmMultiCSUpload , spmBulkWSUpload , spmBulkVehicleUpload}
