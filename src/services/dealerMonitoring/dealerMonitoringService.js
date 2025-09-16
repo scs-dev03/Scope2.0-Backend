@@ -1,9 +1,9 @@
-import { getPool1,getPool2 } from "../../db/db.js";
+import { getPool1, getPool2 } from "../../db/db.js";
 import sql from 'mssql'
-const partInfo = async (brandid,partnumber)=>{
- try {
-       const pool = await getPool2()
-       const query = `
+const partInfo = async (brandid, partnumber) => {
+  try {
+    const pool = await getPool2()
+    const query = `
         use [z_scope]
           SELECT DISTINCT
         pm.partnumber1,
@@ -22,26 +22,26 @@ const partInfo = async (brandid,partnumber)=>{
         ON pm.brandid = sm.brandid and pm.partnumber1 = sm.partnumber1
     WHERE pm.partnumber1 IN ('${partnumber}')
       AND pm.brandid = ${brandid} `
-  //  console.log(query);
-   
-   const result = await pool.request().query(query)
-//    console.log(result);
-   
-   return result
- } catch (error) {
+    //  console.log(query);
+
+    const result = await pool.request().query(query)
+    //    console.log(result);
+
+    return result
+  } catch (error) {
     throw new Error(`partInfo failed: ${error.message}`)
- }
+  }
 }
 
-const reservedForVehicle = async (dealerid,partnumber)=>{
-try {
-        const pool = await getPool2()
-        // const query = ` use z_scope
-        // select count(Part_Number1)as ReservedforVehicle from Create_Order_Request_TD001_${dealerid}
-        // where Part_Number1 = '${partnumber}' and Final_Close = 'N'
-        // group by Part_Number1`
+const reservedForVehicle = async (dealerid, partnumber) => {
+  try {
+    const pool = await getPool2()
+    // const query = ` use z_scope
+    // select count(Part_Number1)as ReservedforVehicle from Create_Order_Request_TD001_${dealerid}
+    // where Part_Number1 = '${partnumber}' and Final_Close = 'N'
+    // group by Part_Number1`
 
-        const query = `
+    const query = `
         use z_scope
         select 
         CASE WHEN cs2.qty < SUM(co.qty)  then cs2.Qty else SUM(co.qty)  end as ReservedforVehicle 
@@ -52,178 +52,111 @@ try {
         and cs2.Qty > 0 and Current_status <> 'Close'
         group by co.Qty , cs2.Qty
         `
-        // console.log(query);
-        const result = await pool.request().query(query)
-        return result
-} catch (error) {
+    // console.log(query);
+    const result = await pool.request().query(query)
+    return result
+  } catch (error) {
     throw new Error(`reservedForVehicle failed: ${error.message}`)
-}
+  }
 }
 
-const groupStock = async (brandid,dealerid,locationid,partnumber)=>{
-try {
-        const pool = await getPool2()
-        const query = `
-         DECLARE 
+const groupStock = async (brandid, dealerid, locationid, partnumber) => {
+  try {
+    const pool = await getPool2()
+    const query = `
+        DECLARE
         @InputPart VARCHAR(40) = '${partnumber}',
         @InputBrandID INT = ${brandid},
         @InputLocationID INT = ${locationid},
-        @InputDealerid int = ${dealerid},
+        @InputDealerid int = ${dealerid} ,
         @RowsInserted INT;
 
+		DECLARE @Part TABLE (partnumber varchar(30))
+	
         declare @latestpart varchar(20) 
-        select @latestpart = subpartnumber1 from Substitution_Master 
+        select @latestpart = subpartnumber1 from Substitution_Master (nolock)
         where brandid = @InputBrandID and (partnumber1 = @InputPart or subpartnumber1 = @InputPart)
 
-        ;with part as (
-        select partnumber1 from substitution_master where brandid = @InputBrandID and subpartnumber1= @latestpart
+		insert into @Part(partnumber)
+        select partnumber1  from substitution_master (nolock) where brandid = @InputBrandID and subpartnumber1= @latestpart
         union 
         select ISNULL(@latestpart,@InputPart) 
-        ),
-        loc as (
-        select locationid , Location from LocationInfo where DealerID  = @InputDealerid
-        )select cs1.LocationID ,l.location ,cs1.Stockdate,SUM(Qty)GroupStock from CurrentStock1 cs1
-        join loc l on l.LocationID = cs1.LocationID
-        join CurrentStock2 cs2 on cs2.StockCode = cs1.tCode
-        join part p on p.partnumber1 = cs2.PartNumber
-        group by cs1.locationid , l.location ,cs1.Stockdate
 
-        -- Drop temp table if exists
-        IF OBJECT_ID('tempdb..#PartFamily','U') IS NOT NULL
-            DROP TABLE #PartFamily;
+		select l.bigid LocationID ,l.work_location location ,a.Stockdate,isnull(a.Qty,0) GroupStock 
+		from Dealer_Workshop_Master l (nolock)
+		left join (select cs1.LocationID , sum(cs2.Qty)Qty , cs1.StockDate from @Part p
+		left join  CurrentStock2 cs2 (nolock) on cs2.PartNumber = p.partnumber
+		left join CurrentStock1 cs1 on cs1.tCode = cs2.StockCode
+		group by  cs1.LocationID ,cs1.Stockdate
+		)a on l.bigid = a.LocationID
+		where l.DealerID = @InputDealerid and l.OgsStatus = 1
+        
+    select * from @part
 
-        -- Create PartFamily temp table
-        CREATE TABLE #PartFamily (
-            Part VARCHAR(40),
-            BrandID INT
-        );
+	DECLARE @StkblDate TABLE
+	(
+	LocationID  int,
+	MaxDate  date
+	)
+	insert into @StkblDate(LocationID,MaxDate)
+	select locationid,MAX(stockdate) from Stockable_Nonstockable_TD001_${dealerid} (nolock) where Dealerid = @InputDealerid
+	group by Locationid
 
-        -- Seed with input part
-        INSERT INTO #PartFamily (Part, BrandID)
-        VALUES (@InputPart, @InputBrandID);
-
-        -- Expand the part family
-        SET @RowsInserted = 1;
-        WHILE @RowsInserted > 0
-        BEGIN
-            INSERT INTO #PartFamily (Part, BrandID)
-            SELECT DISTINCT sm.SubPartNumber1, sm.BrandID
-            FROM Substitution_Master sm
-            JOIN #PartFamily f ON sm.PartNumber1 = f.Part AND sm.BrandID = f.BrandID
-            WHERE NOT EXISTS (
-                SELECT 1 FROM #PartFamily x WHERE x.Part = sm.SubPartNumber1 AND x.BrandID = sm.BrandID
-            )
-            UNION
-            SELECT DISTINCT sm.PartNumber1, sm.BrandID
-            FROM Substitution_Master sm
-            JOIN #PartFamily f ON sm.SubPartNumber1 = f.Part AND sm.BrandID = f.BrandID
-            WHERE NOT EXISTS (
-                SELECT 1 FROM #PartFamily x WHERE x.Part = sm.PartNumber1 AND x.BrandID = sm.BrandID
-            );
-
-            SET @RowsInserted = @@ROWCOUNT;
-        END;
-    select * from #PartFamily
+	DECLARE @RedFlag TABLE( LocationId int , FlagType varchar , Redflag varchar )
+	insert into @RedFlag
+	select dwm.bigid,ep.FlagType,su.RedFlag from 
+	@Part pf 
+	join Dealer_Workshop_Master dwm on dwm.dealerid = @InputDealerid and dwm.OgsStatus = 1
+	outer apply (
+              select top 1* from 
+              Exceptional_Part_History (nolock) where locationid  = dwm.bigid and PartNumber = pf.partnumber
+              order by bigId desc
+         )ep
+	left  join  Stock_Upload_SPM_TD001_${dealerid} su (nolock) on su.locationid = dwm.bigid and su.partnumber1 = pf.partnumber and su.Partnumber not in 
+			(         
+			select Partnumber from Exceptional_Part_History (nolock) where locationid  = dwm.bigid 
+			) 
+	and su.RedFlag = 'Y' and RedDate is not null
 
 
---;WITH sub AS (
---  SELECT LocationID, Location
---  FROM   LocationInfo
---  WHERE  DealerID = (
---           SELECT DealerID
---           FROM   LocationInfo
---           WHERE  LocationID = @InputLocationID
---         )
---    AND  OgsStatus = 1
---)
---SELECT
---  dl.Location,
---  dl.LocationID,
---
---  -- 1) Total stock across all parts
---  ISNULL(SUM(cs2.Qty), 0) AS Stock,  
---  cs1.Stockdate
---
---FROM #PartFamily pf
---  JOIN LocationInfo li
---    ON li.BrandID = pf.BrandID
---  JOIN sub dl
---    ON dl.LocationID = li.LocationID
---
---  OUTER APPLY (
---    SELECT TOP 1 cs1.tCode , cs1.StockDate
---    FROM   CurrentStock1 AS cs1
---    WHERE  cs1.LocationID = dl.LocationID
---    ORDER  BY cs1.StockDate DESC
---  ) AS cs1
---
---  LEFT JOIN CurrentStock2 AS cs2
---    ON cs2.StockCode   = cs1.tCode
---   AND cs2.PartNumber  = pf.Part
---GROUP BY
---  dl.Location,
---  dl.LocationID , 
---  cs1.StockDate
---Having sum(cs2.qty) > 0
---ORDER BY
---  dl.LocationID;
+		select 
+		l.location , l.locationid ,
+		    CASE
+		      WHEN SUM(l.MaxValue) > 0  THEN 'Stockable'
+		      WHEN SUM(CASE WHEN l.greenflag = 'Y'OR l.yellowflag = 'Y'OR l.RedFlag   = 'Y'OR l.FlagType IN ('R','G','Y')THEN 1 ELSE 0 END) > 0THEN 'Non-Moving'
+		      WHEN SUM(l.MaxValue) = 0 THEN 'Non-Stockable'
+		      ELSE '' END AS PartStatus
+		from 
+		(
+		select dl.work_location Location , dl.bigid LocationID , pf.partnumber ,sn.stockdate,
+		case when pf.partnumber = sm.partnumber1 then sm.subpartnumber1 else pf.partnumber end as latest,
+		ISNULL(sn.Maxvalue,0) Maxvalue , os.greenflag , os.yellowflag ,rf.RedFlag, rf.flagtype
+		from @Part pf
+		join Dealer_Workshop_Master (nolock) dl on  dl.BrandID= @InputBrandID
+		join @RedFlag rf on rf.LocationId = dl.bigid
+		left join Substitution_Master sm (nolock) on  sm.brandid = @InputBrandID and pf.partnumber = sm.partnumber1
+		outer apply(
+		           select top 1 a1.* from 
+		           Stockable_Nonstockable_TD001_${dealerid} a1 (nolock)
+		           inner join @StkblDate b1 on(a1.Locationid=b1.LocationID and a1.Stockdate =b1.MaxDate)
+		           where a1.Locationid = dl.bigid and a1.partnumber1 = pf.partnumber 
+		 
+		           )sn
+		left join Opening_Stock_Upload_TD001_${dealerid} os (nolock) on os.Locationid = dl.bigid and os.partnumber1 = pf.partnumber 
+		where dl.OgsStatus = 1 and dl.DealerID=@InputDealerid)l
+		group by l.location , l.LocationID
+		order by l.Location
+`
+    const result = await pool.request().query(query)
+    return result
 
-  ;WITH sub AS (
-    SELECT
-      loc.LocationID,
-      loc.Location
-    FROM LocationInfo loc
-    WHERE loc.DealerID = (
-            SELECT DealerID
-            FROM   LocationInfo
-            WHERE  LocationID = @InputLocationID
-          )
-      AND loc.OgsStatus = 1
-)
-select 
-l.location , l.locationid ,
-    CASE
-      WHEN SUM(l.MaxValue) > 0  THEN 'Stockable'
-      WHEN SUM(CASE WHEN l.greenflag = 'Y'OR l.yellowflag = 'Y'OR l.RedFlag   = 'Y'OR l.FlagType IN ('R','G','Y')THEN 1 ELSE 0 END) > 0THEN 'Non-Moving'
-      WHEN SUM(l.MaxValue) = 0 THEN 'Non-Stockable'
-      ELSE '' END AS PartStatus
-from 
-(
-select li.Location , li.LocationID , pf.Part ,sn.stockdate,
-case when pf.Part = sm.partnumber1 then sm.subpartnumber1 else pf.Part end as latest,
-ISNULL(sn.Maxvalue,0) Maxvalue , os.greenflag , os.yellowflag ,su.RedFlag, ep.flagtype
-from #PartFamily pf
-join LocationInfo li on pf.BrandID = li.BrandID
-join sub dl on dl.LocationID = li.LocationID
-outer apply (
-select top 1* from 
-Exceptional_Part_History where LocationId = dl.LocationID and PartNumber = pf.Part
-order by bigId desc
-)ep
-left join Substitution_Master sm 
-on pf.BrandID = sm.brandid and pf.Part = sm.partnumber1
---left join Stockable_Nonstockable_TD001_${dealerid} sn
---on sn.Locationid = li.LocationID and sn.partnumber1 = pf.Part and sn.Stockdate = (select MAX(stockdate) from Stockable_Nonstockable_TD001_${dealerid} where locationid = li.Locationid)
-outer apply(
-select top 1 * from 
-Stockable_Nonstockable_TD001_${dealerid} where Locationid = li.LocationID and partnumber1 = pf.Part and Stockdate = (select MAX(stockdate) from Stockable_Nonstockable_TD001_${dealerid} where Locationid = li.LocationID)
-)sn
-left join Opening_Stock_Upload_TD001_${dealerid} os
-on os.Locationid = li.LocationID and os.partnumber1 = pf.Part 
-left join Stock_Upload_SPM_TD001_${dealerid} su
-on su.Locationid = li.LocationID and su.partnumber1 = pf.Part and su.Partnumber not in (ep.PartNumber) and su.RedFlag = 'Y' and RedDate is not null --and sn.Stockdate = (select MAX(stockdate) from Stock_Upload_SPM_TD001_${dealerid})
-)l
-group by l.location , l.LocationID
-        `
-        const result = await pool.request().query(query)
-        return result
-} catch (error) {
+  } catch (error) {
     throw new Error(`groupStock failed: ${error.message}`)
-}
+  }
 }
 
-const groupNorms = async(brandid,dealerid,locationid,partnumber)=>{
-try {
+const groupNorms = async (brandid, dealerid, locationid, partnumber) => {
+  try {
     const pool = await getPool2()
     const query = ` use z_scope
     DECLARE 
@@ -281,16 +214,16 @@ try {
     `
     const result = await pool.request().query(query)
     return result
-} catch (error) {
-   throw new Error(`groupNorms failed : ${error.message}`);
-   
+  } catch (error) {
+    throw new Error(`groupNorms failed : ${error.message}`);
+
+  }
 }
-}
-const jobCardByVehicleService = async (filter,vehicleno,dealerid)=>{
-try {
-        const pool= await getPool2()        
-        const query = 
-        `
+const jobCardByVehicleService = async (filter, vehicleno, dealerid) => {
+  try {
+    const pool = await getPool2()
+    const query =
+      `
         DECLARE @StatusFilter VARCHAR(20) 
         SET @StatusFilter = CASE WHEN '${filter}' = 'null' THEN NULL ELSE '${filter}' END; -- Change to 'Approve', 'Close', 'Decline' as needed
         SELECT DISTINCT 
@@ -302,19 +235,19 @@ try {
         AND (@StatusFilter IS NULL OR current_status = @StatusFilter)
         GROUP BY jobcard_number, current_status;
         `
-        
-        const result = await pool.request().query(query)
-        return result
-} catch (error) {
+
+    const result = await pool.request().query(query)
+    return result
+  } catch (error) {
     throw new Error(`jobCardByVehicle failed: ${error.message}`)
-}
+  }
 }
 
-const partsByJobCardService = async(dealerid , jobcardno)=>{
-try {
-            const pool = await getPool2()
-            const query =  
-            `
+const partsByJobCardService = async (dealerid, jobcardno) => {
+  try {
+    const pool = await getPool2()
+    const query =
+      `
             select distinct co.part_number1 , pm.partdesc , pm.mrp , co.Qty as StockQty , 
             CASE
             WHEN os.greenflag = 'N' OR os.yellowflag = 'N' OR su.redflag = 'N' 
@@ -332,17 +265,17 @@ try {
             left JOIN stock_upload_spm_td001_${dealerid} su ON su.locationid = co.locationid AND co.Part_Number1 = su.Partnumber1
             where co.jobcard_number = '${jobcardno}' and su.stockdate = (select max(stockdate) from stock_upload_spm_td001_${dealerid})    
             `
-            const result = await pool.request().query(query)
-            return result 
-} catch (error) {
+    const result = await pool.request().query(query)
+    return result
+  } catch (error) {
     throw new Error(`partsByJobCard failed: ${error.message}`)
-}
+  }
 }
 
-const partSubstituteDetailService = async(brandid,dealerid,locationid,partnumber)=>{
-try {
-        const pool = await getPool2()
-        const query = `
+const partSubstituteDetailService = async (brandid, dealerid, locationid, partnumber) => {
+  try {
+    const pool = await getPool2()
+    const query = `
         DECLARE  
          @InputPart    VARCHAR(40) = '${partnumber}',      -- ←  input part 
          @InputBrandID INT         = ${brandid};           -- ←  input brand 
@@ -425,24 +358,24 @@ ORDER BY pm.PartNumber1, pm.BrandID;
         -- 5) Clean up 
      DROP TABLE #PartFamily;
         `
-        const result = await pool.request().query(query)
-        return result
-} catch (error) {
+    const result = await pool.request().query(query)
+    return result
+  } catch (error) {
     throw new Error(`partSubstituteDetailsService failed: ${error.message}`)
-}
+  }
 }
 
-const userroleService = async(userid)=>{
-try {
-        const pool = await getPool2()
-        const query = `select rm.Role,concat(amg.vcFirstName,' ',amg.vcLastName)as Name from adminmaster_gen amg 
+const userroleService = async (userid) => {
+  try {
+    const pool = await getPool2()
+    const query = `select rm.Role,concat(amg.vcFirstName,' ',amg.vcLastName)as Name from adminmaster_gen amg 
                         join Role_Master rm on rm.bigid = amg.Designation
                         where bintId_Pk = ${userid}`
-        const result = await pool.request().query(query)
-        return result
-} catch (error) {
+    const result = await pool.request().query(query)
+    return result
+  } catch (error) {
     throw new Error(`userinfoService failed: ${error.message}`);
-}
+  }
 }
 
 // const locationwisePPNIValueService = async(dealerid,jobcardstatus , nonstockable)=>{
@@ -451,9 +384,9 @@ try {
 //         const query = `
 //         DECLARE @All_Time_NonStck VARCHAR(1) = ${nonstockable};  -- 'Y', 'N', or NULL
 //         DECLARE @JobCardStatus VARCHAR(10) = ${jobcardstatus};    -- 'OPEN', 'CLOSE', or NULL
-        
+
 //         USE [UAD_BI_PPNI];
-        
+
 //         SELECT 
 //             Location, 
 //             LocationId, 
@@ -479,7 +412,7 @@ try {
 //             SUM(ppni_val) > 0
 //         ORDER BY 
 //             PPNI_Value DESC;
-        
+
 //         `
 //         const result = await pool.request().query(query)
 //         return result
@@ -488,7 +421,7 @@ try {
 // }
 // }
 
-const locationwisePPNIValueService = async (dealerid, jobcardstatus, nonstockable,month) => {
+const locationwisePPNIValueService = async (dealerid, jobcardstatus, nonstockable, month) => {
   try {
     if (!dealerid) throw new Error("dealerid is required");
 
@@ -500,90 +433,90 @@ const locationwisePPNIValueService = async (dealerid, jobcardstatus, nonstockabl
 
     const tableName = `ppni_report_${dealerid}`;
 
-//     const query = `
-//             USE [UAD_BI_PPNI];
-// DECLARE @d VARCHAR(10) = '${month}';
+    // const query = `
+    //  USE [UAD_BI_PPNI];
+    // DECLARE @d VARCHAR(10) = '${month}';
 
-// -- Parse to first day of month (as date)
-// DECLARE @firstDate DATE = TRY_CONVERT(DATE, '01-' + @d, 105);
+    // -- Parse to first day of month (as date)
+    // DECLARE @firstDate DATE = TRY_CONVERT(DATE, '01-' + @d, 105);
 
-// -- Get last day using EOMONTH
-// DECLARE @lastDate DATE = EOMONTH(@firstDate);
+    // -- Get last day using EOMONTH
+    // DECLARE @lastDate DATE = EOMONTH(@firstDate);
 
-//       SELECT 
-//           Location, 
-//           LocationId, 
-//           Advisor,
-//           SUM(ppni_val) AS PPNI_Value
-//       FROM ${tableName}
-//       WHERE  
-//           (
-//               (@All_Time_NonStck IS NULL AND All_Time_NonStck IN ('Y', 'N')) 
-//               OR (@All_Time_NonStck IS NOT NULL AND All_Time_NonStck = @All_Time_NonStck)
-//           )
-//           AND
-//           (
-//               (@JobCardStatus IS NULL AND JobCardStatus IN ('OPEN', 'CLOSE')) 
-//               OR (@JobCardStatus IS NOT NULL AND JobCardStatus = @JobCardStatus)
-//           )
-// 		    AND (
-//           @firstDate IS NULL OR 
-//           (dateadded >= @firstDate AND dateadded <= @lastDate)
-//           )
-//       GROUP BY 
-//           Location, 
-//           LocationId, 
-//           Advisor
-//       HAVING 
-//           SUM(ppni_val) > 0
-//       ORDER BY 
-//           PPNI_Value DESC;
-//     `;
-const query = `
- USE [UAD_BI_PPNI];
-DECLARE @d VARCHAR(10) = '${month}';
+    //       SELECT 
+    //           p.Location, 
+    //           p.LocationId, 
+    //           Advisor,
+    //           SUM(ppni_val) AS PPNI_Value
+    //       FROM ${tableName} p
+    // 	  left join z_scope..Create_Order_Request_TD001_${dealerid} co on co.Vehiclenumber = p.Vehiclenumber and co.Part_Number1 = p.PartNumber 
+    // 	  join z_scope..currentstock1 cs1 on cs1.locationid = p.Locationid
+    // 	  join z_scope..currentstock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = p.PartNumber
+    //       WHERE  
+    // 	  	co.JobLineCloseDate is null and
+    // 	  cs2.Qty != 0  
+    // 	  and 
+    //           (
+    //               (@All_Time_NonStck IS NULL AND All_Time_NonStck IN ('Y', 'N')) 
+    //               OR (@All_Time_NonStck IS NOT NULL AND All_Time_NonStck = @All_Time_NonStck)
+    //           )
+    //           AND
+    //           (
+    //               (@JobCardStatus IS NULL AND JobCardStatus IN ('OPEN', 'CLOSE')) 
+    //               OR (@JobCardStatus IS NOT NULL AND JobCardStatus = @JobCardStatus)
+    //           )
+    // 		    AND (
+    //           @firstDate IS NULL OR 
+    //           (p.dateadded >= @firstDate AND p.dateadded <= @lastDate)
+    //           )
+    //       GROUP BY 
+    //           p.Location, 
+    //           p.LocationId, 
+    //           Advisor 
+    //       HAVING 
+    //           SUM(ppni_val) > 0
+    //       ORDER BY 
+    //           PPNI_Value DESC;`
 
--- Parse to first day of month (as date)
-DECLARE @firstDate DATE = TRY_CONVERT(DATE, '01-' + @d, 105);
+    const query = `
+    
+    DECLARE @d VARCHAR(10) = '${month}';
+    DECLARE @firstDate DATE = TRY_CONVERT(DATE, '01-' + @d, 105);
+    DECLARE @lastDate DATE = EOMONTH(@firstDate);
+    --declare @JobCardStatus varchar(50) = ;
+    --declare @All_Time_NonStck varchar(50) = NULL;
 
--- Get last day using EOMONTH
-DECLARE @lastDate DATE = EOMONTH(@firstDate);
+    ;WITH T1 AS
+    		(
+    		  SELECT A.Part_Number1,C.Qty,A.Current_status,A.LocationID,A.Dealerid,A.BIGID ,A.JobLineCloseDate  
+    		  FROM z_scope..Create_Order_Request_TD001_${dealerid} A
+    		  LEFT JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
+    		  LEFT  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
+    		  where Type='V'  
+    		  )
+    Select A.LocationId , B.Location , B.Advisor , isnull(SUM(B.PPNI_Val),0) PPNI_Value 
+    from T1 A 
+    left join UAD_BI_PPNI..${tableName} B on A.Bigid = B.Bigid
+    where
+    	(
+           @All_Time_NonStck IS NULL
+           OR B.All_Time_NonStck = @All_Time_NonStck
+    	)
+    AND
+     (
+            (@JobCardStatus IS NULL AND b.JobCardStatus IN ('OPEN','CLOSE'))
+            OR
+            (@JobCardStatus IS NOT NULL AND b.JobCardStatus = @JobCardStatus)
+      )
+        AND (
+            @firstDate IS NULL
+            OR (b.DateAdded >= @firstDate AND b.DateAdded <= @lastDate)
+        )
 
-      SELECT 
-          p.Location, 
-          p.LocationId, 
-          Advisor,
-          SUM(ppni_val) AS PPNI_Value
-      FROM ${tableName} p
-	  left join z_scope..Create_Order_Request_TD001_${dealerid} co on co.Vehiclenumber = p.Vehiclenumber and co.Part_Number1 = p.PartNumber 
-	  join z_scope..currentstock1 cs1 on cs1.locationid = p.Locationid
-	  join z_scope..currentstock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = p.PartNumber
-      WHERE  
-	  	co.JobLineCloseDate is null and
-	  cs2.Qty != 0  
-	  and 
-          (
-              (@All_Time_NonStck IS NULL AND All_Time_NonStck IN ('Y', 'N')) 
-              OR (@All_Time_NonStck IS NOT NULL AND All_Time_NonStck = @All_Time_NonStck)
-          )
-          AND
-          (
-              (@JobCardStatus IS NULL AND JobCardStatus IN ('OPEN', 'CLOSE')) 
-              OR (@JobCardStatus IS NOT NULL AND JobCardStatus = @JobCardStatus)
-          )
-		    AND (
-          @firstDate IS NULL OR 
-          (p.dateadded >= @firstDate AND p.dateadded <= @lastDate)
-          )
-      GROUP BY 
-          p.Location, 
-          p.LocationId, 
-          Advisor 
-      HAVING 
-          SUM(ppni_val) > 0
-      ORDER BY 
-          PPNI_Value DESC;
-`
+    GROUP BY A.LocationID , B.Location , B.advisor 
+    HAVING SUM(PPNI_Val)>0
+    order by SUM(PPNI_Val) desc`
+
     const result = await request.query(query);
     return result;
   } catch (error) {
@@ -592,7 +525,7 @@ DECLARE @lastDate DATE = EOMONTH(@firstDate);
 };
 
 
-const advisorwisePPNIValueService = async (dealerid, locationid, jobcardstatus, nonstockable,month) => {
+const advisorwisePPNIValueService = async (dealerid, locationid, jobcardstatus, nonstockable, month) => {
   try {
     const pool = await getPool2();
 
@@ -600,41 +533,81 @@ const advisorwisePPNIValueService = async (dealerid, locationid, jobcardstatus, 
       .input('All_Time_NonStck', sql.VarChar(1), nonstockable)
       .input('JobCardStatus', sql.VarChar(10), jobcardstatus);
 
-const query = `
-      USE [UAD_BI_PPNI];
+    // const query = `
+    //       USE [UAD_BI_PPNI];
+    //       DECLARE @d VARCHAR(10) = '${month}';
+
+    // -- Parse to first day of month (as date)
+    // DECLARE @firstDate DATE = TRY_CONVERT(DATE, '01-' + @d, 105);
+
+    // -- Get last day using EOMONTH
+    // DECLARE @lastDate DATE = EOMONTH(@firstDate);
+
+    //       SELECT Advisor, SUM(ppni_val) AS PPNI_Value 
+    //       FROM PPNI_report_${dealerid} p
+    // 	  left join z_scope..Create_Order_Request_TD001_${dealerid} co on co.Vehiclenumber = p.Vehiclenumber and co.Part_Number1 = p.PartNumber 
+    // 	  join z_scope..currentstock1 cs1 on cs1.locationid = p.Locationid
+    // 	  join z_scope..currentstock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = p.PartNumber
+    // 	  WHERE 
+    // 	 co.JobLineCloseDate is null and
+    // 	  cs2.Qty != 0
+    // and
+    //   (@All_Time_NonStck IS NULL OR All_Time_NonStck = @All_Time_NonStck)
+    // 	AND
+    // 	  (
+    // 			(@JobCardStatus IS NULL AND JobCardStatus IN ('OPEN','CLOSE'))
+    // 			OR
+    // 			(@JobCardStatus IS NOT NULL AND JobCardStatus = @JobCardStatus)
+    // 	  )
+    //    AND (
+    //            @firstDate IS NULL OR 
+    //           (p.dateadded >=  @firstDate AND p.dateadded <= @lastDate)
+    //           )
+    //   AND p.locationid =@LocationID
+    //       GROUP BY Advisor 
+    //       HAVING SUM(ppni_val) > 0
+    //       ORDER BY PPNI_Value DESC;
+    // `
+
+    const query = `
       DECLARE @d VARCHAR(10) = '${month}';
+      DECLARE @firstDate DATE = TRY_CONVERT(DATE, '01-' + @d, 105);
+      DECLARE @lastDate DATE = EOMONTH(@firstDate);
+      --declare @JobCardStatus varchar(50) = 'Close';
+      -- declare @All_Time_NonStck varchar(50) = NULL;
 
--- Parse to first day of month (as date)
-DECLARE @firstDate DATE = TRY_CONVERT(DATE, '01-' + @d, 105);
-
--- Get last day using EOMONTH
-DECLARE @lastDate DATE = EOMONTH(@firstDate);
-
-      SELECT Advisor, SUM(ppni_val) AS PPNI_Value 
-      FROM PPNI_report_${dealerid} p
-	  left join z_scope..Create_Order_Request_TD001_${dealerid} co on co.Vehiclenumber = p.Vehiclenumber and co.Part_Number1 = p.PartNumber 
-	  join z_scope..currentstock1 cs1 on cs1.locationid = p.Locationid
-	  join z_scope..currentstock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = p.PartNumber
-	  WHERE 
-	 co.JobLineCloseDate is null and
-	  cs2.Qty != 0
-and
-  (@All_Time_NonStck IS NULL OR All_Time_NonStck = @All_Time_NonStck)
-	AND
-	  (
-			(@JobCardStatus IS NULL AND JobCardStatus IN ('OPEN','CLOSE'))
-			OR
-			(@JobCardStatus IS NOT NULL AND JobCardStatus = @JobCardStatus)
-	  )
-   AND (
-           @firstDate IS NULL OR 
-          (p.dateadded >=  @firstDate AND p.dateadded <= @lastDate)
+      ;WITH T1 AS
+      		(
+      		  SELECT A.Part_Number1,C.Qty,A.Current_status,A.LocationID,A.Dealerid,A.BIGID ,A.JobLineCloseDate  
+      		  FROM z_scope..Create_Order_Request_TD001_${dealerid} A
+      		  LEFT JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
+      		  LEFT  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
+      		  where Type='V' and A.locationid = ${locationid}
+      		  )
+      Select  B.Advisor , isnull(SUM(B.PPNI_Val),0) PPNI_Value
+      from T1 A 
+      left join UAD_BI_PPNI..PPNI_report_${dealerid} B on A.Bigid = B.Bigid
+      where
+      	(
+             @All_Time_NonStck IS NULL
+             OR B.All_Time_NonStck = @All_Time_NonStck
+      	)
+      AND
+       (
+              (@JobCardStatus IS NULL AND b.JobCardStatus IN ('OPEN','CLOSE'))
+              OR
+              (@JobCardStatus IS NOT NULL AND b.JobCardStatus = @JobCardStatus)
+        )
+          AND (
+              @firstDate IS NULL
+              OR (b.DateAdded >= @firstDate AND b.DateAdded <= @lastDate)
           )
-  AND p.locationid =@LocationID
-      GROUP BY Advisor 
-      HAVING SUM(ppni_val) > 0
-      ORDER BY PPNI_Value DESC;
-`
+
+      GROUP BY  B.advisor 
+      HAVING SUM(PPNI_Val)>0
+      order by SUM(PPNI_Val) desc
+
+    `
     request.input('LocationID', sql.Int, locationid);
 
     const result = await request.query(query);
@@ -645,7 +618,7 @@ and
 };
 
 
-const vehiclewisePPNIValueService = async (dealerid, locationid, jobcardstatus, nonstockable, advisor , month, pageno, pagesize) => {
+const vehiclewisePPNIValueService = async (dealerid, locationid, jobcardstatus, nonstockable, advisor, month, pageno, pagesize) => {
   try {
     const pool = await getPool2();
     const request = pool.request()
@@ -654,71 +627,7 @@ const vehiclewisePPNIValueService = async (dealerid, locationid, jobcardstatus, 
     //   .input('locationid', sql.Int, locationid)
     //   .input('advisor', sql.VarChar, advisor);
 
-// const query = `
-
-// DECLARE @d VARCHAR(10) = '${month}';
-// Declare @pagesize int = ${pagesize}, @pageno int = ${pageno} ;
-// DECLARE @offset INT = (@pageno - 1) * @pagesize;
-// DECLARE @firstDate DATE = TRY_CONVERT(DATE, '01-' + @d, 105);
-// DECLARE @lastDate DATE = EOMONTH(@firstDate);
-
-
-// select count(ppni.Vehiclenumber) over() as TotalCount ,ppni.Vehiclenumber , SUM(PPNI_Val)PPNI_Value  , b.NotIssued , a.InstockCount from UAD_BI_PPNI..PPNI_report_${dealerid} ppni
-// 	  outer apply(
-// 			 SELECT
-// 			ISNULL(SUM(CASE WHEN cs2.PartNumber IS NOT NULL THEN 1 ELSE 0 END),0)    
-// 			  AS InStockCount
-// 		  FROM z_scope..Create_Order_Request_TD001_${dealerid} AS co
-// 		  JOIN z_scope..CurrentStock1 AS cs1
-// 			ON cs1.LocationID = co.LocationID
-// 		  LEFT JOIN z_scope..CurrentStock2 AS cs2
-// 			ON cs2.StockCode   = cs1.tCode
-// 		   AND cs2.PartNumber = co.Part_Number	
-// 		  WHERE
-// 			co.vehiclenumber     = ppni.VehicleNumber
-// 			AND co.JobLineCloseDate IS NULL
-// 			  )as a
-// 			   outer apply (
-// 			 SELECT
-// 			COUNT(Part_Number1)as NotIssued
-// 		  FROM z_scope..create_order_request_td001_${dealerid} AS co
-// 		  WHERE
-// 			co.vehiclenumber     =  ppni.Vehiclenumber
-// 			AND co.JobLineCloseDate IS NULL
-// 			  )as b
-//      left join z_scope..Create_Order_Request_TD001_${dealerid} co on co.Vehiclenumber = ppni.Vehiclenumber and co.Part_Number1 = ppni.PartNumber 
-// 	  left join z_scope..currentstock1 cs1 on cs1.locationid = ppni.Locationid
-// 		LEFT  join z_scope..currentstock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = ppni.PartNumber
-// where ppni.Locationid = @locationid
-// AND
-// 	 co.JobLineCloseDate is null and
-// 		  cs2.Qty > 0
-//    AND (
-//        @All_Time_NonStck IS NULL
-//        OR ppni.All_Time_NonStck = @All_Time_NonStck
-//    )
-// AND
-//  (
-//         (@JobCardStatus IS NULL AND ppni.JobCardStatus IN ('OPEN','CLOSE'))
-//         OR
-//         (@JobCardStatus IS NOT NULL AND ppni.JobCardStatus = @JobCardStatus)
-//   )
-//     AND (
-//         @firstDate IS NULL
-//         OR (ppni.DateAdded >= @firstDate AND ppni.DateAdded <= @lastDate)
-//     )
-//     AND (
-//         @advisor IS NULL
-//         OR ppni.Advisor = @advisor
-//     )
-//         group by ppni.Vehiclenumber   , b.NotIssued , a.InstockCount
-// 		  HAVING 
-// 			  SUM(ppni_val) > 0
-// 			  order by PPNI_Value desc
-// 			  offset  @offset rows
-// 			  fetch next @pagesize Rows only;
-//     `
-  // Prepare SQL-safe variable strings
+    // Prepare SQL-safe variable strings
     const advisorSQL =
       advisor === null || advisor === undefined
         ? "NULL"
@@ -732,9 +641,76 @@ const vehiclewisePPNIValueService = async (dealerid, locationid, jobcardstatus, 
         ? "NULL"
         : `'${nonstockable}'`;
 
-        // console.log(advisorSQL, jobcardstatusSQL , nonstockableSQL);
-        
-const query = `
+    // console.log(advisorSQL, jobcardstatusSQL , nonstockableSQL);
+
+    // const query = `
+    // DECLARE @d VARCHAR(10) = '${month}';
+    // Declare @pagesize int = ${pagesize}, @pageno int = ${pageno} ;
+    // DECLARE @offset INT = (@pageno - 1) * @pagesize;
+    // DECLARE @firstDate DATE = TRY_CONVERT(DATE, '01-' + @d, 105);
+    // DECLARE @lastDate DATE = EOMONTH(@firstDate);
+    // declare @advisor varchar(50) = ${advisorSQL} ;
+    // declare @JobCardStatus varchar(50) = ${jobcardstatusSQL};
+    // declare @All_Time_NonStck varchar(50) = ${nonstockableSQL};
+
+
+    // select count(ppni.Vehiclenumber) over() as TotalCount ,ppni.DealerId,ppni.LocationId,ppni.Vehiclenumber , SUM(PPNI_Val)PPNI_Value  , b.NotIssued , a.InstockCount 
+    // from UAD_BI_PPNI..PPNI_report_${dealerid} ppni
+    // 	  outer apply(
+    // 			 SELECT
+    // 			ISNULL(SUM(CASE WHEN cs2.PartNumber IS NOT NULL THEN 1 ELSE 0 END),0)    
+    // 			  AS InStockCount
+    // 		  FROM z_scope..Create_Order_Request_TD001_${dealerid}  AS co
+    // 		  JOIN z_scope..CurrentStock1 AS cs1
+    // 			ON cs1.LocationID = co.LocationID
+    // 		  LEFT JOIN z_scope..CurrentStock2 AS cs2
+    // 			ON cs2.StockCode   = cs1.tCode
+    // 		   AND cs2.PartNumber = co.Part_Number	
+    // 		  WHERE
+    // 			co.vehiclenumber     = ppni.VehicleNumber
+    // 			AND co.JobLineCloseDate IS NULL
+    // 			  )as a
+    // 			   outer apply (
+    // 			 SELECT
+    // 			COUNT(Part_Number1)as NotIssued
+    // 		  FROM z_scope..create_order_request_td001_${dealerid}  AS co
+    // 		  WHERE
+    // 			co.vehiclenumber     =  ppni.Vehiclenumber
+    // 			AND co.JobLineCloseDate IS NULL
+    // 			  )as b
+    // 	 left join z_scope..Create_Order_Request_TD001_${dealerid}  co on co.Vehiclenumber = ppni.Vehiclenumber and co.Part_Number1 = ppni.PartNumber 
+    // 	  left join z_scope..currentstock1 cs1 on cs1.locationid = ppni.Locationid
+    // 		 LEFT  join z_scope..currentstock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = ppni.PartNumber
+    // where ppni.Locationid = ${locationid}
+    // AND
+    // 	 co.JobLineCloseDate is null and
+    // 		  cs2.Qty != 0
+    //    AND (
+    //        @All_Time_NonStck IS NULL
+    //        OR ppni.All_Time_NonStck = @All_Time_NonStck
+    //    )
+    // AND
+    //  (
+    //         (@JobCardStatus IS NULL AND ppni.JobCardStatus IN ('OPEN','CLOSE'))
+    //         OR
+    //         (@JobCardStatus IS NOT NULL AND ppni.JobCardStatus = @JobCardStatus)
+    //   )
+    //     AND (
+    //         @firstDate IS NULL
+    //         OR (ppni.DateAdded >= @firstDate AND ppni.DateAdded <= @lastDate)
+    //     )
+    //     AND (
+    //         @advisor IS NULL
+    //         OR ppni.Advisor = @advisor
+    //     )
+    //         group by ppni.Vehiclenumber   , b.NotIssued , a.InstockCount ,ppni.Dealerid,ppni.LocationId
+    // 		  HAVING 
+    // 			  SUM(ppni_val) > 0
+    // 			  order by PPNI_Value desc
+    // 			  offset  @offset rows
+    // 			  fetch next @pagesize Rows only;
+    // `
+    const query = `
 DECLARE @d VARCHAR(10) = '${month}';
 Declare @pagesize int = ${pagesize}, @pageno int = ${pageno} ;
 DECLARE @offset INT = (@pageno - 1) * @pagesize;
@@ -744,264 +720,267 @@ declare @advisor varchar(50) = ${advisorSQL} ;
 declare @JobCardStatus varchar(50) = ${jobcardstatusSQL};
 declare @All_Time_NonStck varchar(50) = ${nonstockableSQL};
 
-
-select count(ppni.Vehiclenumber) over() as TotalCount ,ppni.DealerId,ppni.LocationId,ppni.Vehiclenumber , SUM(PPNI_Val)PPNI_Value  , b.NotIssued , a.InstockCount 
-from UAD_BI_PPNI..PPNI_report_${dealerid} ppni
-	  outer apply(
-			 SELECT
-			ISNULL(SUM(CASE WHEN cs2.PartNumber IS NOT NULL THEN 1 ELSE 0 END),0)    
-			  AS InStockCount
-		  FROM z_scope..Create_Order_Request_TD001_${dealerid}  AS co
-		  JOIN z_scope..CurrentStock1 AS cs1
-			ON cs1.LocationID = co.LocationID
-		  LEFT JOIN z_scope..CurrentStock2 AS cs2
-			ON cs2.StockCode   = cs1.tCode
-		   AND cs2.PartNumber = co.Part_Number	
-		  WHERE
-			co.vehiclenumber     = ppni.VehicleNumber
-			AND co.JobLineCloseDate IS NULL
-			  )as a
-			   outer apply (
-			 SELECT
-			COUNT(Part_Number1)as NotIssued
-		  FROM z_scope..create_order_request_td001_${dealerid}  AS co
-		  WHERE
-			co.vehiclenumber     =  ppni.Vehiclenumber
-			AND co.JobLineCloseDate IS NULL
-			  )as b
-	 left join z_scope..Create_Order_Request_TD001_${dealerid}  co on co.Vehiclenumber = ppni.Vehiclenumber and co.Part_Number1 = ppni.PartNumber 
-	  left join z_scope..currentstock1 cs1 on cs1.locationid = ppni.Locationid
-		 LEFT  join z_scope..currentstock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = ppni.PartNumber
-where ppni.Locationid = ${locationid}
-AND
-	 co.JobLineCloseDate is null and
-		  cs2.Qty != 0
-   AND (
+;WITH T1 AS
+(
+		SELECT A.Part_Number1,A.Vehiclenumber,C.Qty,A.Current_status,A.LocationID,A.Dealerid,A.BIGID ,A.JobLineCloseDate  FROM z_scope..Create_Order_Request_TD001_${dealerid} A
+		  LEFT JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
+		  LEFT  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
+		  where A.Locationid = ${locationid}
+		  AND Type='V' 
+		  )
+SELECT count(a.Vehiclenumber) over() as TotalCount,A.DealerId,A.LocationId,A.Vehiclenumber,
+SUM(B.PPNI_Val) PPNI_Value,
+SUM(IIF(A.current_status<>'Close',1,0))  NotIssued,
+SUM(IIF((A.Current_status<>'Close' AND A.QTY>0 AND B.PPNI_Val>0),1,0))  InstockCount
+FROM T1 A
+LEFT JOIN UAD_BI_PPNI..PPNI_report_${dealerid} B ON( A.BIGID=B.Bigid)
+where
+(
        @All_Time_NonStck IS NULL
-       OR ppni.All_Time_NonStck = @All_Time_NonStck
+       OR B.All_Time_NonStck = @All_Time_NonStck
    )
 AND
  (
-        (@JobCardStatus IS NULL AND ppni.JobCardStatus IN ('OPEN','CLOSE'))
+        (@JobCardStatus IS NULL AND b.JobCardStatus IN ('OPEN','CLOSE'))
         OR
-        (@JobCardStatus IS NOT NULL AND ppni.JobCardStatus = @JobCardStatus)
+        (@JobCardStatus IS NOT NULL AND b.JobCardStatus = @JobCardStatus)
   )
     AND (
         @firstDate IS NULL
-        OR (ppni.DateAdded >= @firstDate AND ppni.DateAdded <= @lastDate)
+        OR (b.DateAdded >= @firstDate AND b.DateAdded <= @lastDate)
     )
     AND (
         @advisor IS NULL
-        OR ppni.Advisor = @advisor
+        OR b.Advisor = @advisor
     )
-        group by ppni.Vehiclenumber   , b.NotIssued , a.InstockCount ,ppni.Dealerid,ppni.LocationId
-		  HAVING 
-			  SUM(ppni_val) > 0
-			  order by PPNI_Value desc
-			  offset  @offset rows
-			  fetch next @pagesize Rows only;
+GROUP BY A.Dealerid,A.Locationid,A.Vehiclenumber
+HAVING SUM(PPNI_Val)>0
+order by SUM(PPNI_Val) desc
+offset  @offset rows
+fetch next @pagesize Rows only;
 `
     const result = await request.query(query);
     // console.log(result);
-    
-    return result;
-}
 
- catch (error) {
+    return result;
+  }
+
+  catch (error) {
     throw new Error(`vehiclewisePPNIValueService failed: ${error.message}`);
   }
 };
 
 
-  const partwisePPNIValueService = async(dealerid,locationid,jobcardstatus , nonstockable , advisor , vehicleno , month)=>{
+const partwisePPNIValueService = async (dealerid, locationid, jobcardstatus, nonstockable, advisor, vehicleno, month) => {
   try {
-          const pool = await getPool2()
+    const pool = await getPool2()
+    const advisorSQL =
+      advisor === null || advisor === undefined
+        ? "NULL"
+        : `'${advisor}'`;
+    const jobcardstatusSQL =
+      jobcardstatus === null || jobcardstatus === undefined
+        ? "NULL"
+        : `'${jobcardstatus}'`;
+    const nonstockableSQL =
+      nonstockable === null || nonstockable === undefined
+        ? "NULL"
+        : `'${nonstockable}'`;
 
-  // const query = ` 
-  //  DECLARE @d VARCHAR(10) = '${month}';
-  // DECLARE @firstDate DATE = TRY_CONVERT(DATE, '01-' + @d, 105);
+    // console.log(dealerid,locationid,advisorSQL,jobcardstatusSQL,nonstockableSQL,month);
 
-  // DECLARE @lastDate DATE = EOMONTH(@firstDate);
-  // use z_scope 
-  // 	;with data as(
-  // 	select  latest , isnull(sum(qty),0)StockQty from (
-  // 	select cs2.PartNumber , 
-  // 	CASE WHEN cs2.PartNumber = sm.partnumber1 then sm.subpartnumber1 else cs2.PartNumber end as LAtest,
-  // 	QTY  from z_scope..CurrentStock2 cs2
-  // 	join z_scope..CurrentStock1 cs1 on cs1.tCode = cs2.StockCode
-  // 	join z_scope..LocationInfo li on li.LocationID = cs1.LocationID
-  // 	left join z_scope..substitution_master sm on sm.brandid = li.BrandID and sm.partnumber1 = cs2.PartNumber
-  // 	where cs1.LocationID = ${locationid} and Qty > 0)a
-  // 	group by latest
-  // 	),
-  // data2 as (
-  // select 
-  // ppni.Vehiclenumber,
-  // 			  ppni.PartNumber, 
-  // 			  CASE WHEN ppni.PartNumber = sm.partnumber1 then sm.subpartnumber1 else ppni.PartNumber end as Latest,
-  // 			  ppni.PartDesc, 
-  // 			  part_category, 
-  // 			  ppni.price,
-  // 			  ppni.PPNI_Val,
-  // 			  ppni.Qty as DemandedQty,
-  // 			  All_Time_NonStck
-  // 		  FROM 
-  // 			  UAD_BI_PPNI..PPNI_report_${dealerid} ppni
-  // 			left join z_scope..Create_Order_Request_TD001_${dealerid} co on co.vehiclenumber = ppni.vehiclenumber and co.part_number1 = ppni.partnumber
-  //    			  left join z_scope..substitution_master sm on sm.Brandid = ppni.brandid and ppni.partnumber = sm.partnumber1
-  // 		  WHERE 
-  // 		   co.joblineclosedate is  null 
-  // 		   and ppni.Vehiclenumber = '${vehicleno}'
-  // 		   and
-  // 			  (
-  // 				  (@All_Time_NonStck IS NULL AND All_Time_NonStck IN ('Y', 'N')) 
-  // 				  OR (@All_Time_NonStck IS NOT NULL AND All_Time_NonStck = @All_Time_NonStck)
-  // 			  )
-  // 			  AND
-  // 			  (
-  // 				  (@JobCardStatus IS NULL AND JobCardStatus IN ('OPEN', 'CLOSE')) 
-  // 				  OR (@JobCardStatus IS NOT NULL AND JobCardStatus = @JobCardStatus)
-  // 			  )
-  // 			  AND (
-  // 			  @firstDate IS NULL OR 
-  // 			  (ppni.dateadded >= @firstDate AND ppni.dateadded <= @lastDate)
-  // 			  )
-  // 			  AND ppni.locationid = ${locationid}
-  // 		  GROUP BY 
-  // 			  ppni.PartNumber, ppni.Vehiclenumber, ppni.PartDesc, part_category, ppni.price, ppni.Qty , All_Time_NonStck , sm.partnumber1 , sm.subpartnumber1  , ppni.PPNI_Val
-  // 		  HAVING 
-  // 			  SUM(ppni_val) > 0
-  // )
-  // select Data2.*,isnull(data.StockQty,0)as StockQty  
-  // 	from data2
-  // 	left  join data on data.latest = data2.Latest
-  // 	order by data2.ppni_val desc
-  //   `
-      const advisorSQL =
-        advisor === null || advisor === undefined
-          ? "NULL"
-          : `'${advisor}'`;
-      const jobcardstatusSQL =
-        jobcardstatus === null || jobcardstatus === undefined
-          ? "NULL"
-          : `'${jobcardstatus}'`;
-      const nonstockableSQL =
-        nonstockable === null || nonstockable === undefined
-          ? "NULL"
-          : `'${nonstockable}'`;
+    // const query = `
+    // DECLARE @d VARCHAR(10) = '${month}';
+    // DECLARE @firstDate DATE = TRY_CONVERT(DATE, '01-' + @d, 105);
+    // declare @advisor varchar(50) = ${advisorSQL} ;
+    // declare @JobCardStatus varchar(50) = ${jobcardstatusSQL};
+    // declare @All_Time_NonStck varchar(50) = ${nonstockableSQL};
+    // DECLARE @lastDate DATE = EOMONTH(@firstDate);
 
-  // console.log(dealerid,locationid,advisorSQL,jobcardstatusSQL,nonstockableSQL,month);
-
-  const query = `
-      DECLARE @d VARCHAR(10) = '${month}';
-  DECLARE @firstDate DATE = TRY_CONVERT(DATE, '01-' + @d, 105);
-  declare @advisor varchar(50) = ${advisorSQL} ;
-  declare @JobCardStatus varchar(50) = ${jobcardstatusSQL};
-  declare @All_Time_NonStck varchar(50) = ${nonstockableSQL};
-  DECLARE @lastDate DATE = EOMONTH(@firstDate);
-
-  use z_scope 
-    ;with data as(
-    select  latest , isnull(sum(qty),0)StockQty from (
-    select cs2.PartNumber , 
-    CASE WHEN cs2.PartNumber = sm.partnumber1 then sm.subpartnumber1 else cs2.PartNumber end as LAtest,
-    QTY  from z_scope..CurrentStock2 cs2
-    join z_scope..CurrentStock1 cs1 on cs1.tCode = cs2.StockCode
-    join z_scope..LocationInfo li on li.LocationID = cs1.LocationID
-    left join z_scope..substitution_master sm on sm.brandid = li.BrandID and sm.partnumber1 = cs2.PartNumber
-    where cs1.LocationID = @locationid and Qty > 0)a
-    group by latest
-    ),
-  data2 as (
-  select 
-  co.bigid,
-  co.DealerId,
-  co.LocationId,
-  ppni.Vehiclenumber,
-          ppni.PartNumber, 
-          CASE WHEN ppni.PartNumber = sm.partnumber1 then sm.subpartnumber1 else ppni.PartNumber end as Latest,
-          ppni.PartDesc, 
-          part_category, 
-          ppni.price,
-          ppni.PPNI_Val,
-          ppni.Qty as DemandedQty,
-          All_Time_NonStck
-        FROM 
-        UAD_BI_PPNI..PPNI_report_${dealerid} ppni
-        left join z_scope..Create_Order_Request_TD001_${dealerid} co on co.vehiclenumber = ppni.vehiclenumber and co.part_number1 = ppni.partnumber
-          left join z_scope..substitution_master sm on sm.Brandid = ppni.brandid and ppni.partnumber = sm.partnumber1
-        left join z_scope..currentstock1 cs1 on cs1.locationid = ppni.Locationid
-        LEFT  join z_scope..currentstock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = ppni.PartNumber
-        WHERE 
-        co.joblineclosedate is  null 
-          and	  cs2.Qty != 0
-        and ppni.Vehiclenumber = '${vehicleno}'
-        and
-          (
-            (@All_Time_NonStck IS NULL AND All_Time_NonStck IN ('Y', 'N')) 
-            OR (@All_Time_NonStck IS NOT NULL AND All_Time_NonStck = @All_Time_NonStck)
-          )
-          AND
-          (
-            (@JobCardStatus IS NULL AND JobCardStatus IN ('OPEN', 'CLOSE')) 
-            OR (@JobCardStatus IS NOT NULL AND JobCardStatus = @JobCardStatus)
-          )
-          AND (
-          @firstDate IS NULL OR 
-          (ppni.dateadded >= @firstDate AND ppni.dateadded <= @lastDate)
-          )
-          AND ppni.locationid = @locationid
-        GROUP BY 
-            co.bigid,  co.DealerId,co.LocationId,ppni.PartNumber, ppni.Vehiclenumber, ppni.PartDesc, part_category, ppni.price, ppni.Qty , All_Time_NonStck , sm.partnumber1 , sm.subpartnumber1  , ppni.PPNI_Val
-        HAVING 
-          SUM(ppni_val) > 0
-  )
-  select Data2.*,isnull(data.StockQty,0)as StockQty  
-    from data2
-    left  join data on data.latest = data2.Latest
-    order by data2.ppni_val desc
-  `
-          const result = await pool.request()
-          .input('locationid', sql.Int, locationid)
-          .query(query)
-  // console.log(result);
-
-          return result
-  } catch (error) {
-      throw new Error(`partwisePPNIValueService failed: ${error.message}`);
-  }
-  }
-
-const PPNIVALUE12MonthsService = async (dealerid, locationid, nonstockable, jobcardstatus , advisior) => {
-  try {
-    const pool = await getPool2();
-    const tableName = `PPNI_report_${dealerid}`;
-
+    // use z_scope 
+    //   ;with data as(
+    //   select  latest , isnull(sum(qty),0)StockQty from (
+    //   select cs2.PartNumber , 
+    //   CASE WHEN cs2.PartNumber = sm.partnumber1 then sm.subpartnumber1 else cs2.PartNumber end as LAtest,
+    //   QTY  from z_scope..CurrentStock2 cs2
+    //   join z_scope..CurrentStock1 cs1 on cs1.tCode = cs2.StockCode
+    //   join z_scope..LocationInfo li on li.LocationID = cs1.LocationID
+    //   left join z_scope..substitution_master sm on sm.brandid = li.BrandID and sm.partnumber1 = cs2.PartNumber
+    //   where cs1.LocationID = @locationid and Qty > 0)a
+    //   group by latest
+    //   ),
+    // data2 as (
+    // select 
+    // co.bigid,
+    // co.DealerId,
+    // co.LocationId,
+    // ppni.Vehiclenumber,
+    //         ppni.PartNumber, 
+    //         CASE WHEN ppni.PartNumber = sm.partnumber1 then sm.subpartnumber1 else ppni.PartNumber end as Latest,
+    //         ppni.PartDesc, 
+    //         part_category, 
+    //         ppni.price,
+    //         ppni.PPNI_Val,
+    //         ppni.Qty as DemandedQty,
+    //         All_Time_NonStck
+    //       FROM 
+    //       UAD_BI_PPNI..PPNI_report_${dealerid} ppni
+    //       left join z_scope..Create_Order_Request_TD001_${dealerid} co on co.vehiclenumber = ppni.vehiclenumber and co.part_number1 = ppni.partnumber
+    //         left join z_scope..substitution_master sm on sm.Brandid = ppni.brandid and ppni.partnumber = sm.partnumber1
+    //       left join z_scope..currentstock1 cs1 on cs1.locationid = ppni.Locationid
+    //       LEFT  join z_scope..currentstock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = ppni.PartNumber
+    //       WHERE 
+    //       co.joblineclosedate is  null 
+    //         and	  cs2.Qty != 0
+    //       and ppni.Vehiclenumber = '${vehicleno}'
+    //       and
+    //         (
+    //           (@All_Time_NonStck IS NULL AND All_Time_NonStck IN ('Y', 'N')) 
+    //           OR (@All_Time_NonStck IS NOT NULL AND All_Time_NonStck = @All_Time_NonStck)
+    //         )
+    //         AND
+    //         (
+    //           (@JobCardStatus IS NULL AND JobCardStatus IN ('OPEN', 'CLOSE')) 
+    //           OR (@JobCardStatus IS NOT NULL AND JobCardStatus = @JobCardStatus)
+    //         )
+    //         AND (
+    //         @firstDate IS NULL OR 
+    //         (ppni.dateadded >= @firstDate AND ppni.dateadded <= @lastDate)
+    //         )
+    //         AND ppni.locationid = @locationid
+    //       GROUP BY 
+    //           co.bigid,  co.DealerId,co.LocationId,ppni.PartNumber, ppni.Vehiclenumber, ppni.PartDesc, part_category, ppni.price, ppni.Qty , All_Time_NonStck , sm.partnumber1 , sm.subpartnumber1  , ppni.PPNI_Val
+    //       HAVING 
+    //         SUM(ppni_val) > 0
+    // )
+    // select Data2.*,isnull(data.StockQty,0)as StockQty  
+    //   from data2
+    //   left  join data on data.latest = data2.Latest
+    //   order by data2.ppni_val desc
+    // `
     const query = `
-USE UAD_BI_PPNI;
 
-SELECT TOP 12
-  location,
-  CONCAT(MONTH(dateadded), '-', YEAR(dateadded)) AS [Date],
-  SUM(ppni_val) AS PPNI_val,
-  ROUND(SUM(ppni_val) / 100000.0, 2) AS PPNI_Value
-FROM PPNI_report_${dealerid}
-WHERE 
-  locationid = @locationid
-  AND (@stkable IS NULL OR All_Time_NonStck = @stkable)
-  AND (@jobcard IS NULL OR JobCardStatus = @jobcard)
-  AND (@advisor IS NULL OR Advisor = @advisor)
-GROUP BY 
-  location, YEAR(dateadded), MONTH(dateadded)
-ORDER BY 
-  YEAR(dateadded) DESC, MONTH(dateadded) DESC;
-    `;
-
+    DECLARE @d VARCHAR(10) = '${month}';
+    DECLARE @firstDate DATE = TRY_CONVERT(DATE, '01-' + @d, 105);
+    declare @advisor varchar(50) = ${advisorSQL} ;
+    declare @JobCardStatus varchar(50) = ${jobcardstatusSQL};
+    declare @All_Time_NonStck varchar(50) = ${nonstockableSQL};
+    DECLARE @lastDate DATE = EOMONTH(@firstDate);
+    
+    ;WITH T1 AS
+      (
+		      SELECT A.Part_Number1,A.Vehiclenumber,C.Qty,A.Current_status,A.LocationID,A.Dealerid,A.BIGID ,A.JobLineCloseDate  FROM z_scope..Create_Order_Request_TD001_${dealerid} A
+		      LEFT JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
+		      LEFT  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
+		      where A.Locationid = ${locationid} and Vehiclenumber = '${vehicleno}'
+		      AND Type='V' 
+		  )
+SELECT A.bigid,A.DealerId,A.LocationId,A.Vehiclenumber,A.Part_Number1 PartNumber,
+ CASE WHEN b.PartNumber = sm.partnumber1 then sm.subpartnumber1 else b.PartNumber end as Latest,
+B.PartDesc,part_category, b.price,b.Qty as DemandedQty,SUM(B.PPNI_Val) PPNI_Val,isnull(A.Qty,0) StockQty,All_Time_NonStck
+FROM T1 A
+LEFT JOIN UAD_BI_PPNI..PPNI_report_${dealerid} B ON( A.BIGID=B.Bigid)
+left join z_scope..substitution_master sm on sm.Brandid = b.brandid and b.partnumber = sm.partnumber1
+where
+(
+       @All_Time_NonStck IS NULL
+       OR B.All_Time_NonStck = @All_Time_NonStck
+   )
+AND
+ (
+        (@JobCardStatus IS NULL AND b.JobCardStatus IN ('OPEN','CLOSE'))
+        OR
+        (@JobCardStatus IS NOT NULL AND b.JobCardStatus = @JobCardStatus)
+  )
+    AND (
+        @firstDate IS NULL
+        OR (b.DateAdded >= @firstDate AND b.DateAdded <= @lastDate)
+    )
+    AND (
+        @advisor IS NULL
+        OR b.Advisor = @advisor
+    )
+GROUP BY A.bigid,A.Dealerid,A.Locationid,A.Part_Number1,B.PartDesc, 
+          part_category, 
+          b.price,
+          b.PPNI_Val,
+          b.Qty ,
+          All_Time_NonStck,A.Qty,b.PartNumber ,sm.partnumber1, sm.subpartnumber1,A.VehicleNumber
+HAVING SUM(PPNI_Val)>0
+order by SUM(PPNI_Val) desc
+  `
     const result = await pool.request()
-      .input('locationid', locationid)
-      .input('stkable', nonstockable)
-      .input('jobcard', jobcardstatus)
-      .input('advisor', advisior)
+      .input('locationid', sql.Int, locationid)
+      .query(query)
+    // console.log(result);
+
+    return result
+  } catch (error) {
+    throw new Error(`partwisePPNIValueService failed: ${error.message}`);
+  }
+}
+
+const PPNIVALUE12MonthsService = async (dealerid, locationid, nonstockable, jobcardstatus, advisior) => {
+  try {    
+    const pool = await getPool2();
+    const tableName = `UAD_BI_PPNI..PPNI_report_${dealerid}`;
+
+    const advisorSQL = advisior === null || advisior === undefined ? "NULL" : `'${advisior}'`;
+    const jobcardstatusSQL = jobcardstatus === null || jobcardstatus === undefined ? "NULL" : `'${jobcardstatus}'`;
+    const nonstockableSQL = nonstockable === null || nonstockable === undefined  ? "NULL"  : `'${nonstockable}'`;
+
+    
+    //     const query = `
+    //       select CONCAT(MONTH(dateadded), '-', YEAR(dateadded)) AS [Date] ,
+    // 	    SUM(ppni_val) AS PPNI_val,
+    // 	    ROUND(SUM(ppni_val) / 100000.0, 2) AS PPNI_Value 
+    // 	    from ${tableName}
+    // 	    where (@locationid is null or locationid = @locationid)
+    // 			AND   (@Advisor is null or advisor = @advisor)
+    // 			AND   (@stkable IS NULL OR All_Time_NonStck = @stkable)
+    // 			AND   (@jobcard IS NULL OR JobCardStatus = @jobcard) 
+
+    // 	    group by  YEAR(dateadded), MONTH(dateadded)
+    // 	    ORDER BY YEAR(dateadded) DESC, MONTH(dateadded) DESC;
+    // `
+    const query = `
+Declare @locationid int = ${locationid},
+@advisor varchar(50) = ${advisorSQL},
+@jobcard varchar(10) = ${jobcardstatusSQL},
+@stkable varchar(5)  = ${nonstockableSQL}
+	
+;WITH T1 AS
+		(
+		  SELECT A.Part_Number1,C.Qty,A.Current_status,A.LocationID,A.Dealerid,A.BIGID ,A.JobLineCloseDate  
+		  FROM z_scope..Create_Order_Request_TD001_8 A
+		  LEFT JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
+		  LEFT  JOIN z_scope..CurrentStock2 C ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
+		  where Type='V'  
+		  )
+	select CONCAT(MONTH(dateadded), '-', YEAR(dateadded)) AS [Date] ,
+	SUM(ppni_val) AS PPNI_val,
+	ROUND(SUM(ppni_val) / 100000.0, 2) AS PPNI_Value 
+	from ${tableName} P
+	join T1 A on A.Bigid = P.Bigid
+	where (@locationid is null or p.locationid = @locationid) 
+	AND (@Advisor is null or advisor = @advisor)
+	and 
+	(
+       @stkable IS NULL OR P.All_Time_NonStck = @stkable
+	) AND
+	 (
+        (@jobcard IS NULL AND P.JobCardStatus IN ('OPEN','CLOSE'))
+        OR
+        (@jobcard IS NOT NULL AND P.JobCardStatus = @jobcard)
+  ) 
+	group by  YEAR(dateadded), MONTH(dateadded)
+	ORDER BY YEAR(dateadded) DESC, MONTH(dateadded) DESC;`
+   
+    const result = await pool.request()
+      // .input('locationid', locationid)
+      // .input('stkable', nonstockable)
+      // .input('jobcard', jobcardstatus)
+      // .input('advisor', advisior)
       .query(query);
 
     return result;
@@ -1011,62 +990,62 @@ ORDER BY
 };
 
 
-const vehicleSearchService = async(dealerid,locationid,vehicleno,alltimenonstk,filter,issued,pageno,pagesize)=>{
-try {
-        const pool = await getPool2()
-//  const query  = `
-//   use z_scope 
-// 	;with data as(
-// 	select  latest , sum(ISNULL(Qty,0))StockQty from (
-// 	select cs2.PartNumber , 
-// 	CASE WHEN cs2.PartNumber = sm.partnumber1 then sm.subpartnumber1 else cs2.PartNumber end as LAtest,
-// 	isnull(QTY,0) as QTY from CurrentStock2 cs2
-// 	join CurrentStock1 cs1 on cs1.tCode = cs2.StockCode
-// 	join LocationInfo li on li.LocationID = cs1.LocationID
-// 	left join substitution_master sm on sm.brandid = li.BrandID and sm.partnumber1 = cs2.PartNumber
-// 	where cs1.LocationID = ${locationid}) a
-// 	group by latest
-// 	),
-// 	data2 as(
-//       SELECT DISTINCT
-//           co.jobcard_number,
-//           co.part_number1,
-// 		  CASE WHEN co.Part_Number1 = sm.partnumber1 then sm.subpartnumber1 else co.Part_Number1 end as Latest,
-//           pm.partdesc,
-//           pm.category,
-//           co.Price,
-//           --isnull(cs2.Qty,0) AS StockQty,
-//           --co.current_status,
-//           --co.Final_close,
-		  
-//           co.qty as Qty,
-//           Case when co.Final_close = 'N' then 'Open' else 'Close' END as Final_close,
-//           co.Price * co.Qty AS Value,co.Dateadded as OrderDate,
-//           pr.All_Time_NonStck,
-//           pr.PPNI_Val/pr.price as PPNI_Qty,
-//           Case when co.JobLineCloseDate IS NULL then 'Not Issued' Else 'Issued' End as IssueStatus
-//       FROM Create_Order_Request_TD001_${dealerid} co
-// 	  left join z_scope..substitution_master sm on sm.Brandid = co.brandid and co.Part_Number1 = sm.partnumber1
-//       JOIN LocationInfo li 
-//           ON li.LocationID = co.LocationID
-//       JOIN Part_Master pm 
-//           ON li.brandid = pm.brandid 
-//           AND pm.partnumber = co.Part_Number1  
-//       LEFT JOIN [UAD_BI_PPNI].dbo.ppni_report_${dealerid} pr
-//          ON pr.Jobcard_Number = co.Jobcard_number
-//          AND pr.PartNumber = co.Part_Number1 --and pr.dateadded = co.Dateadded
-//       WHERE co.vehiclenumber = @vehicleno
-//         AND (@filter IS NULL OR co.final_close = @filter)
-//         AND (@alltimenonstk IS NULL OR pr.All_Time_NonStck = @alltimenonstk)
-//         AND (
-//           @issued IS NULL OR
-//           (@issued = '0' AND co.JobLineCloseDate IS NULL) OR
-//           (@issued = '1' AND co.JobLineCloseDate IS NOT NULL)
-//         ))
-// select data2.*,isnull(data.StockQty,0)StockQty from data2 
-// left join data on data.LAtest = data2.Latest
-//  `
-const query =`
+const vehicleSearchService = async (dealerid, locationid, vehicleno, alltimenonstk, filter, issued, pageno, pagesize) => {
+  try {
+    const pool = await getPool2()
+    //  const query  = `
+    //   use z_scope 
+    // 	;with data as(
+    // 	select  latest , sum(ISNULL(Qty,0))StockQty from (
+    // 	select cs2.PartNumber , 
+    // 	CASE WHEN cs2.PartNumber = sm.partnumber1 then sm.subpartnumber1 else cs2.PartNumber end as LAtest,
+    // 	isnull(QTY,0) as QTY from CurrentStock2 cs2
+    // 	join CurrentStock1 cs1 on cs1.tCode = cs2.StockCode
+    // 	join LocationInfo li on li.LocationID = cs1.LocationID
+    // 	left join substitution_master sm on sm.brandid = li.BrandID and sm.partnumber1 = cs2.PartNumber
+    // 	where cs1.LocationID = ${locationid}) a
+    // 	group by latest
+    // 	),
+    // 	data2 as(
+    //       SELECT DISTINCT
+    //           co.jobcard_number,
+    //           co.part_number1,
+    // 		  CASE WHEN co.Part_Number1 = sm.partnumber1 then sm.subpartnumber1 else co.Part_Number1 end as Latest,
+    //           pm.partdesc,
+    //           pm.category,
+    //           co.Price,
+    //           --isnull(cs2.Qty,0) AS StockQty,
+    //           --co.current_status,
+    //           --co.Final_close,
+
+    //           co.qty as Qty,
+    //           Case when co.Final_close = 'N' then 'Open' else 'Close' END as Final_close,
+    //           co.Price * co.Qty AS Value,co.Dateadded as OrderDate,
+    //           pr.All_Time_NonStck,
+    //           pr.PPNI_Val/pr.price as PPNI_Qty,
+    //           Case when co.JobLineCloseDate IS NULL then 'Not Issued' Else 'Issued' End as IssueStatus
+    //       FROM Create_Order_Request_TD001_${dealerid} co
+    // 	  left join z_scope..substitution_master sm on sm.Brandid = co.brandid and co.Part_Number1 = sm.partnumber1
+    //       JOIN LocationInfo li 
+    //           ON li.LocationID = co.LocationID
+    //       JOIN Part_Master pm 
+    //           ON li.brandid = pm.brandid 
+    //           AND pm.partnumber = co.Part_Number1  
+    //       LEFT JOIN [UAD_BI_PPNI].dbo.ppni_report_${dealerid} pr
+    //          ON pr.Jobcard_Number = co.Jobcard_number
+    //          AND pr.PartNumber = co.Part_Number1 --and pr.dateadded = co.Dateadded
+    //       WHERE co.vehiclenumber = @vehicleno
+    //         AND (@filter IS NULL OR co.final_close = @filter)
+    //         AND (@alltimenonstk IS NULL OR pr.All_Time_NonStck = @alltimenonstk)
+    //         AND (
+    //           @issued IS NULL OR
+    //           (@issued = '0' AND co.JobLineCloseDate IS NULL) OR
+    //           (@issued = '1' AND co.JobLineCloseDate IS NOT NULL)
+    //         ))
+    // select data2.*,isnull(data.StockQty,0)StockQty from data2 
+    // left join data on data.LAtest = data2.Latest
+    //  `
+    const query = `
             USE z_scope;
 declare @pagesize int = ${pagesize}, @pageno int = ${pageno};
 DECLARE @offset INT = (@pageno - 1) * @pagesize;
@@ -1172,65 +1151,65 @@ order by value desc
 OFFSET @offset ROWS
 FETCH NEXT @pagesize ROWS ONLY;
 `
-const result = await pool.request()
-        .input('vehicleno', vehicleno)
-        .input('filter', filter)
-        .input('alltimenonstk', alltimenonstk)
-        .input('issued', issued)
-        .query(query);
-        
-      return result;
-} catch (error) {
+    const result = await pool.request()
+      .input('vehicleno', vehicleno)
+      .input('filter', filter)
+      .input('alltimenonstk', alltimenonstk)
+      .input('issued', issued)
+      .query(query);
+
+    return result;
+  } catch (error) {
     throw new Error(`vehiclesearchService failed: ${error.message}`);
-    
-}
+
+  }
 }
 
-const gainerListingService = async(dealerid , locationid , partnumber)=>{
-try {
-        const pool = await getPool2()
-        // const query = `
-        // select pm.partnumber1 , pm.partdesc , pm.Category , pm.mrp , pm.landedcost ,CONCAT(unm.DISCOUNT,'%')as Discount  from SH_UPLOADNONMOVINGPART unm 
-        // join locationinfo li on li.locationid = unm.locationid
-        // join part_master pm on li.brandid = pm.brandid and pm.partnumber = unm.partnumber
-        // where unm.locationid = ${locationid} and unm.partnumber = '${partnumber}'
-        // `
-        const query = `use z_scope EXEC GainerListingSinglePart '${dealerid}', '${partnumber}', ${locationid};`
+const gainerListingService = async (dealerid, locationid, partnumber) => {
+  try {
+    const pool = await getPool2()
+    // const query = `
+    // select pm.partnumber1 , pm.partdesc , pm.Category , pm.mrp , pm.landedcost ,CONCAT(unm.DISCOUNT,'%')as Discount  from SH_UPLOADNONMOVINGPART unm 
+    // join locationinfo li on li.locationid = unm.locationid
+    // join part_master pm on li.brandid = pm.brandid and pm.partnumber = unm.partnumber
+    // where unm.locationid = ${locationid} and unm.partnumber = '${partnumber}'
+    // `
+    const query = `use z_scope EXEC GainerListingSinglePart '${dealerid}', '${partnumber}', ${locationid};`
 
-        const result = await pool.request().query(query)
-        return result.recordset
-} catch (error) {
+    const result = await pool.request().query(query)
+    return result.recordset
+  } catch (error) {
     throw new Error(`gainerListingService failed : ${error.message}`);
-    
-}
+
+  }
 }
 
-const predictiveVehicleSearchService = async(dealerid , vehicleno)=>{
-try {
-        const pool = await getPool2()
-        const query = `
+const predictiveVehicleSearchService = async (dealerid, vehicleno) => {
+  try {
+    const pool = await getPool2()
+    const query = `
         --Declare @vehicleno varchar(10) = '@vehicleno'
     	select distinct(UPPER(Vehiclenumber))as Vehiclenumber from z_scope..Create_Order_Request_TD001_${dealerid}
     	where Vehiclenumber like ('%'+@vehicleno+'%')
         `
-        const result = await pool.request().input('vehicleno',sql.VarChar,vehicleno).query(query)
-        return result.recordset
-} catch (error) {
+    const result = await pool.request().input('vehicleno', sql.VarChar, vehicleno).query(query)
+    return result.recordset
+  } catch (error) {
     throw new Error(`predictiveVehicleSearchService failed : ${error.message}`);
-} 
+  }
 }
 
-const vehicledealercheck = async(vehicleno , dealerid)=>{
-    const pool = await getPool2()
-    const query = `select * from z_scope..Create_Order_Request_TD001_${dealerid} where vehiclenumber = '${vehicleno}'`
-    const result = await pool.request().query(query)
-    // console.log(result.recordset);
-   // returns 1 if there’s at least one row, otherwise 0
-return result.recordset.length > 0 ? 1 : 0;
+const vehicledealercheck = async (vehicleno, dealerid) => {
+  const pool = await getPool2()
+  const query = `select * from z_scope..Create_Order_Request_TD001_${dealerid} where vehiclenumber = '${vehicleno}'`
+  const result = await pool.request().query(query)
+  // console.log(result.recordset);
+  // returns 1 if there’s at least one row, otherwise 0
+  return result.recordset.length > 0 ? 1 : 0;
 }
 
-const partfamilywiseStockColor = async(brandid,dealerid,locationid,partnumber)=>{
-try {
+const partfamilywiseStockColor = async (brandid, dealerid, locationid, partnumber) => {
+  try {
     const pool = await getPool2()
     const query = ` use z_scope
      DECLARE 
@@ -1302,20 +1281,20 @@ left join Stock_Upload_SPM_TD001_${dealerid} su
 on su.Locationid = @InputLocationID and su.partnumber1 = pf.Part and su.Partnumber not in (ep.PartNumber) and su.RedFlag = 'Y' and RedDate is not null --and sn.Stockdate = (select MAX(stockdate) from Stock_Upload_SPM_TD001_${dealerid})
 )l
 group by l.Part
-          ` 
-  
-        const result = await pool.request().query(query)
-        return result
-} catch (error) {
-  throw new Error(`partfamilywiseStockColor failed : ${error.message}`);
-}
+          `
+
+    const result = await pool.request().query(query)
+    return result
+  } catch (error) {
+    throw new Error(`partfamilywiseStockColor failed : ${error.message}`);
+  }
 }
 
-const vehicleScore = async (dealerid,vehiclenumber)=>{
-try {
+const vehicleScore = async (dealerid, vehiclenumber) => {
+  try {
     const pool = await getPool2()
-    const query = 
-    ` use z_scope
+    const query =
+      ` use z_scope
 	SELECT
 		-- In-stock
 		ISNULL(SUM(CASE WHEN cs2.PartNumber IS NOT NULL THEN 1 ELSE 0 END),0)    
@@ -1340,15 +1319,15 @@ try {
     `
     const result = await pool.request().query(query)
     return result
-} catch (error) {
-  throw new Error(`vehicleScore failed : ${error.message}`);
-  
-}
+  } catch (error) {
+    throw new Error(`vehicleScore failed : ${error.message}`);
+
+  }
 }
 
 // const vehicleSearchPagination = async(page,pagesize,dealerid,vehicleno,alltimestk,issued,filter)=>{
 //   console.log(pagesize,dealerid,vehicleno,alltimestk,issued,filter);
-  
+
 // try {
 //     const pool = await getPool2()
 //     const query = `select count(co.bigid)count from z_scope..Create_Order_Request_TD001_${dealerid} co
@@ -1372,7 +1351,7 @@ try {
 //     const totalRecords = totalRecordsQuery.recordset[0].count;
 //     const totalPages = Math.ceil(totalRecords / pagesize);
 //     console.log(totalRecords,totalPages);
-    
+
 //     return page < totalPages
 // } catch (error) {
 //   throw new Error(`vehicleSearchPaginationfailed ${error}`);
@@ -1404,52 +1383,52 @@ const vehicleSearchPagination = async (page, pageSize, dealerId, vehicleNo, allT
       .input('vehicleno', vehicleNo)
       .input('filter', filter ?? null)
       .input('allTimeNonStk', allTimeNonStk ?? null)
-      .input('issued',  issued ?? null)
+      .input('issued', issued ?? null)
       .query(sql);
 
     const totalRecords = result.recordset[0]?.count ?? 0;
     const totalPages = Math.ceil(totalRecords / pageSize);
     const hasMore = page < totalPages;
-      // console.log(page,totalRecords,totalPages,hasMore);
-      
+    // console.log(page,totalRecords,totalPages,hasMore);
+
     // return page < totalPages; 
-    return {page,totalRecords,totalPages,hasMore}
+    return { page, totalRecords, totalPages, hasMore }
   } catch (err) {
     console.log(err);
-    
+
     throw new Error(`vehicleSearchPagination failed: ${err.message}`);
   }
 };
 
-const vehicleSearchlogsService = async(moduleName,event,details,userid)=>{
-try {
+const vehicleSearchlogsService = async (moduleName, event, details, userid) => {
+  try {
     const pool = await getPool1()
     const query = `use z_scope Insert into App_Logging(ModuleName,Event,Details,CreatedBy)
                     OUTPUT inserted.ModuleName, inserted.Event, inserted.Details, inserted.CreatedBy
                     values(@ModuleName,@Event,@Details,@CreatedBy)`
     const result = await pool.request()
-    .input('ModuleName',sql.VarChar,moduleName)
-    .input('Event',sql.VarChar,event)
-    .input('Details',sql.VarChar,details)
-    .input('CreatedBy',sql.Int,userid)
-    .query(query)  
+      .input('ModuleName', sql.VarChar, moduleName)
+      .input('Event', sql.VarChar, event)
+      .input('Details', sql.VarChar, details)
+      .input('CreatedBy', sql.Int, userid)
+      .query(query)
     return result
 
-    } catch (error) {
-      throw new Error(`vehicleSearchlogsService failed : ${error.message}`);  
-    }              
+  } catch (error) {
+    throw new Error(`vehicleSearchlogsService failed : ${error.message}`);
+  }
 }
-const viewLogService = async(type,partnumber,vehiclenumber , from , to)=>{
+const viewLogService = async (type, partnumber, vehiclenumber, from, to) => {
   const pool = await getPool1()
   const query = `use [UAD_BI_PPNI] EXEC dbo.sp_dealerapplogsView @type,@partnumber,@vehiclenumber,@from,@to`
   const result = await pool.request()
-    .input('type',sql.VarChar,type)
-    .input('partnumber',sql.VarChar,partnumber ?? null)
-    .input('vehiclenumber',sql.VarChar,vehiclenumber ?? null)
-    .input('from',sql.DateTime,from ?? null)
-    .input('to',sql.DateTime,to ?? null)
-    .query(query)  
-    return result
+    .input('type', sql.VarChar, type)
+    .input('partnumber', sql.VarChar, partnumber ?? null)
+    .input('vehiclenumber', sql.VarChar, vehiclenumber ?? null)
+    .input('from', sql.DateTime, from ?? null)
+    .input('to', sql.DateTime, to ?? null)
+    .query(query)
+  return result
 
 }
-export {vehicleSearchPagination,vehicleScore,partfamilywiseStockColor,groupNorms,vehicledealercheck,PPNIVALUE12MonthsService,userroleService,partInfo,reservedForVehicle,groupStock,jobCardByVehicleService,partsByJobCardService,partSubstituteDetailService,locationwisePPNIValueService,advisorwisePPNIValueService,vehiclewisePPNIValueService,partwisePPNIValueService,vehicleSearchService,gainerListingService,predictiveVehicleSearchService,vehicleSearchlogsService,viewLogService}
+export { vehicleSearchPagination, vehicleScore, partfamilywiseStockColor, groupNorms, vehicledealercheck, PPNIVALUE12MonthsService, userroleService, partInfo, reservedForVehicle, groupStock, jobCardByVehicleService, partsByJobCardService, partSubstituteDetailService, locationwisePPNIValueService, advisorwisePPNIValueService, vehiclewisePPNIValueService, partwisePPNIValueService, vehicleSearchService, gainerListingService, predictiveVehicleSearchService, vehicleSearchlogsService, viewLogService }
