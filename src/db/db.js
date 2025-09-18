@@ -79,51 +79,51 @@ const config2 = {
     connectionTimeout: 30000,
 };
 
-const config3 = {
-    server: process.env.SERVER3,
-    database: process.env.DATABASE3,
-    user: process.env.USER3,
-    password: process.env.PASSWORD3,
-    // port: Number(process.env.DB_PORT3),
-    options: {
-        encrypt: false,
-        enableArithAbort: true,
-        trustServerCertificate: true,
-    },
-    requestTimeout: 6000000,
-    connectionTimeout: 30000,
-};
+// const config3 = {
+//     server: process.env.SERVER3,
+//     database: process.env.DATABASE3,
+//     user: process.env.USER3,
+//     password: process.env.PASSWORD3,
+//     // port: Number(process.env.DB_PORT3),
+//     options: {
+//         encrypt: false,
+//         enableArithAbort: true,
+//         trustServerCertificate: true,
+//     },
+//     requestTimeout: 6000000,
+//     connectionTimeout: 30000,
+// };
 
 
-const config4 = {
-    server: process.env.SERVER2,
-    database: process.env.DATABASE4,
-    user: process.env.USER2,
-    password: process.env.PASSWORD2,
-    // port: Number(process.env.DB_PORT3),
-    options: {
-        encrypt: false,
-        enableArithAbort: true,
-        trustServerCertificate: true,
-    },
-    requestTimeout: 6000000,
-    connectionTimeout: 30000,
-};
+// const config4 = {
+//     server: process.env.SERVER2,
+//     database: process.env.DATABASE4,
+//     user: process.env.USER2,
+//     password: process.env.PASSWORD2,
+//     // port: Number(process.env.DB_PORT3),
+//     options: {
+//         encrypt: false,
+//         enableArithAbort: true,
+//         trustServerCertificate: true,
+//     },
+//     requestTimeout: 6000000,
+//     connectionTimeout: 30000,
+// };
 
-const ogysConfig = {
-    server: process.env.OGYS_SERVER,
-    database: process.env.OGYS_DATABASE,
-    user: process.env.OGYS_USER,
-    password: process.env.OGYS_PASSWORD,
-    // port: Number(process.env.DB_PORT3),
-    options: {
-        encrypt: false,
-        enableArithAbort: true,
-        trustServerCertificate: true,
-    },
-    requestTimeout: 6000000,
-    connectionTimeout: 30000,
-};
+// const ogysConfig = {
+//     server: process.env.OGYS_SERVER,
+//     database: process.env.OGYS_DATABASE,
+//     user: process.env.OGYS_USER,
+//     password: process.env.OGYS_PASSWORD,
+//     // port: Number(process.env.DB_PORT3),
+//     options: {
+//         encrypt: false,
+//         enableArithAbort: true,
+//         trustServerCertificate: true,
+//     },
+//     requestTimeout: 6000000,
+//     connectionTimeout: 30000,
+// };
 
 let pool1, pool2 , pool3,leadTimePool , pool4,ogysPool;
 
@@ -132,19 +132,14 @@ const connectDB = async () => {
         pool1 = await new sql.ConnectionPool(config1).connect();
         console.log(`Connected to DB1: ${process.env.SERVER1} using ${process.env.USER1}`);
 
-        pool2 = await new sql.ConnectionPool(config1).connect();
-        console.log(`Connected to DB2: ${process.env.SERVER1} using ${process.env.USER1}`);
+        pool2 = await new sql.ConnectionPool(config2).connect();
+        console.log(`Connected to DB2: ${process.env.SERVER2} using ${process.env.USER2}`);
 
-        // pool3 = await new sql.ConnectionPool(config3).connect();
-        // console.log(`Connected to DB3: ${process.env.SERVER3} using ${process.env.USER3}`);
-        pool4 = await new sql.ConnectionPool(config1).connect()
-        console.log(`Ds Connected to Live: ${process.env.SERVER2} using ${process.env.USER2}`);
+        // leadTimePool=await new sql.ConnectionPool(config1).connect();
+        // console.log(`Connected to ${process.env.DATABASE4}: ${process.env.SERVER2} using ${process.env.USER2}`);
 
-        leadTimePool=await new sql.ConnectionPool(config1).connect();
-         console.log(`Connected to ${process.env.DATABASE4}: ${process.env.SERVER2} using ${process.env.USER2}`);
-
-          ogysPool= await new sql.ConnectionPool(config1).connect()
-        console.log(`Ds Connected to Live: ${process.env.OGYS_SERVER} using ${process.env.OGYS_USER}`);
+        // ogysPool= await new sql.ConnectionPool(config1).connect()
+        // console.log(`Ds Connected to Live: ${process.env.OGYS_SERVER} using ${process.env.OGYS_USER}`);
     } catch (err) {
         console.error("Database connection failed!", err);
         throw err;
@@ -161,10 +156,10 @@ const getPool2 = () => {
     return pool2;
 };
 
-const DSpool = () => {
-    if (!pool4) throw new Error("DB3 not connected");
-    return pool4;
-};
+// const DSpool = () => {
+//     if (!pool4) throw new Error("DB3 not connected");
+//     return pool4;
+// };
 
 const OgysPool = () => {
     if (!ogysPool) throw new Error("OGYS SERVER not connected");
@@ -182,4 +177,4 @@ const getLeadTimePool=()=>{
 // getPool2 -> for Live Connection
 // getPool3 -> for OGS Server Connection
 
-export { connectDB, getPool1, getPool2 ,getLeadTimePool ,DSpool ,OgysPool};
+export { connectDB, getPool1, getPool2 ,getLeadTimePool  ,OgysPool};
