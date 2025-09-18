@@ -486,7 +486,6 @@ const getUserModules = async (req, res) => {
 
     const pool = await getPool2();
 
-    // Step 1: Get modules user has access to (with permissions + badge)
     const result = await pool.request()
       .input("userId", sql.Int, userId)
       .query(`
@@ -512,7 +511,9 @@ const getUserModules = async (req, res) => {
       `);
 
     const modules = result.recordset;
-
+    const accessibleRoutes = modules
+      .map(m => m.route)
+      .filter(r => r);
     // Step 2: Load all modules (for parent lookups)
     const allModulesResult = await pool.request().query(`
       select id, parentId, module_name as label, module_route as route,
@@ -524,13 +525,12 @@ const getUserModules = async (req, res) => {
     const allModules = allModulesResult.recordset;
     const moduleMap = new Map(allModules.map(m => [m.id, m]));
 
-    // Step 3: Collect user modules + their parents
     const needed = new Map();
     function addWithParents(moduleId) {
       let current = moduleMap.get(moduleId);
       while (current) {
         needed.set(current.id, current);
-        if (current.parentId === 0) break; // stop at top-level
+        if (current.parentId === 0) break; 
         current = moduleMap.get(current.parentId);
       }
     }
@@ -539,7 +539,6 @@ const getUserModules = async (req, res) => {
       addWithParents(m.moduleId);
     }
 
-    // Step 4: Build sidebar tree
     function buildTree(parentId = 0, visited = new Set()) {
       const children = [...needed.values()].filter(m => m.parentId === parentId);
 
@@ -547,7 +546,7 @@ const getUserModules = async (req, res) => {
         .sort((a, b) => a.order - b.order)
         .map(m => {
           if (visited.has(m.id)) {
-            console.warn(`⚠️ Cycle detected at module ${m.id} (${m.label}), skipping`);
+            console.warn(`Cycle detected at module ${m.id} (${m.label}), skipping`);
             return { ...m, children: [] };
           }
 
@@ -574,11 +573,11 @@ const getUserModules = async (req, res) => {
     }
 
     const tree = buildTree(0);
-    console.log("✅ Final sidebar tree built with", tree.length, "top-level nodes");
-    return res.json(tree);
+    console.log("Final sidebar tree built with", tree.length, "top-level nodes");
+    return res.json({ tree, accessibleRoutes });
 
   } catch (err) {
-    console.error("❌ Error in getUserModules:", err);
+    console.error("Error in getUserModules:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 };
