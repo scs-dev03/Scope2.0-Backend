@@ -4,7 +4,7 @@ import { viewParameter } from "../../controller/auto-approval/parameter-manageme
 const router = Router()
 
 
-router.route('/parameter/view').post(viewParameter)
+router.route('/parameterview').post(viewParameter)
 
 
 
