@@ -1,4 +1,4 @@
-import { getPool2} from "../../db/db.js";
+import { getPool2 } from "../../db/db.js";
 import sql from 'mssql'
 const partInfo = async (brandid, partnumber) => {
   try {
@@ -921,15 +921,15 @@ order by SUM(PPNI_Val) desc
 }
 
 const PPNIVALUE12MonthsService = async (dealerid, locationid, nonstockable, jobcardstatus, advisior) => {
-  try {    
+  try {
     const pool = await getPool2();
     const tableName = `UAD_BI_PPNI..PPNI_report_${dealerid}`;
 
     const advisorSQL = advisior === null || advisior === undefined ? "NULL" : `'${advisior}'`;
     const jobcardstatusSQL = jobcardstatus === null || jobcardstatus === undefined ? "NULL" : `'${jobcardstatus}'`;
-    const nonstockableSQL = nonstockable === null || nonstockable === undefined  ? "NULL"  : `'${nonstockable}'`;
+    const nonstockableSQL = nonstockable === null || nonstockable === undefined ? "NULL" : `'${nonstockable}'`;
 
-    
+
     //     const query = `
     //       select CONCAT(MONTH(dateadded), '-', YEAR(dateadded)) AS [Date] ,
     // 	    SUM(ppni_val) AS PPNI_val,
@@ -975,7 +975,7 @@ Declare @locationid int = ${locationid},
   ) 
 	group by  YEAR(dateadded), MONTH(dateadded)
 	ORDER BY YEAR(dateadded) DESC, MONTH(dateadded) DESC;`
-   
+
     const result = await pool.request()
       // .input('locationid', locationid)
       // .input('stkable', nonstockable)
