@@ -1,4 +1,4 @@
-import { getPool1, getPool2 } from "../../db/db.js";
+import { getPool2} from "../../db/db.js";
 import sql from 'mssql'
 const partInfo = async (brandid, partnumber) => {
   try {
@@ -1402,7 +1402,7 @@ const vehicleSearchPagination = async (page, pageSize, dealerId, vehicleNo, allT
 
 const vehicleSearchlogsService = async (moduleName, event, details, userid) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool2()
     const query = `use z_scope Insert into App_Logging(ModuleName,Event,Details,CreatedBy)
                     OUTPUT inserted.ModuleName, inserted.Event, inserted.Details, inserted.CreatedBy
                     values(@ModuleName,@Event,@Details,@CreatedBy)`
@@ -1419,8 +1419,8 @@ const vehicleSearchlogsService = async (moduleName, event, details, userid) => {
   }
 }
 const viewLogService = async (type, partnumber, vehiclenumber, from, to) => {
-  const pool = await getPool1()
-  const query = `use [UAD_BI_PPNI] EXEC dbo.sp_dealerapplogsView @type,@partnumber,@vehiclenumber,@from,@to`
+  const pool = await getPool2()
+  const query = `use [z_scope] EXEC dbo.sp_dealerapplogsView @type,@partnumber,@vehiclenumber,@from,@to`
   const result = await pool.request()
     .input('type', sql.VarChar, type)
     .input('partnumber', sql.VarChar, partnumber ?? null)
