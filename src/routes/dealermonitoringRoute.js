@@ -1,8 +1,8 @@
 import { Router } from "express";
 const router = Router()
-import { advisorwisePPNIValue, gainerListing, locationwisePPNIValue, orderDetailsByPartnumber, partDetails, partSale, partSearch, partStock, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, singlePartMaxByLocation, substituteParts, userRole, vehicleSearch, vehicleSearchLogs, vehiclewisePPNIValue , viewLog} from "../controller/dealer-monitoring/user.dealermonitoring.js";
+import { advisorwisePPNIValue, gainerListing, locationwisePPNIValue, orderDetailsByPartnumber, partDetails, partSale, partSearch, partStock, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, singlePartMaxByLocation, substituteParts, userRole, vehicleSearch, vehicleSearchLogs, vehiclewisePPNIValue, viewLog } from "../controller/dealer-monitoring/user.dealermonitoring.js";
 import { partremark, ppnipartremark, ppnivehicleremark, remarkMaster, vehicleremark } from "../controller/dealer-monitoring/remark.dealermonitoring.js";
-import {  uploadImg } from "../middlewares/multer.middleware.js";
+import { uploadImg } from "../middlewares/multer.middleware.js";
 
 
 
@@ -44,10 +44,10 @@ router.route('/predictive-v').post(predictiveVehicleSearch)
 
 
 router.route('/remark').post(remarkMaster)
-router.route('/rmrk-vp').post(uploadImg.single('file'),partremark)
+router.route('/rmrk-vp').post(uploadImg.single('file'), partremark)
 // router.route('/rmrk-vv').post(uploadImg.single('file'),vehicleremark)
-router.route('/rmrk-pp').post(uploadImg.single('file'),ppnipartremark)
-router.route('/rmrk-pv').post(uploadImg.single('file'),ppnivehicleremark)
+router.route('/rmrk-pp').post(uploadImg.single('file'), ppnipartremark)
+router.route('/rmrk-pv').post(uploadImg.single('file'), ppnivehicleremark)
 
 router.route('/log').post(vehicleSearchLogs)
 router.route('/view-log').post(viewLog)

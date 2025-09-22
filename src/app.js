@@ -1,4 +1,4 @@
-import express  from 'express'
+import express from 'express'
 import cors from 'cors'
 // import { scheduleTask, siRefresh } from './controller/dashboardSchedulerController.js'
 import dashboardSchedule from './routes/dashboardSchedulerRoute.js'
@@ -9,7 +9,7 @@ import appRoutes from './routes/index.js'
 import dm from './routes/dealermonitoringRoute.js'
 import aaproutes from './routes/auto-approval/index.js'
 
-const app = express() 
+const app = express()
 app.use(cors())
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -21,15 +21,15 @@ app.use(express.urlencoded({ extended: true }));
 // setTimeout(()=>siRefresh(),3000)
 
 
-app.use('/api', appRoutes); 
+app.use('/api', appRoutes);
 app.use("/api/v1/master", MasterApi)
 app.use("/api/v1/dashboardscheduler", dashboardSchedule)
 app.use("/api/v1/salesview", salesView)
-app.use("/api/v1/von",von)
-app.use("/api/v1/dm",dm)
-app.use("/api/v1",aaproutes)
+app.use("/api/v1/von", von)
+app.use("/api/v1/dm", dm)
+app.use("/api/v1", aaproutes)
 
 
-export  {app}
+export { app }
 
 

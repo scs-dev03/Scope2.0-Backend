@@ -1,6 +1,4 @@
-import {
- getOperator
-} from "../../services/auto-approval/OperatorMasterService.js";
+import { getOperator } from "../../services/auto-approval/OperatorMasterService.js";
 import { ApiError } from "../../utils/ApiError.js";
 
 const fetchOperators = async (req, res, next) => {

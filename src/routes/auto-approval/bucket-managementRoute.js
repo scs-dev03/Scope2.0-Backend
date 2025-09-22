@@ -4,7 +4,7 @@ import { viewBucket } from "../../controller/auto-approval/bucket-managementCont
 const router = Router()
 
 
-router.get('/bucket/view',viewBucket)
+router.get('/bucketview',viewBucket)
 
 
 

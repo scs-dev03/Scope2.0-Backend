@@ -396,7 +396,7 @@ const getUserModules = async (req, res) => {
 
     const result = await pool.request()
       .input("userId", sql.Int, userId)
-      .query(`
+      .query(` use [z_scope]
         select ad.bintId_Pk as userId,
                ad.roleID as roleId,
                rm.module_id as moduleId,
@@ -424,10 +424,11 @@ const getUserModules = async (req, res) => {
       .filter(r => r);
     // Step 2: Load all modules (for parent lookups)
     const allModulesResult = await pool.request().query(`
+      use [z_scope]
       select id, parentId, module_name as label, module_route as route,
              Type as type,Icon as icon, Sequence as [order], badge,
              view1, edit1, add1, delete1
-      from Module_Master
+            from Module_Master
     `);
 
     const allModules = allModulesResult.recordset;
@@ -481,12 +482,12 @@ const getUserModules = async (req, res) => {
     }
 
     const tree = buildTree(0);
-    console.log("Final sidebar tree built with", tree.length, "top-level nodes");
+    // console.log("Final sidebar tree built with", tree.length, "top-level nodes");
     return res.json({ tree, accessibleRoutes });
 
   } catch (err) {
-    console.error("Error in getUserModules:", err);
-    res.status(500).json({ error: err.message});
+    // console.error("Error in getUserModules:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
