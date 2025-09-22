@@ -33,7 +33,7 @@ const partInfo = async (brandid, partnumber) => {
   }
 }
 
-const reservedForVehicle = async (dealerid, partnumber) => {
+const reservedForVehicle = async (dealerid,locationid, partnumber) => {
   try {
     const pool = await getPool2()
     // const query = ` use z_scope
@@ -49,7 +49,7 @@ const reservedForVehicle = async (dealerid, partnumber) => {
         join currentstock1 cs1 on cs1.locationid = co.LocationID
         join CurrentStock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = co.Part_Number1
         where Part_Number1 = '${partnumber}' and Dateadded >  DATEADD(day, -60 , GETDATE()) 
-        and cs2.Qty > 0 and Current_status <> 'Close'
+        and cs2.Qty > 0 and Current_status <> 'Close' and co.LocationID = ${locationid}
         group by co.Qty , cs2.Qty
         `
     // console.log(query);
@@ -490,8 +490,8 @@ const locationwisePPNIValueService = async (dealerid, jobcardstatus, nonstockabl
     		(
     		  SELECT A.Part_Number1,C.Qty,A.Current_status,A.LocationID,A.Dealerid,A.BIGID ,A.JobLineCloseDate  
     		  FROM z_scope..Create_Order_Request_TD001_${dealerid} A
-    		  LEFT JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
-    		  LEFT  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
+    		  INNER JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
+    		  INNER  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
     		  where Type='V'  
     		  )
     Select A.LocationId , B.Location , B.Advisor , isnull(SUM(B.PPNI_Val),0) PPNI_Value 
@@ -580,8 +580,8 @@ const advisorwisePPNIValueService = async (dealerid, locationid, jobcardstatus, 
       		(
       		  SELECT A.Part_Number1,C.Qty,A.Current_status,A.LocationID,A.Dealerid,A.BIGID ,A.JobLineCloseDate  
       		  FROM z_scope..Create_Order_Request_TD001_${dealerid} A
-      		  LEFT JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
-      		  LEFT  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
+      		  INNER JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
+      		  INNER  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
       		  where Type='V' and A.locationid = ${locationid}
       		  )
       Select  B.Advisor , isnull(SUM(B.PPNI_Val),0) PPNI_Value
@@ -723,8 +723,8 @@ declare @All_Time_NonStck varchar(50) = ${nonstockableSQL};
 ;WITH T1 AS
 (
 		SELECT A.Part_Number1,A.Vehiclenumber,C.Qty,A.Current_status,A.LocationID,A.Dealerid,A.BIGID ,A.JobLineCloseDate  FROM z_scope..Create_Order_Request_TD001_${dealerid} A
-		  LEFT JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
-		  LEFT  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
+		  INNER JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
+		  INNER  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
 		  where A.Locationid = ${locationid}
 		  AND Type='V' 
 		  )
@@ -870,10 +870,10 @@ const partwisePPNIValueService = async (dealerid, locationid, jobcardstatus, non
     ;WITH T1 AS
       (
 		      SELECT A.Part_Number1,A.Vehiclenumber,C.Qty,A.Current_status,A.LocationID,A.Dealerid,A.BIGID ,A.JobLineCloseDate  FROM z_scope..Create_Order_Request_TD001_${dealerid} A
-		      LEFT JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
-		      LEFT  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
+		      INNER JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
+		      INNER JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
 		      where A.Locationid = ${locationid} and Vehiclenumber = '${vehicleno}'
-		      AND Type='V' 
+		      AND Type='V'
 		  )
 SELECT A.bigid,A.DealerId,A.LocationId,A.Vehiclenumber,A.Part_Number1 PartNumber,
  CASE WHEN b.PartNumber = sm.partnumber1 then sm.subpartnumber1 else b.PartNumber end as Latest,
@@ -1093,10 +1093,7 @@ data2 AS (
         co.Dateadded AS OrderDate,
         pr.All_Time_NonStck,
         iif(isnull(pr.price,0)>0,pr.PPNI_Val / pr.price,0) AS PPNI_Qty,
-        CASE 
-            WHEN co.JobLineCloseDate IS NULL THEN 'Not Issued' 
-            ELSE 'Issued' 
-        END AS IssueStatus,
+        CASE  WHEN co.Current_status <> 'Close'  THEN 'Not Issued' ELSE 'Issued' END AS IssueStatus,
         co.BrandID
     FROM Create_Order_Request_TD001_${dealerid} co
     LEFT JOIN substitution_master sm 
@@ -1105,7 +1102,8 @@ data2 AS (
     left JOIN Part_Master pm 
         ON li.brandid = pm.brandid AND pm.partnumber = co.Part_Number1  
     LEFT JOIN [UAD_BI_PPNI].dbo.ppni_report_${dealerid} pr
-        ON pr.Jobcard_Number = co.Jobcard_number AND pr.PartNumber = co.Part_Number1
+        --ON pr.Jobcard_Number = co.Jobcard_number AND pr.PartNumber = co.Part_Number1
+        ON pr.Bigid = co.Bigid
     WHERE co.vehiclenumber = @vehicleno
 	 AND (@filter IS NULL OR co.final_close = @filter)
         AND (@alltimenonstk IS NULL OR pr.All_Time_NonStck = @alltimenonstk)
@@ -1312,10 +1310,10 @@ const vehicleScore = async (dealerid, vehiclenumber) => {
 		ON cs1.LocationID = co.LocationID
 	  LEFT JOIN CurrentStock2 AS cs2
 		ON cs2.StockCode   = cs1.tCode
-	   AND cs2.PartNumber = co.Part_Number	
+	   AND cs2.PartNumber = co.Part_Number1	
 	  WHERE
 		co.vehiclenumber     = '${vehiclenumber}'
-		AND co.JobLineCloseDate IS NULL;
+		AND co.Current_status <> 'Close';
     `
     const result = await pool.request().query(query)
     return result

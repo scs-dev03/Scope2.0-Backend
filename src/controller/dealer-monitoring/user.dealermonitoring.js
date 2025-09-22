@@ -154,7 +154,7 @@ const partStock = async (req, res) => {
         const times = [];
 
         const s1 = t(); const p1 = partInfo(brandid, partnumber).finally(() => times.push({ label: 'partInfo', ms: +(t() - s1).toFixed(2) }));
-        const s2 = t(); const p2 = reservedForVehicle(dealerid, partnumber).finally(() => times.push({ label: 'reservedForVehicle', ms: +(t() - s2).toFixed(2) }));
+        const s2 = t(); const p2 = reservedForVehicle(dealerid,locationid, partnumber).finally(() => times.push({ label: 'reservedForVehicle', ms: +(t() - s2).toFixed(2) }));
         const s3 = t(); const p3 = groupStock(brandid, dealerid, locationid, partnumber).finally(() => times.push({ label: 'groupStock', ms: +(t() - s3).toFixed(2) }));
         const s4 = t(); const p4 = singlePartMaxByLocationService(brandid, dealerid, locationid, partnumber).finally(() => times.push({ label: 'singlePartMaxByLocation', ms: +(t() - s4).toFixed(2) }));
 
