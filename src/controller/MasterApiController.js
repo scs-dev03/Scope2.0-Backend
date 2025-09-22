@@ -384,98 +384,6 @@ const latestDates = async (req, res) => {
     res.status(500).json({ Error: error.message });
   }
 };
-function buildModuleHierarchy(rootModules, accessiblePages) {
-  const pageMap = {};
-  const roots = [];
-  accessiblePages.forEach(p => {
-    pageMap[p.moduleId] = { ...p, children: [] };
-  });
-  const childTracker = {}; 
-  accessiblePages.forEach(p => {
-    if (p.parentId && pageMap[p.parentId]) {
-      if (!childTracker[p.parentId]) childTracker[p.parentId] = new Set();
-      if (!childTracker[p.parentId].has(p.moduleId)) {
-        pageMap[p.parentId].children.push(pageMap[p.moduleId]);
-        childTracker[p.parentId].add(p.moduleId);
-      }
-    }
-  });
-  rootModules.forEach(r => {
-    roots.push({
-      ...r,
-      children: accessiblePages
-        .filter(p => p.parentId === r.moduleId)
-        .filter((p, idx, arr) => arr.findIndex(x => x.moduleId === p.moduleId) === idx) // filter duplicates
-        .map(p => pageMap[p.moduleId])
-    });
-  });
-
-  return roots;
-}
-// const getUserModules = async (req, res) => {
-//   try {
-//     const { userId } = req.body;
-//     if (!userId) {
-//       return res.status(400).json({ error: "userId is required" });
-//     }
-
-//     const pool = await getPool2();
-
-//     // fetch root modules
-//     const rootResult = await pool.request().query(`
-//       SELECT id AS moduleId, parentId,parentModuleName, module_name, module_route, Sequence, Icon
-//       FROM module_master
-//       WHERE parentId = 0
-//     `);
-//     const rootModules = rootResult.recordset;
-
-//     // fetch accessible pages + their descendants
-//     const pageResult = await pool.request()
-//       .input("userId", userId)
-//       .query(`
-//         WITH AccessiblePages AS (
-//             SELECT 
-//                 mm.id AS moduleId,
-//                 mm.parentId,
-//                 mm.parentModuleName,
-//                 mm.module_name,
-//                 mm.module_route,
-//                 mm.Sequence,
-//                 mm.Icon
-//             FROM AdminMaster_GEN ag
-//             INNER JOIN role_module_mapping rm ON ag.roleID = rm.role_id
-//             INNER JOIN module_master mm ON rm.module_id = mm.id
-//             WHERE ag.bintId_Pk = @userId
-
-//             UNION ALL
-
-//             SELECT 
-//                 m.id AS moduleId,
-//                 m.parentId,
-//                 m.parentModuleName,
-//                 m.module_name,
-//                 m.module_route,
-//                 m.Sequence,
-//                 m.Icon
-//             FROM module_master m
-//             INNER JOIN AccessiblePages ap ON m.parentId = ap.moduleId
-//         )
-//         SELECT * FROM AccessiblePages;
-//       `);
-//     const accessiblePages = pageResult.recordset;
-
-//     // build hierarchy
-//     const hierarchy = buildModuleHierarchy(rootModules, accessiblePages);
-
-//     res.json({
-//       userId,
-//       modules: hierarchy
-//     });
-//   } catch (error) {
-//     console.error("Error in getUserModules:", error);
-//     res.status(500).json({ error: "Internal Server Error" });
-//   }
-// };
 
 const getUserModules = async (req, res) => {
   try {
@@ -578,46 +486,8 @@ const getUserModules = async (req, res) => {
 
   } catch (err) {
     console.error("Error in getUserModules:", err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: err.message});
   }
 };
-
-// const getRawUserModules = async (req, res) => {
-//   try {
-//     const { userId } = req.body;
-//     if (!userId) {
-//       return res.status(400).json({ error: "userId is required" });
-//     }
-
-//     const pool = await getPool2();
-
-//     // Step 1: Get modules user has access to
-//     const result = await pool.request()
-//       .input("userId", sql.Int, userId)
-//       .query(`
-//         select ad.bintId_Pk as userId,
-//                ad.roleID as roleId,
-//                rm.module_id as moduleId,
-//                mm.parentId,
-//                mm.module_name as label,
-//                mm.module_route as route,
-//                mm.module_type as type,
-//                mm.id,
-//                mm.Sequence as [order]
-//         from AdminMaster_GEN ad
-//         inner join role_module_mapping rm on ad.roleID = rm.role_id
-//         inner join Module_Master mm on rm.module_id = mm.id
-//         where ad.bintId_Pk = @userId
-//       `);
-
-//     const modules = result.recordset;
-
-//     // Step 2: Load all modules for parent lookups
-//       return modules;
-//   } catch (err) {
-//     console.error("Error in getUserModules:", err);
-//     res.status(500).json({ error: "Internal server error" });
-//   }
-// };
 
 export { pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules }
