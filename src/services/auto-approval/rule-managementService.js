@@ -341,7 +341,7 @@ export const insertPriorityMapping = async (LocationId, RuleId, Priority, Create
         `);
 
         if (presult.recordset.length > 0) {
-            const priorityList=await transaction.request()
+            await transaction.request()
                   .input("LocationId",LocationId)
                   .input("Priority",Priority)
                   .query(
@@ -475,13 +475,11 @@ export const fetchRuleMappings = async (BrandId, LocationId, DealerId) => {
     try {
         const pool = await getPool1();
         let query = `    
- select li.Brand,li.Dealer,li.Location,mp.RuleID,r.Name,r.RuleDesc,r.[Rule],r.TrueOutput,r.FalseOutput from z_scope..AAP_RuleMapping mp
-Left join z_scope..AAP_RuleMaster r
-on mp.RuleID=r.id
-left join LocationInfo li
-on mp.LocationId=li.LocationID 
-        WHERE li.BrandId = @BrandId
-    `;
+        select li.Brand,li.Dealer,li.Location,mp.RuleID,r.Name,r.RuleDesc,r.[Rule],r.TrueOutput,r.FalseOutput from z_scope..AAP_RuleMapping mp
+        Left join z_scope..AAP_RuleMaster r on mp.RuleID=r.id
+        left join LocationInfo li on mp.LocationId=li.LocationID 
+        WHERE li.BrandId = @BrandId`;
+        
         const request = pool.request().input("BrandId", BrandId);
 
         if (LocationId) {
