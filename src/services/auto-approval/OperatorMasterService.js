@@ -9,8 +9,8 @@ export const getOperator = async () => {
        select Operator from autoapproval..OperatorMaster
       `);
        const data=result.recordset;
-        return {data}
+       return data;
     } catch (err) {
-        throw new ApiError(500, err.message);
+        throw new ApiError(err.statuscode || 500, err.message || "server error");
     }
 };

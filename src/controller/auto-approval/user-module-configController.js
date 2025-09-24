@@ -3,9 +3,10 @@ import {
   updateModuleViewConfig,
 } from "../../services/auto-approval/user-module-configService.js";
 import { ApiError } from "../../utils/ApiError.js";
+import { ApiResponse } from "../../utils/ApiResponse.js";
 
 
-const addModuleViewConfig = async (req, res, next) => {
+const addModuleViewConfig = async (req, res) => {
   try {
     const { userId, moduleId, columns } = req.body;
 
@@ -13,14 +14,18 @@ const addModuleViewConfig = async (req, res, next) => {
       throw new ApiError(400, "userId, moduleId and columns[] are required");
     }
 
-    const result = await insertModuleViewConfig(userId,moduleId, columns);
-    res.status(201).json({ success: true, ...result });
+    const data = await insertModuleViewConfig(userId,moduleId, columns);
+    res
+        .status(200)
+      .json(new ApiResponse(200, data, "column list inserted successfully"));
   } catch (err) {
-    next(err);
+    res
+      .status(err.statusCode || 500)
+      .json(new ApiError(err.statusCode || 500, err.message || "internal server error", [], ""))
   }
 };
 
-const modifyModuleViewConfig = async (req, res, next) => {
+const modifyModuleViewConfig = async (req, res) => {
   try {
     const { userId, moduleId, columns } = req.body;
 
@@ -28,10 +33,14 @@ const modifyModuleViewConfig = async (req, res, next) => {
       throw new ApiError(400, "userId, moduleId and columns[] are required");
     }
 
-    const result = await updateModuleViewConfig(userId, moduleId, columns);
-    res.status(200).json({ success: true, ...result });
+    const data = await updateModuleViewConfig(userId, moduleId, columns);
+   res
+        .status(200)
+      .json(new ApiResponse(200, data, "column list modified successfully"));
   } catch (err) {
-    next(err);
+    res
+      .status(err.statusCode || 500)
+      .json(new ApiError(err.statusCode || 500, err.message || "internal server error", [], ""))
   }
 };
 
