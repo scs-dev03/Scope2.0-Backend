@@ -154,15 +154,15 @@ const partStock = async (req, res) => {
         const times = [];
 
         const s1 = t(); const p1 = partInfo(brandid, partnumber).finally(() => times.push({ label: 'partInfo', ms: +(t() - s1).toFixed(2) }));
-        const s2 = t(); const p2 = reservedForVehicle(dealerid,locationid, partnumber).finally(() => times.push({ label: 'reservedForVehicle', ms: +(t() - s2).toFixed(2) }));
+        const s2 = t(); const p2 = reservedForVehicle(dealerid, locationid, partnumber).finally(() => times.push({ label: 'reservedForVehicle', ms: +(t() - s2).toFixed(2) }));
         const s3 = t(); const p3 = groupStock(brandid, dealerid, locationid, partnumber).finally(() => times.push({ label: 'groupStock', ms: +(t() - s3).toFixed(2) }));
         const s4 = t(); const p4 = singlePartMaxByLocationService(brandid, dealerid, locationid, partnumber).finally(() => times.push({ label: 'singlePartMaxByLocation', ms: +(t() - s4).toFixed(2) }));
 
         const [data, data2, data3, data4] = await Promise.all([p1, p2, p3, p4]);
 
         times.sort((a, b) => b.ms - a.ms);
-        console.table(times);
-        console.log('Slowest:', times[0]);
+        // console.table(times);
+        // console.log('Slowest:', times[0]);
         // const [data, data2, data3, data4] = await Promise.allSettled([
         //     partInfo(brandid,partnumber),
         //     reservedForVehicle(dealerid, partnumber),
