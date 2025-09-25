@@ -3,7 +3,7 @@ import { getPool1 } from "../../db/db.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { trace } from "console";
 
-export const insertTemplate = async (name, TempDesc, Template, createdBy) => {
+export const insertTemplate = async (name, TempDesc, Template, createdBy, trueOutput, falseOutput, trueRemark, falseRemark) => {
     const pool = await getPool1();
     const transaction = pool.transaction();
     try {
@@ -25,9 +25,13 @@ export const insertTemplate = async (name, TempDesc, Template, createdBy) => {
             .input("tempDesc", TempDesc)
             .input("Template", Template)
             .input("createdBy", createdBy)
+            .input("trueOutput",trueOutput)
+            .input("falseOutput",falseOutput)
+            .input("trueRemark",trueRemark)
+            .input("falseRemark",falseRemark)
             .query(`
-        INSERT INTO z_scope..aap_ruletemplate ([Name],[TempDesc],[Template],[CreatedBy])
-VALUES (@name, @tempDesc, @Template, @createdBy)
+        INSERT INTO z_scope..aap_ruletemplate ([Name],[TempDesc],[Template],[CreatedBy],[trueOutput],[falseOutput],[trueRemark],[falseRemark])
+VALUES (@name, @tempDesc, @Template, @createdBy, @trueOutput, @falseOutput, @trueRemark, @falseRemark)
       `);
         if (result.rowsAffected[0] === 0) {
             throw new ApiError(404, `Failed to create the template:${result}`);
@@ -40,7 +44,7 @@ VALUES (@name, @tempDesc, @Template, @createdBy)
     }
 };
 
-export const updateTemplate = async (templateId, name, tempDesc, template, createdBy, status) => {
+export const updateTemplate = async (templateId, name, tempDesc, template, createdBy, status,trueOutput,falseOutput,trueRemark,falseRemark) => {
     try {
         const pool = await getPool1();
         const duplicateCheck = await pool.request()
@@ -76,7 +80,11 @@ SET
     TempDesc = COALESCE(@tempDesc, TempDesc),
     Template = COALESCE(@template, Template),
     CreatedBy= COALESCE(@createdBy, CreatedBy),
-    Status   = COALESCE(@status, Status)
+    Status   = COALESCE(@status, Status),
+    TrueOutput= COALESCE(@trueOutput, TrueOutput),
+    FalseOutput= COALESCE(@falseOutput, FalseOutput),
+    TrueRemark=  COALESCE(@trueRemark, TrueRemark),
+    FalseRemark= COALESCE(@falseRemark, FalseRemark)
 WHERE Id = @templateId
     `;
         const result = await pool.request()
@@ -86,6 +94,10 @@ WHERE Id = @templateId
             .input("template", template)
             .input("createdBy", createdBy)
             .input("status", status)
+            .input("trueOutput",trueOutput)
+            .input("falseOutput",falseOutput)
+            .input("trueRemark",trueRemark)
+            .input("falseRemark",falseRemark)
             .query(query);
         if (result.rowsAffected[0] === 0) {
             throw new ApiError(404, "No tempalte exists for this template id");
@@ -234,7 +246,8 @@ export const updateRule = async (ruleId, name, description, expression, trueOutp
     }
 };
 
-export const insertRuleMapping = async (BrandId, RuleId, CreatedBy, DealerId = null, LocationId = null) => {
+export const insertRuleMapping = async (BrandId, RuleId, CreatedBy, DealerId, LocationId) => {
+
     const pool = await getPool1();
     const transaction = pool.transaction();
     try {
@@ -605,7 +618,34 @@ export const fetchPriorityMappings = async (LocationId) => {
         `);
         return result.recordset;
     } catch (err) {
-        throw new ApiError(500, err.message);
+        throw new ApiError(err.statusCode || 500, err.message || "internal server error");
     }
 };
+
+export const fetchAllRules = async () => {
+    try {
+        const pool = await getPool1();
+        const result = await pool.request()
+            .query(`
+           select Id,Name from z_scope..AAP_RuleMaster
+        `);
+        return result.recordset;
+    } catch (err) {
+        throw new ApiError(err.statusCode || 500, err.message || "internal server error");
+    }
+};
+
+export const fetchRuleOutput = async () => {
+    try {
+        const pool = await getPool1();
+        const result = await pool.request()
+            .query(`
+           select Id,Condition from z_scope..AAP_RuleOutput
+        `);
+        return result.recordset;
+    } catch (err) {
+        throw new ApiError(err.statusCode || 500, err.message || "internal server error");
+    }
+};
+
 
