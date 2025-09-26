@@ -31,5 +31,3 @@ app.use("/api/v1", aaproutes)
 
 
 export { app }
-
-

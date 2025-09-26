@@ -33,7 +33,7 @@ const partInfo = async (brandid, partnumber) => {
   }
 }
 
-const reservedForVehicle = async (dealerid,locationid, partnumber) => {
+const reservedForVehicle = async (dealerid, locationid, partnumber) => {
   try {
     const pool = await getPool2()
     // const query = ` use z_scope
@@ -84,7 +84,7 @@ const groupStock = async (brandid, dealerid, locationid, partnumber) => {
 
 		select l.bigid LocationID ,l.work_location location ,a.Stockdate,isnull(a.Qty,0) GroupStock 
 		from Dealer_Workshop_Master l (nolock)
-		left join (select cs1.LocationID , sum(cs2.Qty)Qty , cs1.StockDate from @Part p
+		 join (select cs1.LocationID , sum(cs2.Qty)Qty , cs1.StockDate from @Part p
 		left join  CurrentStock2 cs2 (nolock) on cs2.PartNumber = p.partnumber
 		left join CurrentStock1 cs1 on cs1.tCode = cs2.StockCode
 		group by  cs1.LocationID ,cs1.Stockdate
@@ -492,7 +492,7 @@ const locationwisePPNIValueService = async (dealerid, jobcardstatus, nonstockabl
     		  FROM z_scope..Create_Order_Request_TD001_${dealerid} A
     		  INNER JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
     		  INNER  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
-    		  where Type='V'  
+    		  where Type='V' and A.current_status<>'Close'
     		  )
     Select A.LocationId , B.Location , B.Advisor , isnull(SUM(B.PPNI_Val),0) PPNI_Value 
     from T1 A 
@@ -582,7 +582,7 @@ const advisorwisePPNIValueService = async (dealerid, locationid, jobcardstatus, 
       		  FROM z_scope..Create_Order_Request_TD001_${dealerid} A
       		  INNER JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
       		  INNER  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
-      		  where Type='V' and A.locationid = ${locationid}
+      		  where Type='V' and A.locationid = ${locationid} and A.current_status<>'Close'
       		  )
       Select  B.Advisor , isnull(SUM(B.PPNI_Val),0) PPNI_Value
       from T1 A 
@@ -726,7 +726,7 @@ declare @All_Time_NonStck varchar(50) = ${nonstockableSQL};
 		  INNER JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
 		  INNER  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
 		  where A.Locationid = ${locationid}
-		  AND Type='V' 
+		  AND Type='V' and A.current_status<>'Close'
 		  )
 SELECT count(a.Vehiclenumber) over() as TotalCount,A.DealerId,A.LocationId,A.Vehiclenumber,
 SUM(B.PPNI_Val) PPNI_Value,
@@ -952,10 +952,10 @@ Declare @locationid int = ${locationid},
 ;WITH T1 AS
 		(
 		  SELECT A.Part_Number1,C.Qty,A.Current_status,A.LocationID,A.Dealerid,A.BIGID ,A.JobLineCloseDate  
-		  FROM z_scope..Create_Order_Request_TD001_8 A
+		  FROM z_scope..Create_Order_Request_TD001_${dealerid} A
 		  LEFT JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
 		  LEFT  JOIN z_scope..CurrentStock2 C ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
-		  where Type='V'  
+		  where Type='V' and A.current_status<>'Close'
 		  )
 	select CONCAT(MONTH(dateadded), '-', YEAR(dateadded)) AS [Date] ,
 	SUM(ppni_val) AS PPNI_val,

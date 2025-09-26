@@ -185,12 +185,18 @@ const uploadSchedule = async (req, res) => {
     const {dashboardcodes, brandid, brand, dealer, dealerid, scheduledon, addedby } = req.body;    
      // Validate other required fields
      if (!brandid || !brand || !dealer || !dealerid || !scheduledon || !dashboardcodes) {
-       console.log(`all fields are required`);
       return res.status(400).json({ error: "All fields are required." });
       
     }
+    const Block_Dealers = [20305,20538,21432,20670,13,20260,20486,20366,20280,8,
+      "20305","20538","21432","20670","13","20260","20486","20366","20280","8"
+    ];
+    if(Block_Dealers.includes(dealerid)){
+      return res.status(400).json({message:`Blocked from Scheduling Dashboard`})
+    }
+
     if(!addedby){
-      console.log(`Userid is required`);
+      // console.log(`Userid is required`);
       
      return res.status(400).send(`Userid is Required`)
     }
