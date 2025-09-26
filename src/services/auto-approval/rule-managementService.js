@@ -34,7 +34,7 @@ export const insertTemplate = async (name, TempDesc, Template, createdBy, trueOu
 VALUES (@name, @tempDesc, @Template, @createdBy, @trueOutput, @falseOutput, @trueRemark, @falseRemark)
       `);
         if (result.rowsAffected[0] === 0) {
-            throw new ApiError(404, `Failed to create the template:${result}`);
+            throw new ApiError(500, `Failed to create the template:${result}`);
         }
         await transaction.commit();
         return result.recordset;

@@ -24,7 +24,7 @@ const addTemplate = async (req, res) => {
     if (!name || !tempDesc || !template || !createdBy || !trueOutput || !falseOutput || trueRemark===undefined ||falseRemark===undefined) {
       return res
         .status(400)
-        .json(new ApiError(400, "name, TempDesc, Template, createdBy, trueOutput, falseOutput, trueRemark, falseRemark are compulsory", [], ""));
+        .json(new ApiError(400, "name, tempDesc, template, createdBy, trueOutput, falseOutput, trueRemark, falseRemark are compulsory", [], ""));
     }
 
     const data = await insertTemplate(name, tempDesc, template, createdBy, trueOutput, falseOutput, trueRemark, falseRemark);
@@ -106,7 +106,7 @@ const addRule = async (req, res) => {
     ) {
       return res
         .status(400)
-        .json(new ApiError(400, "LocationId, name, description, expression, output, trueRemark, falseRemark and createdBy are compulsory", [], ""));
+        .json(new ApiError(400, "LocationId, name, description, expression, trueOutput, falseOutput, trueRemark, falseRemark and createdBy are compulsory", [], ""));
     }
 
     const data = await insertRule(LocationId, name, description, expression, trueOutput, falseOutput, createdBy, trueRemark, falseRemark);
@@ -149,7 +149,7 @@ const modifyRule = async (req, res) => {
     ) {
       return res
         .status(400)
-        .json(new ApiError(400, "ruleId,name,description,expression,trueOutput,falseOutput,createdBy,trueRemark,falseRemark is mandatory for updating", [], ""));
+        .json(new ApiError(400, "ruleId,name,description,expression,trueOutput,falseOutput,trueRemark,falseRemark is mandatory for updating", [], ""));
     }
 
     const data = await updateRule(ruleId, name, description, expression, trueOutput, falseOutput, trueRemark, falseRemark);
@@ -296,7 +296,7 @@ const getRuleMappings = async (req, res) => {
     if (!BrandId || DealerId===undefined || LocationId===undefined) {
       return res
         .status(400)
-        .json(new ApiError(400, "BrandId is mandatory for fetching rule mappings", [], ""));
+        .json(new ApiError(400, "BrandId, DealerId, LocationId is mandatory for fetching rule mappings", [], ""));
     }
 
     const data = await fetchRuleMappings(BrandId, LocationId, DealerId);
