@@ -2,15 +2,28 @@ import { getPool1 } from "../../db/db.js";
 import { ApiError } from "../../utils/ApiError.js";
 
 export const insertModuleViewConfig = async (userId, moduleId, columns) => {
-  if (!userId || !moduleId || !Array.isArray(columns)) {
-    throw new ApiError(400, "userId, moduleId and columns[] are required");
-  }
-
   const cols = JSON.stringify(columns);
-
   const pool = await getPool1();
+  const transaction=pool.transaction();
   try {
-    const result = await pool.request()
+    await transaction.begin();
+//     const useridForeignKeyCheckCheck = await transaction.request()
+//       .input("userId", userId)
+//       .query(
+//         `SELECT bintId_Pk 
+// FROM AdminMaster_GEN 
+// WHERE bintId_Pk = @userId
+// `
+//       )
+//     const moduleForeignKeyCheck = await transaction.request()
+//       .input("moduleId", moduleId)
+//       .query(
+//         `select * from Module_Master where id=@moduleId`
+//       )
+//     if (useridForeignKeyCheckCheck.recordset.length == 0 || moduleForeignKeyCheck.recordset.length == 0) {
+//       throw new ApiError(400, "invalid user id or module id");
+//     }
+    const result = await transaction.request()
       .input("userId", userId)
       .input("moduleId", moduleId)
       .input("columns", cols)
@@ -18,38 +31,53 @@ export const insertModuleViewConfig = async (userId, moduleId, columns) => {
         INSERT INTO AAP_ModuleViewConfig (columns, userId, moduleId)
         VALUES (@columns, @userId, @moduleId)
       `);
-
-    return { message: "Config inserted successfully" };
+    await transaction.commit();
+    return result.recordset;
   } catch (err) {
-    if (err.number === 2627) { 
-      throw new ApiError(400, "Config already exists for this user and module");
-    }
-    throw new ApiError(500, err.message);
+    await transaction.rollback();
+    throw new ApiError(err.statusCode || 500, err.message || "internal server error");
   }
 };
 
 export const updateModuleViewConfig = async (userId, moduleId, columns) => {
-  if (!userId || !moduleId || !Array.isArray(columns)) {
-    throw new ApiError(400, "userId, moduleId and columns[] are required");
-  }
+  try {
+    const cols = JSON.stringify(columns);
 
-  const cols = JSON.stringify(columns);
-
-  const pool = await getPool1();
-  const result = await pool.request()
-    .input("userId", userId)
-    .input("moduleId", moduleId)
-    .input("columns", cols)
-    .query(`
+    const pool = await getPool1();
+//     const useridForeignKeyCheckCheck = await pool.request()
+//       .input("userId", userId)
+//       .query(
+//         `SELECT bintId_Pk 
+// FROM AdminMaster_GEN 
+// WHERE bintId_Pk = @userId
+// `
+//       )
+//     const moduleForeignKeyCheck = await pool.request()
+//       .input("moduleId", moduleId)
+//       .query(
+//         `select * from Module_Master where id=@moduleId`
+//       )
+//     if (useridForeignKeyCheckCheck.recordset.length == 0 || moduleForeignKeyCheck.recordset.length == 0) {
+//       throw new ApiError(400, "invalid user id or module id");
+//     }
+    const result = await pool.request()
+      .input("userId", userId)
+      .input("moduleId", moduleId)
+      .input("columns", cols)
+      .query(`
       UPDATE AAP_ModuleViewConfig
       SET columns = @columns,
       updatedAt = GETDATE()
       WHERE userId = @userId AND moduleId = @moduleId
     `);
 
-  if (result.rowsAffected[0] === 0) {
-    throw new ApiError(404, "No existing config found for this user and module");
-  }
+    if (result.rowsAffected[0] === 0) {
+      throw new ApiError(404, "No existing config found for this user and module");
+    }
 
-  return { message: "Config updated successfully" };
+    return result.recordset;
+  }
+  catch (err) {
+    throw new ApiError(err.statusCode || 500, err.message || "internal server error")
+  }
 };
