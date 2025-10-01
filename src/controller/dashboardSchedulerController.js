@@ -188,12 +188,12 @@ const uploadSchedule = async (req, res) => {
       return res.status(400).json({ error: "All fields are required." });
       
     }
-    const Block_Dealers = [20305,20538,21432,20670,13,20260,20486,20366,20280,8,
-      "20305","20538","21432","20670","13","20260","20486","20366","20280","8"
-    ];
-    if(Block_Dealers.includes(dealerid)){
-      return res.status(400).json({message:`Blocked from Scheduling Dashboard`})
-    }
+    // const Block_Dealers = [20305,20538,21432,20670,13,20260,20486,20366,20280,8,
+    //   "20305","20538","21432","20670","13","20260","20486","20366","20280","8"
+    // ];
+    // if(Block_Dealers.includes(dealerid)){
+    //   return res.status(400).json({message:`Blocked from Scheduling Dashboard`})
+    // }
 
     if(!addedby){
       // console.log(`Userid is required`);
