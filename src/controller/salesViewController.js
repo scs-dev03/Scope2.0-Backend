@@ -414,7 +414,7 @@ const partDetails = async (req, res) => {
  * Supports reading from body or Excel file
  */
 const getLedger = async (req, res) => {
-  const pool = await getPool1();
+  const pool = await getPool2();
   const { Brandid, Dealerid, Locationid, PartNumber, from, to, excel } = req.body;
   if(!Brandid || !Dealerid || !Locationid == null || !from || !to || !excel){
     return res.status(400).json({message:`All Fields are required`})

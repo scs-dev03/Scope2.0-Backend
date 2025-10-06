@@ -159,7 +159,7 @@ const userInfo = async (req, res) => {
       const completedata = result.recordset;
       const vcphoto = completedata.length > 0 ? completedata[0].vcphoto : null;
       const data = completedata.map(({ vcphoto, ...rest }) => rest);
-      res.status(200).json({vcphoto,data: data});
+      res.status(200).json({vcphoto,Data: data});
     }
   } catch (error) {
     res.status(500).json({ Error: error.message })
@@ -171,6 +171,15 @@ const homePageData = async (req, res) => {
   if (!locationId || !dealerid) {
     return res.status(400).json({ message: `locationId and dealerid are required` });
   }
+
+    const t = () => performance.now();
+  const times = [];
+  const timeRun = (label, runFn) => {
+    const start = t();
+    const p = runFn();
+    p.finally(() => times.push({ label, ms: +(t() - start).toFixed(2) }));
+    return p;
+  };
 
   try {
     const pool = await getPool2();
@@ -306,8 +315,14 @@ JOIN sn on sn.latest = s.latest
         EXEC sp_executesql @sql;
       `;
 
+    // const SixMonthLocationwiseSaleValue = await pool.request().query(SixMonthLocationwiseSaleValueQuery);
+        const sixStart = t();
     const SixMonthLocationwiseSaleValue = await pool.request().query(SixMonthLocationwiseSaleValueQuery);
+    times.push({ label: 'SixMonthSaleValue', ms: +(t() - sixStart).toFixed(2) });
 
+    // sort + log
+    times.sort((a, b) => b.ms - a.ms);
+    console.table(times);
     res.status(200).json({
       StockQty: stock.recordset,
       StockValue: stockValue.recordset,

@@ -873,7 +873,7 @@ const partwisePPNIValueService = async (dealerid, locationid, jobcardstatus, non
 		      INNER JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
 		      INNER JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
 		      where A.Locationid = ${locationid} and Vehiclenumber = '${vehicleno}'
-		      AND Type='V'
+		      AND Type='V' and A.current_status<>'Close'
 		  )
 SELECT A.bigid,A.DealerId,A.LocationId,A.Vehiclenumber,A.Part_Number1 PartNumber,
  CASE WHEN b.PartNumber = sm.partnumber1 then sm.subpartnumber1 else b.PartNumber end as Latest,
