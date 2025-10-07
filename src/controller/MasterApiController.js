@@ -1,5 +1,6 @@
 import sql from 'mssql'
 import { getPool1, getPool2 } from '../db/db.js'
+import { jobcardDate, lastOrderValue, ppniValue, SixMonthLocationwiseSaleValue, snstockValue, stockQty, stockValue } from '../services/MasterApi/MasterApiService.js';
 
 const getBrands = async (req, res) => {
   try {
@@ -159,7 +160,7 @@ const userInfo = async (req, res) => {
       const completedata = result.recordset;
       const vcphoto = completedata.length > 0 ? completedata[0].vcphoto : null;
       const data = completedata.map(({ vcphoto, ...rest }) => rest);
-      res.status(200).json({vcphoto,Data: data});
+      res.status(200).json({ vcphoto, Data: data });
     }
   } catch (error) {
     res.status(500).json({ Error: error.message })
@@ -171,15 +172,6 @@ const homePageData = async (req, res) => {
   if (!locationId || !dealerid) {
     return res.status(400).json({ message: `locationId and dealerid are required` });
   }
-
-    const t = () => performance.now();
-  const times = [];
-  const timeRun = (label, runFn) => {
-    const start = t();
-    const p = runFn();
-    p.finally(() => times.push({ label, ms: +(t() - start).toFixed(2) }));
-    return p;
-  };
 
   try {
     const pool = await getPool2();
@@ -316,13 +308,7 @@ JOIN sn on sn.latest = s.latest
       `;
 
     // const SixMonthLocationwiseSaleValue = await pool.request().query(SixMonthLocationwiseSaleValueQuery);
-        const sixStart = t();
-    const SixMonthLocationwiseSaleValue = await pool.request().query(SixMonthLocationwiseSaleValueQuery);
-    times.push({ label: 'SixMonthSaleValue', ms: +(t() - sixStart).toFixed(2) });
 
-    // sort + log
-    times.sort((a, b) => b.ms - a.ms);
-    console.table(times);
     res.status(200).json({
       StockQty: stock.recordset,
       StockValue: stockValue.recordset,
@@ -330,7 +316,7 @@ JOIN sn on sn.latest = s.latest
       SNStockValue: [{ StockableValue: a, NonStockableValue: b - a }],
       lastOrderDetails: lastOrderValue.recordset,
       JobCardDate: lastjobcard.recordset,
-      SixMonthSaleValue: SixMonthLocationwiseSaleValue.recordset
+      // SixMonthSaleValue: SixMonthLocationwiseSaleValue.recordset
     });
 
   } catch (error) {
@@ -338,7 +324,6 @@ JOIN sn on sn.latest = s.latest
     res.status(500).json({ message: error.message });
   }
 };
-
 
 const latestDates = async (req, res) => {
   try {
@@ -454,7 +439,7 @@ const getUserModules = async (req, res) => {
       let current = moduleMap.get(moduleId);
       while (current) {
         needed.set(current.id, current);
-        if (current.parentId === 0) break; 
+        if (current.parentId === 0) break;
         current = moduleMap.get(current.parentId);
       }
     }
@@ -482,7 +467,7 @@ const getUserModules = async (req, res) => {
             label: m.label,
             type: m.type,
             route: m.route,
-            icon:m.icon,
+            icon: m.icon,
             order: m.order,
             badge: m.badge,
             roles: {
@@ -506,4 +491,74 @@ const getUserModules = async (req, res) => {
   }
 };
 
-export { pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules }
+// const spmhomepage = async (req,res)=>{
+//   const { locationId, dealerid } = req.body;
+//   if (!locationId || !dealerid) {
+//     return res.status(400).json({ message: `locationId and dealerid are required` });
+//   }
+
+//   const [data, data2, data3, data4, data5, data6 , data7] = await Promise.all([
+//             stockQty(locationId),
+//             stockValue(locationId),
+//             ppniValue(dealerid,locationId),
+//             snstockValue(dealerid,locationId),
+//             lastOrderValue(dealerid,locationId),
+//             jobcardDate(dealerid,locationId),
+//             SixMonthLocationwiseSaleValue(dealerid,locationId)
+//         ]);
+
+// }
+
+const spmhomepage = async (req, res) => {
+  const { locationId, dealerid } = req.body;
+  if (!locationId || !dealerid) {
+    return res.status(400).json({ message: `locationId and dealerid are required` });
+  }
+
+  const t = () => performance.now();
+  const times = [];
+
+  try {
+    const s1 = t(); const p1 = stockQty(locationId)
+      .finally(() => times.push({ label: 'stockQty', ms: +(t() - s1).toFixed(2) }));
+
+    const s2 = t(); const p2 = stockValue(locationId)
+      .finally(() => times.push({ label: 'stockValue', ms: +(t() - s2).toFixed(2) }));
+
+    const s3 = t(); const p3 = ppniValue(dealerid, locationId)
+      .finally(() => times.push({ label: 'ppniValue', ms: +(t() - s3).toFixed(2) }));
+
+    const s4 = t(); const p4 = snstockValue(dealerid, locationId)
+      .finally(() => times.push({ label: 'snstockValue', ms: +(t() - s4).toFixed(2) }));
+
+    const s5 = t(); const p5 = lastOrderValue(dealerid, locationId)
+      .finally(() => times.push({ label: 'lastOrderValue', ms: +(t() - s5).toFixed(2) }));
+
+    const s6 = t(); const p6 = jobcardDate(dealerid, locationId)
+      .finally(() => times.push({ label: 'jobcardDate', ms: +(t() - s6).toFixed(2) }));
+
+    const s7 = t(); const p7 = SixMonthLocationwiseSaleValue(dealerid, locationId)
+      .finally(() => times.push({ label: 'SixMonthLocationwiseSaleValue', ms: +(t() - s7).toFixed(2) }));
+
+    const [data, data2, data3, data4, data5, data6, data7] = await Promise.allSettled([p1, p2, p3, p4, p5, p6, p7]);
+
+    times.sort((a, b) => b.ms - a.ms);
+    // console.table(times);
+    // console.log('Slowest:', times[0]);
+
+    return res.status(200).json({
+      StockQty: data.value,
+      StockValue: data2.value,
+      PPNIValue: data3.value,
+      SNStockValue: data4.value,
+      lastOrderDetails: data5.value,
+      JobCardDate: data6.value,
+      SixMonthSaleValue: data7.value
+    });
+  } catch (err) {
+    console.error('Error in spmhomepage:', err);
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+export { spmhomepage, pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules }

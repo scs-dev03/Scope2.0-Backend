@@ -1,46 +1,3 @@
-// import sql from 'mssql'
-// import "dotenv/config"
-// const config1 = {
-
-//     server: process.env.SERVER,    // SQL Server hostname or IP address
-//     database: process.env.DATABASE,    // Your database name
-//     user: process.env.USER,                // SQL Server login username
-//     password: process.env.PASSWORD,
-//     port:Number(process.env.DB_PORT),        // SQL Server login password
-//     options: {
-//         encrypt: false,           // Disable encryption for local servers
-//         enableArithAbort: true ,
-//         trustServerCertificate: true,  // Helps with certain SQL Server errors
-//     },
-//     requestTimeout: 6000000, // 30 seconds
-//     connectionTimeout: 30000, // 30 seconds
-// };
- 
-// let pool;
-// const connectDB = async()=>{
-// pool = await new sql.connect(config1)
-// // .connect()
-// .then(pool => {
-//     console.log(`Connected to ${process.env.SERVER} Server`);
-//     return pool;
-// })
-// .catch(err => {
-//     console.error('Database connection failed!', err);
-//     throw err;
-// });
-// };
-
-
-// const getPool1 = () => {
-//   if (!pool) {
-//       throw new Error("Database connection is not established yet");
-//   }
-//   return pool;
-// };
-
-// export {connectDB,getPool1};
-
-
 import sql from 'mssql'
 import "dotenv/config"
 
@@ -79,52 +36,6 @@ const config2 = {
     connectionTimeout: 30000,
 };
 
-// const config3 = {
-//     server: process.env.SERVER3,
-//     database: process.env.DATABASE3,
-//     user: process.env.USER3,
-//     password: process.env.PASSWORD3,
-//     // port: Number(process.env.DB_PORT3),
-//     options: {
-//         encrypt: false,
-//         enableArithAbort: true,
-//         trustServerCertificate: true,
-//     },
-//     requestTimeout: 6000000,
-//     connectionTimeout: 30000,
-// };
-
-
-// const config4 = {
-//     server: process.env.SERVER2,
-//     database: process.env.DATABASE4,
-//     user: process.env.USER2,
-//     password: process.env.PASSWORD2,
-//     // port: Number(process.env.DB_PORT3),
-//     options: {
-//         encrypt: false,
-//         enableArithAbort: true,
-//         trustServerCertificate: true,
-//     },
-//     requestTimeout: 6000000,
-//     connectionTimeout: 30000,
-// };
-
-// const ogysConfig = {
-//     server: process.env.OGYS_SERVER,
-//     database: process.env.OGYS_DATABASE,
-//     user: process.env.OGYS_USER,
-//     password: process.env.OGYS_PASSWORD,
-//     // port: Number(process.env.DB_PORT3),
-//     options: {
-//         encrypt: false,
-//         enableArithAbort: true,
-//         trustServerCertificate: true,
-//     },
-//     requestTimeout: 6000000,
-//     connectionTimeout: 30000,
-// };
-
 let pool1, pool2 , pool3,leadTimePool , pool4,ogysPool;
 
 const connectDB = async () => {
@@ -135,11 +46,6 @@ const connectDB = async () => {
         pool2 = await new sql.ConnectionPool(config2).connect();
         console.log(`Connected to DB2: ${process.env.SERVER2} using ${process.env.USER2}`);
 
-        // leadTimePool=await new sql.ConnectionPool(config1).connect();
-        // console.log(`Connected to ${process.env.DATABASE4}: ${process.env.SERVER2} using ${process.env.USER2}`);
-
-        // ogysPool= await new sql.ConnectionPool(config1).connect()
-        // console.log(`Ds Connected to Live: ${process.env.OGYS_SERVER} using ${process.env.OGYS_USER}`);
     } catch (err) {
         console.error("Database connection failed!", err);
         throw err;
@@ -156,10 +62,6 @@ const getPool2 = () => {
     return pool2;
 };
 
-// const DSpool = () => {
-//     if (!pool4) throw new Error("DB3 not connected");
-//     return pool4;
-// };
 
 const OgysPool = () => {
     if (!ogysPool) throw new Error("OGYS SERVER not connected");
