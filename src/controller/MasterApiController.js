@@ -37,7 +37,7 @@ const getLocation = async (req, res) => {
 }
 const getWorkspace = async (req, res) => {
   try {
-    const pool = getPool1();
+    const pool = getPool2();
     // const {dealerid} = req.body;
     const result = await pool.request().query(`select WorkspaceID, Workspace from UAD_BI..SBS_DBS_WorkspaceMaster`)
     res.status(200).json(result.recordset)

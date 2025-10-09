@@ -1,11 +1,10 @@
 import { partBrandMapping, partfamilySaleservice, partFamilyService, singlePartMaxByLocationService } from "../../services/norms-management/utils.service.js";
 import { orderDetailsByPartnumberService, transformOrderData } from "../../services/orderDetails/orderDetailsService.js";
 import { partDetailsservice } from "../../services/salesview/salesviewservices.js";
-import { advisorwisePPNIValueService, groupStock, gainerListingService, jobCardByVehicleService, locationwisePPNIValueService, partInfo, partsByJobCardService, partSubstituteDetailService, partwisePPNIValueService, PPNIVALUE12MonthsService, reservedForVehicle, userroleService, vehicleSearchService, vehiclewisePPNIValueService, predictiveVehicleSearchService, vehicledealercheck, groupNorms, partfamilywiseStockColor, vehicleScore, vehicleSearchPagination, vehicleSearchlogsService, viewLogService } from "../../services/dealerMonitoring/dealerMonitoringService.js";
-import { getPool2 } from "../../db/db.js";
-import { partFamily } from "../vonController.js";
-import { partBrandCheck } from "../../utils/vonHelper.js";
+import { advisorwisePPNIValueService, groupStock, gainerListingService, jobCardByVehicleService, locationwisePPNIValueService, partInfo, partsByJobCardService, partSubstituteDetailService, partwisePPNIValueService, PPNIVALUE12MonthsService, reservedForVehicle, userroleService, vehicleSearchService, vehiclewisePPNIValueService, predictiveVehicleSearchService, vehicledealercheck, groupNorms, partfamilywiseStockColor, vehicleScore, vehicleSearchPagination, vehicleSearchlogsService, viewLogService, vehicleSearchConsentService } from "../../services/dealerMonitoring/dealerMonitoringService.js";
 import { performance } from 'node:perf_hooks';
+import { ApiError } from "../../utils/ApiError.js";
+import { ApiResponse } from "../../utils/ApiResponse.js";
 
 // import { transformOrderData } from "../../services/orderDetails/orderDetailsService.js";
 
@@ -553,4 +552,22 @@ const viewLog = async (req, res) => {
         res.status(500).json({ Error: error.message })
     }
 }
-export { gainerListing, partSale, partDetails, singlePartMaxByLocation, orderDetailsByPartnumber, partStock, vehicleSearch, partSearch, substituteParts, userRole, locationwisePPNIValue, advisorwisePPNIValue, vehiclewisePPNIValue, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, vehicleSearchLogs, viewLog }
+
+const vehicleSearchConsent = async(req,res)=>{
+try {
+        const {vehiclenumber , dealerid , locationid , userId} = req.body
+        if(!vehiclenumber || !dealerid || !locationid || !userId){
+            return res.status(400).json(new ApiError(400,`vehiclenumber , dealerid , locationid , userId is Required`,[],``))
+        }
+        const result = await vehicleSearchConsentService(vehiclenumber , dealerid , locationid , userId)
+        
+        if(result.rowsAffected[0] > 0){
+            return res.status(200).json(new ApiResponse(204,[],'Consent Recorded Successfully'))
+        }
+        res.status(500).json(new ApiError(500,'Unable to Record the Consent',[],''))
+    }
+ catch (error) {
+    res.status(500).json(new ApiError(500,`Unexpected error while recording consent`,[]))    
+}
+}
+export { vehicleSearchConsent,gainerListing, partSale, partDetails, singlePartMaxByLocation, orderDetailsByPartnumber, partStock, vehicleSearch, partSearch, substituteParts, userRole, locationwisePPNIValue, advisorwisePPNIValue, vehiclewisePPNIValue, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, vehicleSearchLogs, viewLog }

@@ -1,5 +1,6 @@
 import { getPool2 } from "../../db/db.js";
 import sql from 'mssql'
+import { ApiError } from "../../utils/ApiError.js";
 const partInfo = async (brandid, partnumber) => {
   try {
     const pool = await getPool2()
@@ -1429,4 +1430,24 @@ const viewLogService = async (type, partnumber, vehiclenumber, from, to) => {
   return result
 
 }
-export { vehicleSearchPagination, vehicleScore, partfamilywiseStockColor, groupNorms, vehicledealercheck, PPNIVALUE12MonthsService, userroleService, partInfo, reservedForVehicle, groupStock, jobCardByVehicleService, partsByJobCardService, partSubstituteDetailService, locationwisePPNIValueService, advisorwisePPNIValueService, vehiclewisePPNIValueService, partwisePPNIValueService, vehicleSearchService, gainerListingService, predictiveVehicleSearchService, vehicleSearchlogsService, viewLogService }
+
+const vehicleSearchConsentService = async(vehiclenumber , dealerid , locationid , userId)=>{
+try {
+    const pool = await getPool2()
+    const query = `
+     use z_scope
+     insert into vehicleremark (dealerId , LocationId , vehicleno , createdby)
+    values(@dealerId,@LocationId,@vehicleno,@userId)`
+
+    const result = await pool.request()
+    .input('dealerId',sql.Int,dealerid)
+    .input('LocationId',sql.Int,locationid)
+    .input('vehicleno',sql.VarChar,vehiclenumber)
+    .input('userId',sql.Int,userId)
+    .query(query)
+    return result
+} catch (error) {
+  throw new ApiError(500,'Unable to log the consent')
+}
+}
+export { vehicleSearchConsentService,vehicleSearchPagination, vehicleScore, partfamilywiseStockColor, groupNorms, vehicledealercheck, PPNIVALUE12MonthsService, userroleService, partInfo, reservedForVehicle, groupStock, jobCardByVehicleService, partsByJobCardService, partSubstituteDetailService, locationwisePPNIValueService, advisorwisePPNIValueService, vehiclewisePPNIValueService, partwisePPNIValueService, vehicleSearchService, gainerListingService, predictiveVehicleSearchService, vehicleSearchlogsService, viewLogService }
