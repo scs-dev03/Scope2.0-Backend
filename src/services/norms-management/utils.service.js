@@ -129,7 +129,7 @@ select ISNULL(@latestpart,@InputPart)
 select sn.Maxvalue , sn.partnumber1 
 from z_scope..Stockable_Nonstockable_TD001_${dealerid} sn
 join #part pf on pf.part = sn.partnumber1 
-where sn.Stockdate = (select MAX(stockdate) from Stockable_Nonstockable_TD001_${dealerid} where locationid = @InputLocationID) and sn.locationid = @InputLocationID
+where sn.Stockdate = (select MAX(stockdate) from Stockable_Nonstockable_TD001_${dealerid} where locationid = @InputLocationID  and addedby <> 7) and sn.locationid = @InputLocationID and addedby <> 7
 group by  sn.Maxvalue , sn.partnumber1
 
 select cs2.Qty,cs2.PartNumber  from #part pf 
