@@ -1,146 +1,250 @@
 import { readExcel } from "../../utils/vonHelper.js";
-import {insertApprovals , insertSpmParty , insertadvisorParty} from "../../services/auto-approval/spm-InsertionService.js"
+import { insertApprovals, insertSpmParty, insertadvisorParty } from "../../services/auto-approval/spm-InsertionService.js"
 import fs from 'fs'
 import { ApiResponse } from "../../utils/ApiResponse.js";
 import { ApiError } from "../../utils/ApiError.js";
-import { spmBulkCSUpload ,spmMultiCSUpload , spmBulkWSUpload, spmBulkVehicleUpload } from "../../services/auto-approval/spm-uploadService.js";
-import {partyNameCodeMapping} from '../../services/auto-approval/spm-uploadService.js'
+import { spmBulkCSUpload, spmMultiCSUpload, spmBulkWSUpload, spmBulkVehicleUpload, stockViewService, partyAlreadyExistsCheck, getduplicatesArray } from "../../services/auto-approval/spm-uploadService.js";
+import { partyNameCodeMapping } from '../../services/auto-approval/spm-uploadService.js'
+import { validateHeaders, findRowIssues, getDuplicatesByKey, getDuplicateGroups, normalizePartyRows, partyKey, isBlank } from '../../utils/validator.js';
 
+const stockuploadCs = async (req, res) => {
+  try {
+    const { LocationId, OrderType, PartyName, PartyCode, Bulk, userId } = req.body
+    const file = req.file
+    if (!file) {
+      return res.status(400).json(new ApiError(400, "" || "File Not Attached"));
+    }
+    if (!Bulk || !OrderType || !LocationId || !userId) {
+      return res.status(400).json(new ApiError(400, `Bulk , LocationId , userId and  OrderType is required`, [], ''))
+    }
+    if (Bulk == 1) {
+      try {
+        const data = await spmBulkCSUpload(LocationId, OrderType, file.path, userId)
 
-const stockuploadCs = async(req,res)=>{
-    try {
-      const {LocationId,OrderType , PartyName , PartyCode , Bulk ,userId  } = req.body
-      const file = req.file
-        if (!file) {
-          return res.status(400).json(new ApiError(400, "" || "File Not Attached"));
-        }
-      if(!Bulk || !OrderType || !LocationId || !userId){
-        return res.status(400).json(new ApiError(400,`Bulk , LocationId , userId and  OrderType is required`,[],''))
+        // await insertApprovals(data)
+        res.status(200).json(`Bulk Insertion Successful`)
+      } catch (error) {
+        return res.status(error.statusCode).json(error);
       }
-      if(Bulk == 1){
+    }
+    else {
       try {
-          const data = await spmBulkCSUpload(LocationId,OrderType , file.path , userId)
-          await insertApprovals(data)
-          res.status(200).json(`Bulk Insertion Successful`)
-        } catch (error) {
-          return res.status(error.statusCode).json(error);   
-        }
-      }
-    else{
-      try {
-        const data = await spmMultiCSUpload(LocationId,OrderType ,PartyName, file.path , userId)
-        await insertApprovals(data)
+        const data = await spmMultiCSUpload(LocationId, OrderType, PartyName, file.path, userId)
+
+        // await insertApprovals(data)
         res.status(200).json(`Multi Insertion Succesfull`)
       } catch (error) {
         return res.status(error.statusCode).json(error);
       }
     }
-    } catch (error) {
-       return res.status(error.statusCode).json(error); 
-    }
+  } catch (error) {
+    return res.status(error.statusCode).json(error);
+  }
 }
 
-const stockuploadWs = async(req,res)=>{
-try {
-    const {LocationId,OrderType,userId} = req.body
+const stockuploadWs = async (req, res) => {
+  try {
+    const { LocationId, OrderType, userId } = req.body
     const file = req.file
-        if (!file) {
-          return res.status(400).json(new ApiError(400, error?.message || "File Not Attached"));
-       }
-       if(!OrderType || !LocationId || !userId){
-        return res.status(400).json(new ApiError(400,`LocationId , userId and  OrderType is required`,[],''))
-      }
-      const data = await spmBulkWSUpload(LocationId,OrderType , file.path ,userId)
-      await insertApprovals(data)
-      res.status(200).json(`Bulk Insertion Successful`)
-} catch (error) {
-  return res.status(error.statusCode).json(error);
-}
-}
-
-const vehicleUpload = async(req,res)=>{
-try {
-      const file = req.file
-       if (!file) {
-          return res.status(400).json(new ApiError(400, error?.message || "File Not Attached"));
-      }
-      const {LocationId , userId} = req.body
-      if(!LocationId || !userId){
-      return res.status(400).json(new ApiError(400,`LocationId and userId  is required`,[],''))
-    }
-      const data = await spmBulkVehicleUpload(file.path,LocationId,userId)
-      await insertApprovals(data)
-      res.status(200).json(`Bulk Insertion Successful`)
-} catch (error) {
-  return res.status(error.statusCode).json(error);
-}
-}
-
-const spmPartyUpload = async(req,res)=>{
-try {
-    const file = req.file
-    const {LocationId , userId} = req.body
-    if(!file){
+    if (!file) {
       return res.status(400).json(new ApiError(400, error?.message || "File Not Attached"));
     }
-    if(!LocationId || !userId ){
-      return res.status(400).json(new ApiError(400, error?.message || "LocationId and userId Not Found"));
+    if (!OrderType || !LocationId || !userId) {
+      return res.status(400).json(new ApiError(400, `LocationId , userId and  OrderType is required`, [], ''))
     }
-    const {headers, data} = await readExcel(file.path)
-    fs.unlinkSync(file.path)
+    const data = await spmBulkWSUpload(LocationId, OrderType, file.path, userId)
+    await insertApprovals(data)
+    res.status(200).json(`Bulk Insertion Successful`)
+  } catch (error) {
+    return res.status(error.statusCode).json(error);
+  }
+}
 
-    const REQUIRED_HEADERS = ["PartyCode" , "PartyName"];
-    const missingHeaders = REQUIRED_HEADERS.filter(header=> !headers.includes(header))
-    if (missingHeaders.length > 0) {
-            return res.status(400).json({
-              message: "Missing headers or data",
-              missingHeaders
-            });
-          }
+const vehicleUpload = async (req, res) => {
+  try {
+    const file = req.file
+    if (!file) {
+      return res.status(400).json(new ApiError(400, error?.message || "File Not Attached"));
+    }
+    const { LocationId, userId } = req.body
+    if (!LocationId || !userId) {
+      return res.status(400).json(new ApiError(400, `LocationId and userId  is required`, [], ''))
+    }
+    const data = await spmBulkVehicleUpload(file.path, LocationId, userId)
+    await insertApprovals(data)
+    res.status(200).json(`Bulk Insertion Successful`)
+  } catch (error) {
+    return res.status(error.statusCode).json(error);
+  }
+}
 
-    const formattedData =  data.map(row => ({
+// const spmPartyUpload = async (req, res) => {
+//   try {
+//     const file = req.file
+//     const { LocationId, userId } = req.body
+//     if (!file) {
+//       return res.status(400).json(new ApiError(400, error?.message || "File Not Attached"));
+//     }
+//     if (!LocationId || !userId) {
+//       return res.status(400).json(new ApiError(400, error?.message || "LocationId and userId Not Found"));
+//     }
+//     const { headers, data } = await readExcel(file.path)
+//     fs.unlinkSync(file.path)
+
+//     const REQUIRED_HEADERS = ["PartyCode", "PartyName"];
+//     const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header))
+//     if (missingHeaders.length > 0) {
+//       return res.status(400).json({
+//         message: "Missing headers or data",
+//         missingHeaders
+//       });
+//     }
+
+//     console.log("data" ,data);
+//     const duplicate = await getduplicatesArray(data);
+//     console.log("duplicate", duplicate);
+
+
+//     const formattedData = data.map(row => ({
+//       ...row,
+//       LocationId,
+//       CreatedBy:userId
+//     }));
+//     // console.log(formattedData);
+
+//     const duplicates = await partyAlreadyExistsCheck(formattedData)
+//     if (duplicates.length != 0) {
+//       return res.status(400).json(new ApiError(400, `Some Records Already Exists`, duplicates))
+//     }
+
+//     // await insertSpmParty(formattedData);
+//     res.status(200).json(new ApiResponse(200, [], `Bulk Insertion Successfull`))
+//   } catch (error) {
+//     return res.status(error.statusCode).json(error);
+//   }
+// }
+
+const spmPartyUpload = async (req, res) => {
+  try {
+    const file = req.file;
+    const LocationId = Number(req.body.LocationId);
+    const userId = Number(req.body.userId);
+
+    if (!file) {
+      return res.status(400).json(new ApiError(400, "File not attached", []));
+    }
+    if (!Number.isInteger(LocationId) || !Number.isInteger(userId)) {
+      fs.unlinkSync(file.path);
+      return res.status(400).json(new ApiError(400, "LocationId and userId are required", []));
+    }
+
+    const REQUIRED_HEADERS = ["PartyCode", "PartyName"];
+    const { headers, data } = await readExcel(file.path);
+    fs.unlinkSync(file.path);
+
+    // 1) Header validation
+    const { ok: headersOk, missingHeaders } = validateHeaders(headers, REQUIRED_HEADERS);
+    if (!headersOk) {
+      return res.status(400).json(
+        new ApiError(400, "Missing headers", { missingHeaders }, "")
+      );
+    }
+
+    // 2) Normalize party rows (trim/cap lengths)
+    const normalized = normalizePartyRows(data);
+    console.log(`normalized`, normalized);
+
+    // 3) Row-level completeness (at least one of PartyCode/PartyName must be present)
+    //    If you want BOTH required, keep REQUIRED_HEADERS; if "at least one", do this:
+    const issues = normalized
+      .map((row, i) => {
+        const missing = [];
+        const bothNull = isBlank(row.PartyCode) && isBlank(row.PartyName);
+        if (bothNull) missing.push("PartyCode_or_PartyName");
+        return { index: i, missing, row };
+      })
+      .filter(x => x.missing.length);
+    console.log(`issues`, issues);
+
+    if (issues.length) {
+      return res.status(400).json(
+        new ApiError(400, "Data Incomplete", { missingRows: issues.map(x => x.row), issues }, "")
+      );
+    }
+
+    // 4) Duplicates within the uploaded file
+    const duplicateRows = getDuplicatesByKey(normalized, partyKey);
+    console.log(`duplicateRows`, duplicateRows);
+
+    if (duplicateRows.length) {
+      const duplicateGroups = getDuplicateGroups(normalized, partyKey);
+      return res.status(400).json(
+        new ApiError(400, "Duplicate PartyCode/PartyName pairs in file", { duplicateRows, duplicateGroups }, "")
+      );
+    }
+
+    // 5) Build DB payload
+    const formattedData = normalized.map(row => ({
       ...row,
       LocationId,
-      userId
-      }));
+      CreatedBy: userId
+    }));
+
+    // 6) Check duplicates against DB (existing rows)
+    const existing = await partyAlreadyExistsCheck(formattedData);
+    if (existing.length) {
+      return res.status(400).json(
+        new ApiError(400, "Some records already exist", existing, "")
+      );
+    }
+
+    // 7) Insert
     await insertSpmParty(formattedData);
-    res.status(200).json(new ApiResponse(200,[],`Bulk Insertion Successfull`))
-    } catch (error) {
-  return res.status(error.statusCode).json(error);
-}
-}
 
-const spmAdvisorUpload = async(req,res)=>{
-try {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, [], "Bulk insertion successful"));
+
+  } catch (error) {
+    const code = error?.statusCode || 500;
+    return res.status(code).json(
+      new ApiError(code, error?.message || "Something went wrong", error?.data || [], "")
+    );
+  }
+};
+
+
+const spmAdvisorUpload = async (req, res) => {
+  try {
     const file = req.file
-    const {LocationId, userId} = req.body
-    if(!LocationId || !userId ){
+    const { LocationId, userId } = req.body
+    if (!LocationId || !userId) {
       return res.status(400).json(new ApiError(400, error?.message || "LocationId and userId Not Found"));
     }
-    if(!file){
+    if (!file) {
       return res.status(400).json(new ApiError(400, error?.message || "File Not Attached"));
     }
-    const {headers, data} = await readExcel(file.path)
-    const REQUIRED_HEADERS = ["Advisor" , "PhoneNo" , "Email"];
-    const missingHeaders = REQUIRED_HEADERS.filter(header=> !headers.includes(header))
+    const { headers, data } = await readExcel(file.path)
+    const REQUIRED_HEADERS = ["Advisor", "PhoneNo", "Email"];
+    const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header))
     if (missingHeaders.length > 0) {
-          return res.status(400).json({
-            message: "Missing headers or data",
-            missingHeaders
-            });
-          }
+      return res.status(400).json({
+        message: "Missing headers or data",
+        missingHeaders
+      });
+    }
 
-    const formattedData =  data.map(row => ({
+    const formattedData = data.map(row => ({
       ...row,
       LocationId,
       userId
-      })); 
+    }));
 
     await insertadvisorParty(formattedData);
-    res.status(200).json(new ApiResponse(200,[],`Bulk Insertion Successfull`))
-    } catch (error) {
-  return res.status(error.statusCode).json(error);
-}
+    res.status(200).json(new ApiResponse(200, [], `Bulk Insertion Successfull`))
+  } catch (error) {
+    return res.status(error.statusCode).json(error);
+  }
 }
 
 const singleUploadCs = async (req, res) => {
@@ -153,19 +257,18 @@ const singleUploadCs = async (req, res) => {
     if (!LocationId || !OrderType || !PartyName || !PartNumber || !userId) {
       return res.status(400).json(new ApiError(400, 'LocationId, OrderType, PartyName, PartNumber and userId are required', [], ''));
     }
-  //Normal/Urgent/Co-Dealer/Transfer
-    if(!(OrderType == 'Normal' || OrderType == 'Urgent' || OrderType == 'Co-Dealer' ||OrderType == 'Transfer')){
-      return res.status(400).json(new ApiError(400, 'please enter a valid order type',['Normal','Co-Dealer','Urgent','Transfer']));
+    //Normal/Urgent/Co-Dealer/Transfer
+    if (!(OrderType == 'Normal' || OrderType == 'Urgent' || OrderType == 'Co-Dealer' || OrderType == 'Transfer')) {
+      return res.status(400).json(new ApiError(400, 'please enter a valid order type', ['Normal', 'Co-Dealer', 'Urgent', 'Transfer']));
     }
     const partyMappingData = await partyNameCodeMapping(LocationId);
     if (!Array.isArray(partyMappingData) || partyMappingData.length === 0) {
-      return res.status(400).json(new ApiError(400,`No Parties configured for Location ${LocationId}`));
+      return res.status(400).json(new ApiError(400, `No Parties configured for Location ${LocationId}`));
     }
 
     const norm = s => String(s ?? "").trim().toLowerCase();
     const idByName = new Map(partyMappingData.map(({ PartyName, Id }) => [norm(PartyName), Id]));
     const PartyId = idByName.get(norm(PartyName));
-    //console.log("Party mapping data:", partyMappingData);
     if (!PartyId) {
       return res.status(400).json(new ApiError(400, `No party found matching PartyName='${PartyName}' for Location ${LocationId}`));
     }
@@ -181,7 +284,6 @@ const singleUploadCs = async (req, res) => {
       UploadedBy: userId ? parseInt(userId, 10) : null
     };
 
-    // console.log("Row being inserted:", row);
     const result = await insertApprovals([row]);
     return res.status(200).json({ message: 'Single Insertion Successful', result });
   } catch (error) {
@@ -206,8 +308,8 @@ const stockuploadWsSingle = async (req, res) => {
       );
     }
     //Normal/Urgent/Co-Dealer/Transfer
-    if(!(OrderType == 'Normal' || OrderType == 'Urgent' || OrderType == 'Co-Dealer' ||OrderType == 'Transfer')){
-      return res.status(400).json(new ApiError(400, 'please enter a valid(Normal/Urgent/Co-Dealer/Transfer) order type',['Normal','Co-Dealer','Urgent','Transfer']));
+    if (!(OrderType == 'Normal' || OrderType == 'Urgent' || OrderType == 'Co-Dealer' || OrderType == 'Transfer')) {
+      return res.status(400).json(new ApiError(400, 'please enter a valid(Normal/Urgent/Co-Dealer/Transfer) order type', ['Normal', 'Co-Dealer', 'Urgent', 'Transfer']));
     }
     const formattedData = {
       PartNumber,
@@ -219,7 +321,7 @@ const stockuploadWsSingle = async (req, res) => {
       UploadedBy: userId,
     };
 
-    await insertApprovals([formattedData]); 
+    await insertApprovals([formattedData]);
     res.status(200).json("Single Insertion Successful");
   } catch (error) {
     return res.status(error.statusCode || 500).json(error);
@@ -250,7 +352,7 @@ const vehicleUploadSingle = async (req, res) => {
       );
     }
 
-    const REQUIRED_ALWAYS = ["VehicleNumber","VehicleModel","JobType","Advisor","OrderType","PartNumber","Qty"];
+    const REQUIRED_ALWAYS = ["VehicleNumber", "VehicleModel", "JobType", "Advisor", "OrderType", "PartNumber", "Qty"];
     const missing = REQUIRED_ALWAYS.filter(field => !req.body[field]);
     if (missing.length) {
       return res.status(400).json(
@@ -266,7 +368,7 @@ const vehicleUploadSingle = async (req, res) => {
     }
 
     // Validate OrderType
-    const ALLOWED = ["Normal","Urgent","Co-Dealer","Transfer"];
+    const ALLOWED = ["Normal", "Urgent", "Co-Dealer", "Transfer"];
     const norm = v => String(v ?? "").trim().toLowerCase();
     if (!ALLOWED.map(norm).includes(norm(OrderType))) {
       return res.status(400).json(
@@ -301,13 +403,23 @@ const vehicleUploadSingle = async (req, res) => {
 
 const spmPartyUploadSingle = async (req, res) => {
   try {
-    const { LocationId, userId, PartyCode, PartyName } = req.body;
+    const normalize = v =>
+      v === undefined || v === null || (typeof v === 'string' && v.trim() === '')
+        ? null
+        : v;
 
-    if (!LocationId || !userId || !PartyCode || !PartyName) {
+    const { LocationId, userId } = req.body;
+    let { PartyCode = null, PartyName = null } = req.body;
+
+    // normalize both
+    PartyCode = normalize(PartyCode);
+    PartyName = normalize(PartyName);
+
+    if (!LocationId || !userId || !(PartyCode !== null || PartyName !== null)) {
       return res.status(400).json(
         new ApiError(
           400,
-          "LocationId, userId, PartyCode and PartyName are required",
+          "LocationId, userId and PartyCode or PartyName are required",
           [],
           ""
         )
@@ -323,15 +435,21 @@ const spmPartyUploadSingle = async (req, res) => {
       }
     ];
 
+    const duplicates = await partyAlreadyExistsCheck(formattedData)
+    if (duplicates.length != 0) {
+      return res.status(400).json(new ApiError(400, `Some Records Already Exists`, duplicates))
+    }
+
     await insertSpmParty(formattedData);
 
     res
       .status(200)
-      .json(new ApiResponse(200, [], "Single Insertion Successful"));
+      .json(new ApiResponse(200, [formattedData[0]], "Single Insertion Successful"));
   } catch (error) {
-    return res.status(error.statusCode || 500).json(error);
+    return res.status(error.statusCode || 500).json(new ApiError(500, error, []));
   }
 };
+
 const spmAdvisorUploadSingle = async (req, res) => {
   try {
     const { LocationId, userId, Advisor, PhoneNo, Email } = req.body;
@@ -375,5 +493,19 @@ const spmAdvisorUploadSingle = async (req, res) => {
   }
 };
 
+const stockView = async (req, res) => {
 
-export {stockuploadCs,stockuploadWs,vehicleUpload,spmPartyUpload,spmAdvisorUpload,singleUploadCs,stockuploadWsSingle,vehicleUploadSingle,spmPartyUploadSingle,spmAdvisorUploadSingle}
+  const { LocationId, OrderType, PartyName, userId } = req.body
+  const file = req.file
+  if (!file) {
+    return res.status(400).json(new ApiError(400, "" || "File Not Attached"));
+  }
+
+  const data = await stockViewService(file.path, LocationId, OrderType, userId)
+
+  res.status(200).json(new ApiResponse(200, data, 'message'))
+
+
+}
+
+export { stockView, stockuploadCs, stockuploadWs, vehicleUpload, spmPartyUpload, spmAdvisorUpload, singleUploadCs, stockuploadWsSingle, vehicleUploadSingle, spmPartyUploadSingle, spmAdvisorUploadSingle }

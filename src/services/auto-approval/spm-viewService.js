@@ -5,7 +5,7 @@ import { ApiError } from "../../utils/ApiError.js";
 const viewPartyService = async (LocationId) => {
     try {
         const pool = await getPool1()
-        const query = `use [z_scope] select PartyName , PartyCode , CreatedAt , Status from AAP_SPMPartyMaster where LocationId = @LocationId`
+        const query = `use [z_scope] select Id,  PartyName , PartyCode , CreatedAt , Status from AAP_SPMPartyMaster where LocationId = @LocationId`
         const result = await pool.request().input('LocationId', sql.Int, LocationId).query(query)
         return result.recordset
     }
@@ -28,4 +28,19 @@ const viewAdvisorService = async (LocationId) => {
     }
 }
 
-export { viewPartyService, viewAdvisorService }
+const changePartyStatusService = async (Id, status) => {
+    try {
+        console.log(Id,status);
+        
+        const pool = await getPool1()
+        const query = `use z_scope update AAP_SPMPartyMaster set Status = @status where Id = @Id`
+        const result = await pool.request()
+            .input('Id', Id)
+            .input('status', status).query(query)
+        return result.rowsAffected
+    } catch (error) {
+        throw new ApiError(500, 'Unable to Change Party Status', [], error.message)
+    }
+
+}
+export { viewPartyService, viewAdvisorService, changePartyStatusService }

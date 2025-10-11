@@ -9,11 +9,19 @@ import spmviewroutes from './spm-viewRoute.js'
 const router = Router()
 
 router.use('/aa',bucketroutes)
+
 router.use('/aa',parameterroutes)
-router.use('/aa',spmuploadroutes)
-router.use('/aa',userModuleConfigroutes)
-router.use('/aa',rulemgmtroutes)
+
 router.use('/aa',operatorroutes)
+
+router.use('/aa',spmuploadroutes)
 router.use('/aa',spmviewroutes)
+
+router.use('/aa',userModuleConfigroutes)
+
+router.use('/aa',rulemgmtroutes)
+
+
+
 
 export default router
