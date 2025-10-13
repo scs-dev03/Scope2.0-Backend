@@ -5,10 +5,10 @@ import { spmAdvisorUpload, spmPartyUpload, stockuploadCs  , vehicleUpload , stoc
 
 const router = Router()
 
-router.route('/partyupload-single').post(spmPartyUploadSingle)
+router.route('/addparty').post(spmPartyUploadSingle)
 router.route('/partyupload').post(upload.single('file'),spmPartyUpload)
 
-router.route('/advisorupload-single').post(spmAdvisorUploadSingle);
+router.route('/addadvisor').post(spmAdvisorUploadSingle);
 router.route('/advisorupload').post(upload.single('file'),spmAdvisorUpload)
 
 router.route('/vehicleupload-single').post(vehicleUploadSingle);

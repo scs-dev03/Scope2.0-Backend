@@ -3,9 +3,9 @@ import { insertApprovals, insertSpmParty, insertadvisorParty } from "../../servi
 import fs from 'fs'
 import { ApiResponse } from "../../utils/ApiResponse.js";
 import { ApiError } from "../../utils/ApiError.js";
-import { spmBulkCSUpload, spmMultiCSUpload, spmBulkWSUpload, spmBulkVehicleUpload, stockViewService, partyAlreadyExistsCheck, getduplicatesArray } from "../../services/auto-approval/spm-uploadService.js";
+import { spmBulkCSUpload, spmMultiCSUpload, spmBulkWSUpload, spmBulkVehicleUpload, stockViewService, partyAlreadyExistsCheck, getduplicatesArray, advisorAlreadyExistsCheck, findAdvisorOnLocation } from "../../services/auto-approval/spm-uploadService.js";
 import { partyNameCodeMapping } from '../../services/auto-approval/spm-uploadService.js'
-import { validateHeaders, findRowIssues, getDuplicatesByKey, getDuplicateGroups, normalizePartyRows, partyKey, isBlank } from '../../utils/validator.js';
+import { validateHeaders, findRowIssues, getDuplicatesByKey, getDuplicateGroups, normalizePartyRows, partyKey, isBlank, validateExcelRows, validatePartyExcelRows } from '../../utils/validator.js';
 
 const stockuploadCs = async (req, res) => {
   try {
@@ -78,52 +78,6 @@ const vehicleUpload = async (req, res) => {
   }
 }
 
-// const spmPartyUpload = async (req, res) => {
-//   try {
-//     const file = req.file
-//     const { LocationId, userId } = req.body
-//     if (!file) {
-//       return res.status(400).json(new ApiError(400, error?.message || "File Not Attached"));
-//     }
-//     if (!LocationId || !userId) {
-//       return res.status(400).json(new ApiError(400, error?.message || "LocationId and userId Not Found"));
-//     }
-//     const { headers, data } = await readExcel(file.path)
-//     fs.unlinkSync(file.path)
-
-//     const REQUIRED_HEADERS = ["PartyCode", "PartyName"];
-//     const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header))
-//     if (missingHeaders.length > 0) {
-//       return res.status(400).json({
-//         message: "Missing headers or data",
-//         missingHeaders
-//       });
-//     }
-
-//     console.log("data" ,data);
-//     const duplicate = await getduplicatesArray(data);
-//     console.log("duplicate", duplicate);
-
-
-//     const formattedData = data.map(row => ({
-//       ...row,
-//       LocationId,
-//       CreatedBy:userId
-//     }));
-//     // console.log(formattedData);
-
-//     const duplicates = await partyAlreadyExistsCheck(formattedData)
-//     if (duplicates.length != 0) {
-//       return res.status(400).json(new ApiError(400, `Some Records Already Exists`, duplicates))
-//     }
-
-//     // await insertSpmParty(formattedData);
-//     res.status(200).json(new ApiResponse(200, [], `Bulk Insertion Successfull`))
-//   } catch (error) {
-//     return res.status(error.statusCode).json(error);
-//   }
-// }
-
 const spmPartyUpload = async (req, res) => {
   try {
     const file = req.file;
@@ -140,65 +94,64 @@ const spmPartyUpload = async (req, res) => {
 
     const REQUIRED_HEADERS = ["PartyCode", "PartyName"];
     const { headers, data } = await readExcel(file.path);
-    fs.unlinkSync(file.path);
+    fs.unlinkSync(file.path); 
 
     // 1) Header validation
     const { ok: headersOk, missingHeaders } = validateHeaders(headers, REQUIRED_HEADERS);
     if (!headersOk) {
       return res.status(400).json(
-        new ApiError(400, "Missing headers", { missingHeaders }, "")
+        new ApiError(400, "Missing headers",  missingHeaders , "")
       );
     }
 
     // 2) Normalize party rows (trim/cap lengths)
-    const normalized = normalizePartyRows(data);
-    console.log(`normalized`, normalized);
+    // const normalized = normalizePartyRows(data);
 
-    // 3) Row-level completeness (at least one of PartyCode/PartyName must be present)
-    //    If you want BOTH required, keep REQUIRED_HEADERS; if "at least one", do this:
-    const issues = normalized
-      .map((row, i) => {
-        const missing = [];
-        const bothNull = isBlank(row.PartyCode) && isBlank(row.PartyName);
-        if (bothNull) missing.push("PartyCode_or_PartyName");
-        return { index: i, missing, row };
-      })
-      .filter(x => x.missing.length);
-    console.log(`issues`, issues);
+    // // 3) Row-level completeness (at least one of PartyCode/PartyName must be present)
+    // const issues = normalized
+    //   .map((row, i) => {
+    //     const missing = [];
+    //     const bothNull = isBlank(row.PartyCode) && isBlank(row.PartyName);
+    //     if (bothNull) missing.push("PartyCode_or_PartyName");
+    //     return { index: i, missing, row };
+    //   })
+    //   .filter(x => x.missing.length);
+    // // console.log(`issues`, issues);
 
-    if (issues.length) {
-      return res.status(400).json(
-        new ApiError(400, "Data Incomplete", { missingRows: issues.map(x => x.row), issues }, "")
-      );
-    }
+    // if (issues.length) {
+    //   return res.status(400).json(
+    //     new ApiError(400, "Data Incomplete", { missingRows: issues.map(x => x.row), issues }, "")
+    //   );
+    // }
 
-    // 4) Duplicates within the uploaded file
-    const duplicateRows = getDuplicatesByKey(normalized, partyKey);
-    console.log(`duplicateRows`, duplicateRows);
+    // // 4) Duplicates within the uploaded file
+    // const duplicateRows = getDuplicatesByKey(normalized, partyKey);
+    // // console.log(`duplicateRows`, duplicateRows);
 
-    if (duplicateRows.length) {
-      const duplicateGroups = getDuplicateGroups(normalized, partyKey);
-      return res.status(400).json(
-        new ApiError(400, "Duplicate PartyCode/PartyName pairs in file", { duplicateRows, duplicateGroups }, "")
-      );
-    }
-
-    // 5) Build DB payload
+    // if (duplicateRows.length) {
+    //   const duplicateGroups = getDuplicateGroups(normalized, partyKey);
+    //   return res.status(400).json(
+    //     new ApiError(400, "Duplicate PartyCode/PartyName pairs in file", { duplicateRows, duplicateGroups }, "")
+    //   );
+    // }
+    const normalized = normalizePartyRows(data); 
+const v = validatePartyExcelRows(normalized);
+if (!v.isValid) {
+  return res.status(400).json(new ApiError(400, "Excel Contains Duplicate Values", v.issues));
+}
     const formattedData = normalized.map(row => ({
       ...row,
       LocationId,
       CreatedBy: userId
     }));
 
-    // 6) Check duplicates against DB (existing rows)
     const existing = await partyAlreadyExistsCheck(formattedData);
     if (existing.length) {
       return res.status(400).json(
         new ApiError(400, "Some records already exist", existing, "")
       );
     }
-
-    // 7) Insert
+    
     await insertSpmParty(formattedData);
 
     return res
@@ -213,7 +166,6 @@ const spmPartyUpload = async (req, res) => {
   }
 };
 
-
 const spmAdvisorUpload = async (req, res) => {
   try {
     const file = req.file
@@ -224,26 +176,65 @@ const spmAdvisorUpload = async (req, res) => {
     if (!file) {
       return res.status(400).json(new ApiError(400, error?.message || "File Not Attached"));
     }
-    const { headers, data } = await readExcel(file.path)
-    const REQUIRED_HEADERS = ["Advisor", "PhoneNo", "Email"];
-    const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header))
-    if (missingHeaders.length > 0) {
-      return res.status(400).json({
-        message: "Missing headers or data",
-        missingHeaders
-      });
-    }
 
+    const REQUIRED_HEADERS = ["Advisor", "PhoneNo", "Email"];
+    const { headers, data } = await readExcel(file.path)
+    fs.unlinkSync(file.path)
+    
+
+ // 1) Header validation
+    const { ok: headersOk, missingHeaders } = validateHeaders(headers, REQUIRED_HEADERS);
+    if (!headersOk) {
+      return res.status(400).json(
+        new ApiError(400, "Missing headers", missingHeaders, "")
+      );
+    }
+       const check = validateExcelRows(data);
+    if (!check.isValid) {
+      // Build a concise error payload
+      const problems = [];
+      if (check.issues.missingAdvisor.length) {
+        problems.push({
+          type: "MissingAdvisor",
+          rows: check.issues.missingAdvisor
+        });
+      }
+      if (check.issues.duplicateAdvisors.length) {
+        problems.push({
+          type: "DuplicateAdvisors",
+          items: check.issues.duplicateAdvisors
+        });
+      }
+      if (check.issues.duplicateRows.length) {
+        problems.push({
+          type: "ExactDuplicateRows",
+          items: check.issues.duplicateRows
+        });
+      }
+      return res.status(400).json(new ApiError(400, "Excel Contains Duplicate Values", problems));
+    }
     const formattedData = data.map(row => ({
       ...row,
       LocationId,
       userId
     }));
-
+    
+    const existing = await advisorAlreadyExistsCheck(formattedData, 'dbo.AAP_SPMAdvisorMaster')
+    if (existing.length) {
+      return res.status(400).json(
+        new ApiError(400, "Some records already exist", existing, "")
+      );
+    }
+    const advisorExists = await findAdvisorOnLocation(formattedData, 'dbo.AAP_SPMAdvisorMaster')
+        if (advisorExists.length) {
+      return res.status(400).json(
+        new ApiError(400, "Some records already exist", advisorExists, "")
+      );
+    }
     await insertadvisorParty(formattedData);
     res.status(200).json(new ApiResponse(200, [], `Bulk Insertion Successfull`))
   } catch (error) {
-    return res.status(error.statusCode).json(error);
+    return res.status(500).json(error);
   }
 }
 
@@ -472,7 +463,10 @@ const spmAdvisorUploadSingle = async (req, res) => {
         .status(400)
         .json(new ApiError(400, "Invalid Phone Number", [], ""));
     }
-
+    // const isExists = await isPhoneEmailExists(PhoneNo,Email,'AAP_SPMAdvisorMaster')
+    // if(isExists > 0){
+    //   return res.status(400).json(new ApiError(400,`PhoneNo or Email already associated with another user`))
+    // }
     const formattedData = [
       {
         LocationId,
@@ -482,12 +476,23 @@ const spmAdvisorUploadSingle = async (req, res) => {
         userId
       }
     ];
-
+    const existing = await advisorAlreadyExistsCheck(formattedData, 'dbo.AAP_SPMAdvisorMaster')
+    if (existing.length) {
+      return res.status(400).json(
+        new ApiError(400, "Some records already exist", existing, "")
+      );
+    }
+    const advisorExists = await findAdvisorOnLocation(formattedData, 'dbo.AAP_SPMAdvisorMaster')
+        if (advisorExists.length) {
+      return res.status(400).json(
+        new ApiError(400, "Some records already exist", advisorExists, "")
+      );
+    }
     await insertadvisorParty(formattedData);
 
     res
       .status(200)
-      .json(new ApiResponse(200, [], "Single Advisor Insertion Successful"));
+      .json(new ApiResponse(200, [], "Advisor Added Successfully"));
   } catch (error) {
     return res.status(error.statusCode || 500).json(error);
   }
@@ -507,5 +512,4 @@ const stockView = async (req, res) => {
 
 
 }
-
 export { stockView, stockuploadCs, stockuploadWs, vehicleUpload, spmPartyUpload, spmAdvisorUpload, singleUploadCs, stockuploadWsSingle, vehicleUploadSingle, spmPartyUploadSingle, spmAdvisorUploadSingle }

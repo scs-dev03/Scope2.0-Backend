@@ -3,6 +3,7 @@ import fs from 'fs'
 import { getPool1 } from "../../db/db.js";
 import { ApiError } from "../../utils/ApiError.js";
 import sql from 'mssql'
+import { resourceLimits } from "worker_threads";
 
 const spmBulkCSUpload = async (LocationId, OrderType, file, userId) => {
   let { headers, data } = await readExcel(file);
@@ -362,7 +363,7 @@ const partyAlreadyExistsCheck = async (data) => {
   }));
 
   // collect distinct values
-  const locs  = [...new Set(rows.map(r => r.LocationId))];
+  const locs = [...new Set(rows.map(r => r.LocationId))];
   const names = [...new Set(rows.map(r => r.PartyName).filter(v => v !== null))];
   const codes = [...new Set(rows.map(r => r.PartyCode).filter(v => v !== null))];
 
@@ -372,18 +373,18 @@ const partyAlreadyExistsCheck = async (data) => {
   // build parameterized IN lists
   const req = pool.request();
 
-  const locParams  = locs.map((_, i) => `@loc${i}`);
+  const locParams = locs.map((_, i) => `@loc${i}`);
   const nameParams = names.map((_, i) => `@pn${i}`);
   const codeParams = codes.map((_, i) => `@pc${i}`);
 
-  locs.forEach((v, i)  => req.input(`loc${i}`,  sql.Int,        v));
-  names.forEach((v, i) => req.input(`pn${i}`,   sql.VarChar(30), v));
-  codes.forEach((v, i) => req.input(`pc${i}`,   sql.VarChar(30), v));
+  locs.forEach((v, i) => req.input(`loc${i}`, sql.Int, v));
+  names.forEach((v, i) => req.input(`pn${i}`, sql.VarChar(30), v));
+  codes.forEach((v, i) => req.input(`pc${i}`, sql.VarChar(30), v));
 
   // build WHERE parts safely (avoid empty IN())
-  const whereLoc   = `LocationId IN (${locParams.join(',')})`;
-  const whereName  = names.length ? `PartyName IN (${nameParams.join(',')})` : '1=0';
-  const whereCode  = codes.length ? `PartyCode IN (${codeParams.join(',')})` : '1=0';
+  const whereLoc = `LocationId IN (${locParams.join(',')})`;
+  const whereName = names.length ? `PartyName IN (${nameParams.join(',')})` : '1=0';
+  const whereCode = codes.length ? `PartyCode IN (${codeParams.join(',')})` : '1=0';
 
   const query = `
     SELECT LocationId, PartyName, PartyCode
@@ -416,15 +417,15 @@ const partyAlreadyExistsCheck = async (data) => {
     if (nameHit || codeHit) {
       alreadyExists.push({
         ...r,
-        conflictBy: nameHit && codeHit ? 'Both' : (nameHit ? 'PartyName' : 'PartyCode')
+        conflictBy: nameHit && codeHit ? 'Both Duplicates' : (nameHit ? 'PartyName' : 'PartyCode')
       });
     }
   }
   return alreadyExists;
 };
 
-const getduplicatesArray = async(arr)=>{
- const norm = v => (v == null ? "" : String(v).trim().toLowerCase());
+const getduplicatesArray = async (arr) => {
+  const norm = v => (v == null ? "" : String(v).trim().toLowerCase());
   const keyOf = o => `${norm(o.PartyCode)}|${norm(o.PartyName)}`;
 
   const map = new Map();
@@ -438,4 +439,212 @@ const getduplicatesArray = async(arr)=>{
     .filter(([, e]) => e.count > 1)
     .map(([k, e]) => ({ key: k, count: e.count, sample: e.sample }));
 }
-export { getduplicatesArray,partyAlreadyExistsCheck, stockViewService, spmBulkCSUpload, spmMultiCSUpload, spmBulkWSUpload, spmBulkVehicleUpload, partyNameCodeMapping }
+
+// Checks if PhoneNo / Email already exist anywhere in the Advisor table.
+// Input: array of { LocationId, Advisor, PhoneNo, Email, userId }
+// Output: array of conflicted rows with conflictBy: 'PhoneNo' | 'Email' | 'Both'
+const advisorAlreadyExistsCheck = async (data, tableName ) => {
+  const pool = await getPool1();
+
+  // --- helpers ---
+  const normPhone = (v) => {
+    if (v == null) return null;
+    const s = String(v).replace(/\D+/g, '').trim();   // keep digits only
+    return s.length ? s.slice(0, 10) : null;          // cap length defensively
+  };
+  const normEmail = (v) => {
+    if (v == null) return null;
+    const s = String(v).trim().toLowerCase();
+    return s.length ? s.slice(0, 320) : null;         // RFC-ish max
+  };
+  const toIntOrNull = (v) => (v == null ? null : Number(v));
+
+  // --- normalize incoming rows ---
+  const rows = data.map(r => ({
+    LocationId: toIntOrNull(r.LocationId),
+    Advisor: r.Advisor == null ? null : String(r.Advisor).trim(),
+    PhoneNo: normPhone(r.PhoneNo),
+    Email: normEmail(r.Email),
+    userId: toIntOrNull(r.userId)
+  }));
+
+  // --- collect distinct phones/emails (non-null) ---
+  const phones = [...new Set(rows.map(r => r.PhoneNo).filter(Boolean))];
+  const emails = [...new Set(rows.map(r => r.Email).filter(Boolean))];
+
+  // nothing to check
+  if (phones.length === 0 && emails.length === 0) return [];
+
+  // --- whitelist table to avoid injection ---
+  const ALLOWED_TABLES = new Set([
+    'dbo.AAP_SPMAdvisorMaster',
+    // add other valid advisor tables if any
+  ]);
+  if (!ALLOWED_TABLES.has(tableName)) {
+    throw new ApiError(400, `Invalid table name: ${tableName}`, []);
+  }
+
+  // --- build parameterized IN lists ---
+  const req = pool.request();
+
+  const phoneParams = phones.map((_, i) => `@ph${i}`);
+  const emailParams = emails.map((_, i) => `@em${i}`);
+
+  phones.forEach((v, i) => req.input(`ph${i}`, sql.VarChar(20), v));
+  emails.forEach((v, i) => req.input(`em${i}`, sql.VarChar(320), v));
+
+  // Avoid empty IN() by guarding with 1=0 when list empty
+  const wherePhone = phones.length ? `PhoneNo IN (${phoneParams.join(',')})` : '1=0';
+  // Force case-insensitive compare regardless of DB collation
+  const whereEmail = emails.length
+    ? `LOWER(Email) IN (${emailParams.map(p => `LOWER(${p})`).join(',')})`
+    : '1=0';
+
+  const query = `
+    SELECT PhoneNo, Email
+    FROM ${tableName} WITH (NOLOCK)
+    WHERE ${wherePhone} OR ${whereEmail};
+  `;
+
+  const { recordset } = await req.query(query);
+
+  // --- build fast lookup sets ---
+  const existingPhones = new Set(
+    recordset.map(r => normPhone(r.PhoneNo)).filter(Boolean)
+  );
+  const existingEmails = new Set(
+    recordset.map(r => normEmail(r.Email)).filter(Boolean)
+  );
+
+  // --- decide conflicts for each input row ---
+  const conflicts = [];
+  for (const r of rows) {
+    const phoneHit = r.PhoneNo ? existingPhones.has(r.PhoneNo) : false;
+    const emailHit = r.Email ? existingEmails.has(r.Email) : false;
+
+    if (phoneHit || emailHit) {
+      conflicts.push({
+        ...r,
+        conflictBy: phoneHit && emailHit ? 'Both' : (phoneHit ? 'PhoneNo' : 'Email')
+      });
+    }
+  }
+  return conflicts;
+};
+
+// Check if (LocationId, Advisor) already exists in the advisor table (case-insensitive, trimmed).
+// Input: [{ LocationId, Advisor, PhoneNo?, Email?, userId? }, ...]
+// Output: array of rows that clash, each with conflictBy: 'Advisor' and echo of the original row.
+const findAdvisorOnLocation = async (
+  data,
+  tableName = 'dbo.AAP_SPMAdvisorMaster'  // change if your table differs
+) => {
+  const pool = await getPool1();
+
+  // --- helpers ---
+  const toIntOrNull = v => (v == null ? null : Number(v));
+  const normAdvisor = v => {
+    if (v == null) return null;
+    // trim, collapse multiple spaces to single, lowercase, cap length
+    const s = String(v).trim().replace(/\s+/g, ' ').toLowerCase();
+    return s ? s.slice(0, 100) : null;
+  };
+
+  // --- normalize incoming rows ---
+  const rows = data.map(r => ({
+    LocationId: toIntOrNull(r.LocationId),
+    AdvisorRaw: r.Advisor == null ? null : String(r.Advisor).trim(),
+    AdvisorKey: normAdvisor(r.Advisor),
+    PhoneNo: r.PhoneNo ?? null,
+    Email: r.Email ?? null,
+    userId: toIntOrNull(r.userId)
+  }));
+
+  // collect distinct locations and advisor names (normalized)
+  const locs = [...new Set(rows.map(r => r.LocationId).filter(v => v != null))];
+  const advisorKeys = [
+    ...new Set(rows.map(r => r.AdvisorKey).filter(Boolean))
+  ];
+
+  // nothing to check
+  if (locs.length === 0 || advisorKeys.length === 0) return [];
+
+  // --- whitelist table to avoid injection ---
+  const ALLOWED_TABLES = new Set([
+    'dbo.AAP_SPMAdvisorMaster',
+    // add other allowed advisor tables if needed
+  ]);
+  if (!ALLOWED_TABLES.has(tableName)) {
+    throw new ApiError(400, `Invalid table name: ${tableName}`, []);
+  }
+
+  // --- build parameterized IN lists ---
+  const req = pool.request();
+  const locParams = locs.map((_, i) => `@loc${i}`);
+  const advParams = advisorKeys.map((_, i) => `@adv${i}`);
+
+  locs.forEach((v, i) => req.input(`loc${i}`, sql.Int, v));
+  advisorKeys.forEach((v, i) => req.input(`adv${i}`, sql.VarChar(100), v)); // normalized key
+
+  // SQL: fetch existing advisors for those locations with any of those normalized names
+  // We normalize in SQL similarly: LOWER(TRIM(...)) and collapse spaces to one via REPLACE trick.
+  // (SQL Server has no regex; the below approximates JS normalization enough for matching.)
+  const normSql = `
+    LOWER(
+      LTRIM(RTRIM(
+        REPLACE(REPLACE(REPLACE(Advisor, CHAR(13), ' '), CHAR(10), ' '), CHAR(9), ' ')
+      ))
+    )
+  `;
+
+  const query = `
+    SELECT LocationId,
+           Advisor,
+           ${normSql} AS AdvisorKey
+    FROM ${tableName} WITH (NOLOCK)
+    WHERE LocationId IN (${locParams.join(',')})
+      AND ${normSql} IN (${advParams.join(',')});
+  `;
+
+  const { recordset } = await req.query(query);
+
+  // Build lookup: map of LocationId -> Set(normalized advisor names)
+  const byLoc = new Map();
+  for (const r of recordset) {
+    const key = r.LocationId;
+    if (!byLoc.has(key)) byLoc.set(key, new Set());
+    if (r.AdvisorKey) byLoc.get(key).add(String(r.AdvisorKey));
+  }
+
+  // Decide conflicts
+  const conflicts = [];
+  for (const r of rows) {
+    const set = byLoc.get(r.LocationId);
+    const hit = !!(set && r.AdvisorKey && set.has(r.AdvisorKey));
+    if (hit) {
+      conflicts.push({
+        ...r,
+        conflictBy: 'Advisor'
+      });
+    }
+  }
+
+  return conflicts;
+};
+
+// const isPhoneEmailExists = async (phoneno, email, tableName) => {
+//   try {
+//     const pool = await getPool1()
+//     const query = `use [z_scope] select * from ${tableName} where PhoneNo = @PhoneNo OR Email = @Email`
+
+//     const result = await pool.request()
+//       .input('PhoneNo', sql.VarChar(10), phoneno)
+//       .input('Email', sql.VarChar, email)
+//       .query(query)
+//     return result.rowsAffected
+//   } catch (error) {
+//     throw new ApiError(500, `Unable to find existing PhoneNo and Email`, [error.message])
+//   }
+// }
+
+export { findAdvisorOnLocation,advisorAlreadyExistsCheck, getduplicatesArray, partyAlreadyExistsCheck, stockViewService, spmBulkCSUpload, spmMultiCSUpload, spmBulkWSUpload, spmBulkVehicleUpload, partyNameCodeMapping }
