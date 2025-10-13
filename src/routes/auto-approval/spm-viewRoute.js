@@ -4,9 +4,9 @@ import { changePartyStatus,  viewAdvisor, viewParty } from "../../controller/aut
 
 const router = Router();
 
-router.get("/viewparty", viewParty);
+router.post("/viewparty", viewParty);
 router.delete("/party",changePartyStatus);
 
-router.get("/viewadvisor", viewAdvisor);
+router.post("/viewadvisor", viewAdvisor);
 
 export default router
