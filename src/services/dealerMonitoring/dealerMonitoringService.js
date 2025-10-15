@@ -715,13 +715,13 @@ const vehiclewisePPNIValueService = async (dealerid, locationid, jobcardstatus, 
         A.Dealerid,
         A.BIGID,
         A.JobLineCloseDate
-    FROM z_scope..Create_Order_Request_TD001_8 A
+    FROM z_scope..Create_Order_Request_TD001_${dealerid} A
     LEFT JOIN z_scope..CurrentStock1 B
            ON B.LocationID = A.LocationID
     LEFT JOIN z_scope..CurrentStock2 C
            ON C.Stockcode = B.tcode
           AND C.PartNumber = A.Part_Number
-    WHERE A.Locationid = 14
+    WHERE A.Locationid = ${locationid}
       AND A.Type = 'V'
       AND A.current_status <> 'Close'
 )
@@ -734,7 +734,7 @@ SELECT
     COUNT(*)                                  AS NotIssued,    
     SUM(CASE WHEN  1 = 0 OR (A.StockQty > 0) AND B.PPNI_Val > 0THEN 1 ELSE 0 END) AS InstockCount
 FROM T1 A
-LEFT JOIN UAD_BI_PPNI..PPNI_report_8 B
+LEFT JOIN UAD_BI_PPNI..PPNI_report_${dealerid} B
        ON B.Bigid = A.BIGID
       AND (@All_Time_NonStck IS NULL OR B.All_Time_NonStck = @All_Time_NonStck)
       AND (
@@ -747,9 +747,7 @@ GROUP BY A.Dealerid, A.Locationid, A.Vehiclenumber
 HAVING SUM(B.PPNI_Val) > 0
 ORDER BY SUM(B.PPNI_Val) DESC, A.DealerId, A.LocationId, A.Vehiclenumber
 OFFSET @offset ROWS
-FETCH NEXT @pagesize ROWS ONLY;
-
-    `
+FETCH NEXT @pagesize ROWS ONLY;`
     const result = await request.query(query);
     // console.log(result);
 
@@ -897,7 +895,7 @@ GROUP BY A.bigid,A.Dealerid,A.Locationid,A.Part_Number1,B.PartDesc,
           b.PPNI_Val,
           b.Qty ,
           All_Time_NonStck,A.Qty,b.PartNumber ,sm.partnumber1, sm.subpartnumber1,A.VehicleNumber
-HAVING SUM(PPNI_Val)>0
+HAVING SUM(PPNI_Val)>0 AND A.Qty > 0
 order by SUM(PPNI_Val) desc
   `
     const result = await pool.request()
