@@ -8,62 +8,84 @@ const insertApprovals = async (data) => {
         const tableName = 'Temp_createorderrequest_VB'
         const table = new sql.Table(tableName); // Use fully qualified name
         table.create = false;
-        data = data.map((row) => ({
-            ...row,
-            PartNumber: row.PartNumber ? row.PartNumber.toString() : null, // Ensure PartNumber is a string
-            Remarks: row.Remarks ? row.Remarks.toString() : null, // Ensure Remarks is a string
-            VehicleNumber: row.VehicleNumber ? row.VehicleNumber.toString() : null, // Ensure VehicleNumber is a string
-            VehicleModel: row.VehicleModel ? row.VehicleModel.toString() : null, // Ensure VehicleModel is a string
-            JobCardNumber: row.JobCardNumber ? row.JobCardNumber.toString() : null, // Ensure JobCardNumber is a string
-            JobType: row.JobType ? row.JobType.toString() : null, // Ensure JobType is a string
-            Advisor: row.Advisor ? row.Advisor.toString() : null, // Ensure Advisor is a string
-            OrderType: row.OrderType ? row.OrderType.toString() : null, // Ensure OrderType is a string
-            // Ensure numeric fields are passed as numbers (no strings)
-            LocationId: row.LocationId || null,
-            Qty: row.Qty || null,
-            PartyId: row.PartyId || null,
-            AdvanceValue: row.AdvanceValue || null,
-            Estimate: row.Estimate || null,
-            UploadedBy: row.UploadedBy || null,
-            Type: row.Type || null
-        }));
+        // data = data.map((row) => ({
+        //     ...row,
+        //     PartNumber: row.PartNumber ? row.PartNumber.toString() : null, // Ensure PartNumber is a string
+        //     Remarks: row.Remarks ? row.Remarks.toString() : null, // Ensure Remarks is a string
+        //     VehicleNumber: row.VehicleNumber ? row.VehicleNumber.toString() : null, // Ensure VehicleNumber is a string
+        //     VehicleModel: row.VehicleModel ? row.VehicleModel.toString() : null, // Ensure VehicleModel is a string
+        //     JobCardNumber: row.JobCardNumber ? row.JobCardNumber.toString() : null, // Ensure JobCardNumber is a string
+        //     JobType: row.JobType ? row.JobType.toString() : null, // Ensure JobType is a string
+        //     Advisor: row.Advisor ? row.Advisor.toString() : null, // Ensure Advisor is a string
+        //     OrderType: row.OrderType ? row.OrderType.toString() : null, // Ensure OrderType is a string
+        //     // Ensure numeric fields are passed as numbers (no strings)
+        //     LocationId: row.LocationId || null,
+        //     Qty: row.Qty || null,
+        //     PartyId: row.PartyId || null,
+        //     AdvanceValue: row.AdvanceValue || null,
+        //     Estimate: row.Estimate || null,
+        //     UploadedBy: row.UploadedBy || null,
+        //     Type: row.Type || null
+        // }));
 
 
-        // 2) Define the 11 non-default columns, in exact ordinal order & types:
-        table.columns.add('LocationId', sql.Int, { nullable: true });
-        table.columns.add('PartNumber', sql.VarChar(50), { nullable: true });
+        table.columns.add('LocationId', sql.Int, { nullable: false });
+        table.columns.add('PartNumber', sql.VarChar(50), { nullable: false });
+        // table.columns.add('Latest', sql.VarChar(50), { nullable: true });
+        table.columns.add('isSubstitution', sql.VarChar(1), { nullable: true });
+        table.columns.add('PartDesc', sql.VarChar(50), { nullable: true });
+        table.columns.add('MOQ', sql.Int, { nullable: true });
         table.columns.add('Qty', sql.Int, { nullable: true });
         table.columns.add('Remarks', sql.VarChar(100), { nullable: true });
         table.columns.add('VehicleNumber', sql.VarChar(20), { nullable: true });
         table.columns.add('VehicleModel', sql.VarChar(30), { nullable: true });
         table.columns.add('JobCardNumber', sql.VarChar(40), { nullable: true });
-        table.columns.add('JobType', sql.VarChar(15), { nullable: true });
+        table.columns.add('JobTypeId', sql.Int, { nullable: true });
         table.columns.add('Advisor', sql.VarChar(20), { nullable: true });
         table.columns.add('OrderType', sql.VarChar(10), { nullable: true });
         table.columns.add('PartyId', sql.Int, { nullable: true });
+        table.columns.add('Stock', sql.Decimal(18, 2), { nullable: true });
+        table.columns.add('GroupStock', sql.Decimal(18, 2), { nullable: true });
+        table.columns.add('Receipt', sql.NVarChar(sql.MAX), { nullable: true });
+        table.columns.add('Price', sql.Decimal(18, 2), { nullable: true });
+        table.columns.add('OrderValue', sql.Decimal(18, 2), { nullable: true });
+        table.columns.add('OrderDate', sql.DateTime, { nullable: true });
         table.columns.add('AdvanceValue', sql.Int, { nullable: true });
         table.columns.add('Estimate', sql.Int, { nullable: true });
+        table.columns.add('NonMoving', sql.Int, { nullable: true });
         table.columns.add('UploadedBy', sql.Int, { nullable: true });
-        table.columns.add('Type', sql.VarChar, { nullable: true });
+        table.columns.add('Type', sql.VarChar(1), { nullable: true });
 
         // Add rows to the table for bulk insert
         data.forEach((row) => {
             table.rows.add(
                 row.LocationId,
                 row.PartNumber,
+                // row.Latest,
+                row.isSubstitution,
+                row.PartDesc,
+                row.MOQ,
                 row.Qty,
                 row.Remarks,
                 row.VehicleNumber,
                 row.VehicleModel,
                 row.JobCardNumber,
-                row.JobType,
+                row.JobTypeId,
                 row.Advisor,
                 row.OrderType,
                 row.PartyId,
+                row.Stock,
+                row.GroupStock,
+                row.Receipt,
+                row.Price,
+                row.OrderValue,
+                row.OrderDate,
                 row.AdvanceValue,
                 row.Estimate,
+                row.NonMoving,
                 row.UploadedBy,
-                row.Type
+                row.Type,
+
             );
         });
 
@@ -96,25 +118,25 @@ const insertSpmParty = async (data) => {
             CreatedBy: row.CreatedBy
         }));
 
-        table.columns.add('LocationId', sql.Int,        { nullable: false });
+        table.columns.add('LocationId', sql.Int, { nullable: false });
         table.columns.add('PartyCode', sql.VarChar(30), { nullable: true });
         table.columns.add('PartyName', sql.VarChar(30), { nullable: true });
-        table.columns.add('CreatedBy', sql.Int,         { nullable: true });
+        table.columns.add('CreatedBy', sql.Int, { nullable: true });
 
-          // normalize: undefined/null/blank -> null, else string trimmed to 30
-  const toVarchar = (v, max = 30) =>
-    v === undefined || v === null || (typeof v === 'string' && v.trim() === '')
-      ? null
-      : String(v).slice(0, max);
+        // normalize: undefined/null/blank -> null, else string trimmed to 30
+        const toVarchar = (v, max = 30) =>
+            v === undefined || v === null || (typeof v === 'string' && v.trim() === '')
+                ? null
+                : String(v).slice(0, max);
 
-  for (const r of data) {
-    table.rows.add(
-      Number(r.LocationId),
-      toVarchar(r.PartyCode, 30),
-      toVarchar(r.PartyName, 30),
-      r.CreatedBy == null ? null : Number(r.CreatedBy)
-    );
-  }
+        for (const r of data) {
+            table.rows.add(
+                Number(r.LocationId),
+                toVarchar(r.PartyCode, 30),
+                toVarchar(r.PartyName, 30),
+                r.CreatedBy == null ? null : Number(r.CreatedBy)
+            );
+        }
 
         const result = await pool.request().bulk(table)
         return

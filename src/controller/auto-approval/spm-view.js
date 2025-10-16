@@ -1,4 +1,5 @@
-import { updateAdvisorService, updatePartyService, viewAdvisorService, viewPartyService } from "../../services/auto-approval/spm-viewService.js"
+import { partyAlreadyExistsCheck } from "../../services/auto-approval/spm-uploadService.js"
+import { existingPartyNameandCodeService, updateAdvisorService, updatePartyService, viewAdvisorService, viewPartyService } from "../../services/auto-approval/spm-viewService.js"
 import { ApiError } from "../../utils/ApiError.js"
 import { ApiResponse } from "../../utils/ApiResponse.js"
 
@@ -6,11 +7,11 @@ import { ApiResponse } from "../../utils/ApiResponse.js"
 
 const viewParty = async (req, res) => {
     try {
-        const { LocationId } = req.body
+        const { LocationId, Status } = req.body
         if (!LocationId) {
             return res.status(400).json(new ApiError(400, 'LocationId is Required', []))
         }
-        const data = await viewPartyService(LocationId)
+        const data = await viewPartyService(LocationId, Status)
         res.status(200).json(new ApiResponse(200, data, 'Data Fetched Successfully'))
     } catch (error) {
         res.status(500).json(new ApiError(500, error, []))
@@ -42,47 +43,64 @@ const updateParty = async (req, res) => {
             );
         }
 
+        const existingPartyNameandCode = await existingPartyNameandCodeService(Id)
+        const partyNames = existingPartyNameandCode
+            .map(obj => obj.PartyName)
+            .filter(name => name !== null && name !== undefined);
+
+        const partyCodes = existingPartyNameandCode
+            .map(obj => obj.PartyCode)
+            .filter(code => code !== null && code !== undefined);
+
+        if(partyNames.includes(PartyName)){
+            return res.status(400).json(new ApiError(400,`PartyName Already Exists`))
+        }
+        if(partyCodes.includes(PartyCode)){
+            return res.status(400).json(new ApiError(400,`PartyCode Already Exists`))
+        }
+
         const result = await updatePartyService(Id, PartyName, PartyCode, status)
         if (result.updatedCount >= 0) {
             return res.status(200).json(new ApiResponse(200, [result.updatedRow], 'Party Updated Successfully'))
         }
     } catch (error) {
-        throw new ApiError(error.statusCode || 500, error || 'Something Went Wrong', [], error.message)
+        return res.status(error.statusCode || 500).json(new ApiError(error.statusCode || 500, error.message || 'Unable to Update Party Details', []));
+        // throw new ApiError(error.statusCode || 500, error || 'Something Went Wrong', [], error.message)
     }
 }
 
 const updateAdvisor = async (req, res) => {
-  try {
-    const { Id, Advisor, PhoneNo, Email, Status } = req.body;
+    try {
+        const { Id, Advisor, PhoneNo, Email, Status } = req.body;
 
-    // Validate Id & Status (if provided)
-    const IdNum = Number(Id);
-    if (!Number.isInteger(IdNum) || IdNum <= 0) {
-      return res.status(400).json(new ApiError(400, 'Valid Id is required.', [], ''));
-    }
-    if (Status !== null && Status !== undefined) {
-      const s = Number(Status);
-      if (!(s === 0 || s === 1)) {
-        return res.status(400).json(new ApiError(400, 'Status must be 0 or 1 when provided.', [], ''));
-      }
-    }
+        // Validate Id & Status (if provided)
+        const IdNum = Number(Id);
+        if (!Number.isInteger(IdNum) || IdNum <= 0) {
+            return res.status(400).json(new ApiError(400, 'Valid Id is required.', [], ''));
+        }
+        if (Status !== null && Status !== undefined) {
+            const s = Number(Status);
+            if (!(s === 0 || s === 1)) {
+                return res.status(400).json(new ApiError(400, 'Status must be 0 or 1 when provided.', [], ''));
+            }
+        }
 
-    const result = await updateAdvisorService({ Id, Advisor, PhoneNo, Email, Status });
+        const result = await updateAdvisorService({ Id, Advisor, PhoneNo, Email, Status });
 
-    if ((result.updatedCount ?? 0) > 0) {
-      return res
-        .status(200)
-        .json(new ApiResponse(200, [result.updatedRow], 'Advisor updated successfully'));
+        if ((result.updatedCount ?? 0) > 0) {
+            return res
+                .status(200)
+                .json(new ApiResponse(200, [result.updatedRow], 'Advisor updated successfully'));
+        }
+        return res
+            .status(404)
+            .json(new ApiError(404, 'Advisor not found or nothing to update', [], ''));
+    } catch (error) {
+        return res
+            .status(error.statusCode || 500)
+            .json(new ApiError(error.statusCode || 500, error.message || 'Something went wrong', [], ''));
     }
-    return res
-      .status(404)
-      .json(new ApiError(404, 'Advisor not found or nothing to update', [], ''));
-  } catch (error) {
-    return res
-      .status(error.statusCode || 500)
-      .json(new ApiError(error.statusCode || 500, error.message || 'Something went wrong', [], ''));
-  }
 };
 
 
-export { viewParty, viewAdvisor, updateParty , updateAdvisor}
+export { viewParty, viewAdvisor, updateParty, updateAdvisor }

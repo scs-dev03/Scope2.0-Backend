@@ -3,63 +3,162 @@ import fs from 'fs'
 import { getPool1 } from "../../db/db.js";
 import { ApiError } from "../../utils/ApiError.js";
 import sql from 'mssql'
-import { resourceLimits } from "worker_threads";
+import { validateCommonRows, orderTypeCheck, validateAndClean } from "../../utils/validator.js";
+
+// const spmBulkCSUpload = async (LocationId, OrderType, file, userId) => {
+//   let { headers, data } = await readExcel(file);
+//   fs.unlinkSync(file); // Delete uploaded file after processing
+
+//   const REQUIRED_HEADERS = ["PartNumber", "Qty", "Remarks", "PartyName", "PartyCode"];
+//   const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
+
+//   if (missingHeaders.length > 0) {
+//     throw new ApiError(400, "Missing headers or data", [missingHeaders], '');
+//   }
+
+//   // const isBlank = v =>
+//   //   v == null || (typeof v === "string" && v.trim() === "") || (typeof v === "number" && Number.isNaN(v));
+
+//   // // objects where any required key is missing/blank
+//   // const missingRows = data.filter(row => REQUIRED_HEADERS.some(k => isBlank(row[k])));
+
+//   // //  include which keys are missing
+//   // const issues = data
+//   //   .map((row, i) => ({ index: i, missing: REQUIRED_HEADERS.filter(k => isBlank(row[k])), row }))
+//   //   .filter(x => x.missing.length);
+
+//   // if (missingRows.length != 0 || issues.length != 0) {
+//   //   throw new ApiError(400, `Data Incomplete`, { missingRows, issues }, '')
+//   // }
+
+//     const { cleaned, errors } = validateCommonRows(data);
+//   console.log(cleaned,errors);
+
+//   // Bulk-specific: per-row must have PartyName or PartyCode value
+//   cleaned.forEach((row, i) => {
+//     const partyNameVal = hasPartyNameHeader ? row.PartyName : undefined;
+//     const partyCodeVal = hasPartyCodeHeader ? row.PartyCode : undefined;
+
+//     if (isBlank(partyNameVal) && isBlank(partyCodeVal)) {
+//       errors.push({
+//         index: i,
+//         conflictBy: "Party",
+//         message: "Either PartyName or PartyCode is required (bulk=1)",
+//         row
+//       });
+//     }
+//   });
+
+//   if (errors.length) {
+//     throw new ApiError(400, "Data validation failed", errors, "");
+//   }
+
+//   // No PartyId mapping here—return as-is plus meta fields
+//   const output = cleaned.map(row => ({
+//     PartNumber: row.PartNumber,
+//     Qty: row.Qty,
+//     Remarks: row.Remarks ?? "",
+//     PartyName: row.PartyName ?? null,
+//     PartyCode: row.PartyCode ?? null,
+//     LocationId,
+//     OrderType,
+//     Type: "S",
+//     UploadedBy: userId
+//   }));
+//   console.log(output);
+
+//   return output;
+// };
+
+// const formattedData = data.map((row) => ({
+//   ...row,
+//   LocationId: LocationId,
+//   OrderType: OrderType,
+//   Type: "S",
+//   UploadedBy: userId
+// }))
+
+
+//   const partyMappingData = await partyNameCodeMapping(LocationId)
+//   if (!Array.isArray(partyMappingData) || partyMappingData.length == 0) {
+//     throw new ApiError(400, `No Matching Party found for Your Location `)
+//   }
+
+//   const norm = s => String(s ?? "").trim().toLowerCase();
+//   const idByName = new Map(
+//     partyMappingData.map(({ PartyName, Id }) => [norm(PartyName), Id])
+//   );
+
+//   const output = formattedData
+//     .map(({ PartNumber, Qty, PartyName, LocationId, OrderType, Type, Remarks, UploadedBy }) => {
+//       const PartyId = idByName.get(norm(PartyName));
+//       return PartyId != null ? { PartNumber, Qty, PartyId, LocationId, OrderType, Type, Remarks, UploadedBy } : null;
+//     })
+//     .filter(Boolean);
+
+//   return output
+// }
 
 const spmBulkCSUpload = async (LocationId, OrderType, file, userId) => {
-  let { headers, data } = await readExcel(file);
-  fs.unlinkSync(file); // Delete uploaded file after processing
+  let headers, data;
 
-  const REQUIRED_HEADERS = ["PartNumber", "Qty", "Remarks", "PartyName"];
-  const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
-
-  if (missingHeaders.length > 0) {
-    throw new ApiError(400, "Missing headers or data", [missingHeaders], '');
-  }
-
+  // local helper just for the bulk check
   const isBlank = v =>
-    v == null || (typeof v === "string" && v.trim() === "") || (typeof v === "number" && Number.isNaN(v));
+    v == null ||
+    (typeof v === "string" && v.trim() === "") ||
+    (typeof v === "number" && Number.isNaN(v));
 
-  // objects where any required key is missing/blank
-  const missingRows = data.filter(row => REQUIRED_HEADERS.some(k => isBlank(row[k])));
+  try {
+    ({ headers, data } = await readExcel(file));
 
-  //  include which keys are missing
-  const issues = data
-    .map((row, i) => ({ index: i, missing: REQUIRED_HEADERS.filter(k => isBlank(row[k])), row }))
-    .filter(x => x.missing.length);
+    // Must-have headers
+    const mustHave = ["PartNumber", "Qty"]; // Remarks optional
+    const missingMust = mustHave.filter(h => !headers.includes(h));
+    if (missingMust.length) {
+      throw new ApiError(400, "Missing headers", [{ message: `Missing Headers PartNumber, Qty`, headers: mustHave }], "");
+    }
 
-  if (missingRows.length != 0 || issues.length != 0) {
-    throw new ApiError(400, `Data Incomplete`, { missingRows, issues }, '')
-  }
-  const formattedData = data.map((row) => ({
+    // At least one of PartyName or PartyCode header must exist (bulk=1 rule)
+    const hasPartyNameHeader = headers.includes("PartyName");
+    const hasPartyCodeHeader = headers.includes("PartyCode");
+    if (!hasPartyNameHeader && !hasPartyCodeHeader) {
+      throw new ApiError(
+        400,
+        "Missing headers",
+        [{ message: `Missing Headers PartyName OR PartyCode`, headers :["PartyName","PartyCode"]}],
+        ""
+      );
+    }
+
+    const requiredData =  data.map((row) => ({
     ...row,
     LocationId: LocationId,
     OrderType: OrderType,
+    // PartyId: PartyId,
     Type: "S",
     UploadedBy: userId
   }))
+    
+    const { cleanData, errors } = validateAndClean(requiredData, {
+      required: ["PartNumber", "Qty"],
+      qtyFields: ["Qty"],          // must be > 0
+      coerceQty: true,             // put numeric Qty in cleanData
+      partField: "PartNumber"      // sanitize this field
+    });
+    // console.log(cleanData,errors);
+    
+    if (errors.length) {
+      throw new ApiError(400, "Excel validation failed", errors, "");
+    }
 
-
-  const partyMappingData = await partyNameCodeMapping(LocationId)
-  if (!Array.isArray(partyMappingData) || partyMappingData.length == 0) {
-    throw new ApiError(400, `No Matching Party found for Your Location `)
+    return cleanData;
+  } finally {
+    // ensure temp file is deleted even if an error was thrown
+    try { fs.unlinkSync(file); } catch { }
   }
+};
 
-  const norm = s => String(s ?? "").trim().toLowerCase();
-  const idByName = new Map(
-    partyMappingData.map(({ PartyName, Id }) => [norm(PartyName), Id])
-  );
-
-  const output = formattedData
-    .map(({ PartNumber, Qty, PartyName, LocationId, OrderType, Type, Remarks, UploadedBy }) => {
-      const PartyId = idByName.get(norm(PartyName));
-      return PartyId != null ? { PartNumber, Qty, PartyId, LocationId, OrderType, Type, Remarks, UploadedBy } : null;
-    })
-    .filter(Boolean);
-
-  return output
-}
-
-const spmMultiCSUpload = async (LocationId, OrderType, PartyName, file, userId) => {
+const spmMultiCSUpload = async (LocationId, OrderType, PartyId, file, userId) => {
   let { headers, data } = await readExcel(file);
   fs.unlinkSync(file); // Delete uploaded file after processing
 
@@ -68,48 +167,28 @@ const spmMultiCSUpload = async (LocationId, OrderType, PartyName, file, userId) 
   if (missingHeaders.length > 0) {
     throw new ApiError(400, "Missing headers or data", missingHeaders, '');
   }
-  const isBlank = v =>
-    v == null || (typeof v === "string" && v.trim() === "") || (typeof v === "number" && Number.isNaN(v));
 
-  // objects where any required key is missing/blank
-  const missingRows = data.filter(row => REQUIRED_HEADERS.some(k => isBlank(row[k])));
-
-  //  include which keys are missing
-  const issues = data
-    .map((row, i) => ({ index: i, missing: REQUIRED_HEADERS.filter(k => isBlank(row[k])), row }))
-    .filter(x => x.missing.length);
-
-  if (missingRows.length != 0 || issues.length != 0) {
-    throw new ApiError(400, `Data Incomplete`, { missingRows, issues }, '')
-  }
   const formattedData = data.map((row) => ({
     ...row,
     LocationId: LocationId,
     OrderType: OrderType,
-    PartyName: PartyName,
+    PartyId: PartyId,
     Type: "S",
     UploadedBy: userId
   }))
-
-
-  const partyMappingData = await partyNameCodeMapping(LocationId)
-  if (!Array.isArray(partyMappingData) || partyMappingData.length == 0) {
-    throw new ApiError(400, `No Matching Party found for Your Location `)
-  }
-
-  const norm = s => String(s ?? "").trim().toLowerCase();
-  const idByName = new Map(
-    partyMappingData.map(({ PartyName, Id }) => [norm(PartyName), Id])
-  );
-
-  const output = formattedData
-    .map(({ PartNumber, Qty, PartyName, LocationId, OrderType, Type, Remarks, UploadedBy }) => {
-      const PartyId = idByName.get(norm(PartyName));
-      return PartyId != null ? { PartNumber, Qty, PartyId, LocationId, OrderType, Type, Remarks, UploadedBy } : null;
-    })
-    .filter(Boolean);
-
-  return output
+  
+  const { cleanData, errors } = validateAndClean(formattedData, {
+      required: ["PartNumber", "Qty"],
+      qtyFields: ["Qty"],          // must be > 0
+      coerceQty: true,             // put numeric Qty in cleanData
+      partField: "PartNumber"      // sanitize this field
+    });
+    
+    if (errors.length) {
+      throw new ApiError(400, "Excel validation failed", errors, "");
+    }
+  
+  return cleanData
 }
 
 const spmBulkWSUpload = async (LocationId, OrderType, file, userId) => {
@@ -122,20 +201,7 @@ const spmBulkWSUpload = async (LocationId, OrderType, file, userId) => {
   if (missingHeaders.length > 0) {
     throw new ApiError(400, "Missing headers or data", missingHeaders, '');
   }
-  const isBlank = v =>
-    v == null || (typeof v === "string" && v.trim() === "") || (typeof v === "number" && Number.isNaN(v));
 
-  // objects where any required key is missing/blank
-  const missingRows = data.filter(row => REQUIRED_HEADERS.some(k => isBlank(row[k])));
-
-  //  include which keys are missing
-  const issues = data
-    .map((row, i) => ({ index: i, missing: REQUIRED_HEADERS.filter(k => isBlank(row[k])), row }))
-    .filter(x => x.missing.length);
-
-  if (missingRows.length != 0 || issues.length != 0) {
-    throw new ApiError(400, `Data Incomplete`, { missingRows, issues }, '')
-  }
   const formattedData = data.map((row) => ({
     ...row,
     LocationId: LocationId,
@@ -143,7 +209,20 @@ const spmBulkWSUpload = async (LocationId, OrderType, file, userId) => {
     Type: "S",
     UploadedBy: userId
   }))
-  return formattedData
+
+  const { cleanData, errors } = validateAndClean(formattedData, {
+      required: ["PartNumber", "Qty"],
+      qtyFields: ["Qty"],          // must be > 0
+      coerceQty: true,             // put numeric Qty in cleanData
+      partField: "PartNumber"      // sanitize this field
+    });
+    // console.log(cleanData,errors);
+    
+    if (errors.length) {
+      throw new ApiError(400, "Excel validation failed", errors, "");
+    }
+
+    return cleanData;
 }
 
 // const spmBulkVehicleUpload = async(file, LocationId , userId)=>{
@@ -210,6 +289,7 @@ const spmBulkWSUpload = async (LocationId, OrderType, file, userId) => {
 
 //         return formattedData
 // }
+
 const spmBulkVehicleUpload = async (file, LocationId, userId) => {
   let { headers, data } = await readExcel(file); // make sure readExcel uses defval:null
   fs.unlinkSync(file);
@@ -310,8 +390,8 @@ const partyNameCodeMapping = async (LocationId) => {
     const pool = await getPool1()
     const query = `
         use z_scope
-        select Id , PartyName , PartyCode from AAP_SPMPartyMaster
-        where LocationId = ${LocationId}`
+        select Id , PartyName , PartyCode , LocationId from AAP_SPMPartyMaster
+        where LocationId = ${LocationId} and status = 1`
 
     const result = await pool.request().query(query)
     return result.recordset
@@ -321,27 +401,21 @@ const partyNameCodeMapping = async (LocationId) => {
   }
 }
 
-const stockViewService = async (file, LocationId, OrderType, userId) => {
-  const pool = await getPool1()
-  let { headers, data } = await readExcel(file);
-  fs.unlinkSync(file);
+const stockViewService = async (formattedData, BrandId) => {
+  try {
+    const pool = await getPool1()
+    const jsonPayload = JSON.stringify(formattedData);
 
-  const formattedData = data.map((row) => ({
-    ...row,
-    LocationId: LocationId,
-    OrderType: OrderType,
-  }))
+    const result = await pool.request()
+      .input('Json', sql.NVarChar(sql.MAX), jsonPayload)
+      .input('BrandId', sql.Int, BrandId)
+      .execute('dbo.StockView_FromJson')
 
-  const jsonPayload = JSON.stringify(formattedData);
+    return result.recordset
 
-  const result = await pool.request()
-    .input('Json', sql.NVarChar(sql.MAX), jsonPayload)
-    .input('BrandId', sql.Int, 9)           // or make this a function arg
-    .execute('dbo.StockView_FromJson');
-
-
-  return result.recordset
-
+  } catch (error) {
+    throw new ApiError(500, error.message, [])
+  }
 
 }
 
@@ -440,10 +514,7 @@ const getduplicatesArray = async (arr) => {
     .map(([k, e]) => ({ key: k, count: e.count, sample: e.sample }));
 }
 
-// Checks if PhoneNo / Email already exist anywhere in the Advisor table.
-// Input: array of { LocationId, Advisor, PhoneNo, Email, userId }
-// Output: array of conflicted rows with conflictBy: 'PhoneNo' | 'Email' | 'Both'
-const advisorAlreadyExistsCheck = async (data, tableName ) => {
+const advisorAlreadyExistsCheck = async (data, tableName) => {
   const pool = await getPool1();
 
   // --- helpers ---
@@ -647,4 +718,4 @@ const findAdvisorOnLocation = async (
 //   }
 // }
 
-export { findAdvisorOnLocation,advisorAlreadyExistsCheck, getduplicatesArray, partyAlreadyExistsCheck, stockViewService, spmBulkCSUpload, spmMultiCSUpload, spmBulkWSUpload, spmBulkVehicleUpload, partyNameCodeMapping }
+export { findAdvisorOnLocation, advisorAlreadyExistsCheck, getduplicatesArray, partyAlreadyExistsCheck, stockViewService, spmBulkCSUpload, spmMultiCSUpload, spmBulkWSUpload, spmBulkVehicleUpload, partyNameCodeMapping }

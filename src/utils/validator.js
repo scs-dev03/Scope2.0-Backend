@@ -1,4 +1,7 @@
-// // normalize helpers
+import { getPool1 } from "../db/db.js";
+import sql from 'mssql'
+
+// normalize helpers
 // export const normStr = (v, max = 30) =>
 //   v == null ? null : String(v).trim().slice(0, max);
 
@@ -160,7 +163,7 @@ export function normalizeAdvisorRows(rows) {
     ...r,
     Advisor: normStr(r?.Advisor, 100),
     PhoneNo: normPhone(r?.PhoneNo, 20),
-    Email:   normEmail(r?.Email, 320),
+    Email: normEmail(r?.Email, 320),
   }));
 }
 
@@ -197,10 +200,10 @@ export function validateExcelRows(rows) {
     // Row numbers as in Excel: header = row 1, first data row = 2
     const rowNum = excelRowOf(i);
 
-    const advisor    = normStr(raw?.Advisor, 100);
+    const advisor = normStr(raw?.Advisor, 100);
     const advisorKey = normLower(raw?.Advisor, 100);
-    const phone      = (normPhone(raw?.PhoneNo, 20) ?? "");  // use "" for map keys
-    const email      = normLower(normEmail(raw?.Email, 320) ?? "", 320);
+    const phone = (normPhone(raw?.PhoneNo, 20) ?? "");  // use "" for map keys
+    const email = normLower(normEmail(raw?.Email, 320) ?? "", 320);
 
     if (!advisor) issues.missingAdvisor.push(rowNum);
 
@@ -288,10 +291,734 @@ export function validatePartyExcelRows(rows) {
   return {
     isValid,
     issues: {
-      rowsBothBlank,         
+      rowsBothBlank,
       duplicatePartyCodes,   // [{ key:'vishu123', rows:[2,3,4] }, ...]
       duplicatePartyNames,   // [{ key:'testing', rows:[...]}]
     },
   };
 }
 
+// export function validateCommonRows(data, { allowDuplicates = false } = {}) {
+//   const isBlank = v =>
+//     v == null ||
+//     (typeof v === "string" && v.trim() === "") ||
+//     (typeof v === "number" && Number.isNaN(v));
+
+//   const norm = s => String(s ?? "").trim().toLowerCase();
+//   const partRegex = /^[A-Za-z0-9]+$/;
+
+//   const missingCells = [];
+//   const invalidPartChars = [];
+//   const duplicateParts = [];
+
+//   // Only track duplicates when disallowed
+//   const partSeen = allowDuplicates ? null : new Map();
+//   const partRows = allowDuplicates ? null : new Map();
+
+//   const cleaned = data.map((row, i) => {
+//     const PartNumber = row.PartNumber;
+//     const Qty = row.Qty;
+
+//     // Missing fields
+//     const details = [];
+//     if (isBlank(PartNumber)) details.push({ field: "PartNumber", message: "PartNumber is required" });
+//     if (isBlank(Qty)) details.push({ field: "Qty", message: "Qty is required" });
+//     if (details.length) missingCells.push({ index: i, conflictBy: "MissingCell", details, row });
+
+//     // Char rule
+//     if (!isBlank(PartNumber) && !partRegex.test(String(PartNumber))) {
+//       invalidPartChars.push({
+//         index: i,
+//         conflictBy: "InvalidPartNumber",
+//         field: "PartNumber",
+//         value: PartNumber,
+//         message: "PartNumber must be alphanumeric only (no spaces or special characters)",
+//         row
+//       });
+//     }
+
+//     // Track for duplicates only if not allowed
+//     if (!allowDuplicates && !isBlank(PartNumber)) {
+//       const key = norm(PartNumber);
+//       partSeen.set(key, (partSeen.get(key) || 0) + 1);
+//       if (!partRows.has(key)) partRows.set(key, []);
+//       partRows.get(key).push(i);
+//     }
+
+//     return {
+//       ...row,
+//       PartNumber: isBlank(PartNumber) ? PartNumber : String(PartNumber).trim(),
+//       Qty: isBlank(Qty) ? Qty : Number(Qty)
+//     };
+//   });
+
+//   // Expand duplicate errors if disallowed
+//   if (!allowDuplicates) {
+//     for (const [key, count] of partSeen.entries()) {
+//       if (count > 1) {
+//         const idxs = partRows.get(key) || [];
+//         for (const i of idxs) {
+//           const value = cleaned[i].PartNumber;
+//           duplicateParts.push({
+//             index: i,
+//             conflictBy: "DuplicatePartNumber",
+//             field: "PartNumber",
+//             value,
+//             message: "Duplicate PartNumber",
+//             row: data[i]
+//           });
+//         }
+//       }
+//     }
+//   }
+
+//   const errors = [];
+//   if (missingCells.length) errors.push({ conflictBy: "MissingCell", items: missingCells });
+//   if (invalidPartChars.length) errors.push({ conflictBy: "InvalidPartNumber", items: invalidPartChars });
+//   if (duplicateParts.length) errors.push({ conflictBy: "DuplicatePartNumber", items: duplicateParts });
+
+//   return { cleaned, errors };
+// }
+// export function validateCommonRows(data, { allowDuplicates = false } = {}) {
+//   const isBlank = v =>
+//     v == null ||
+//     (typeof v === "string" && v.trim() === "") ||
+//     (typeof v === "number" && Number.isNaN(v));
+
+//   const norm = s => String(s ?? "").trim().toLowerCase();
+//   const partRegex = /^[A-Za-z0-9]+$/;
+
+//   const missingCells = [];
+//   const invalidPartChars = [];
+//   const invalidQty = [];              // <-- NEW
+//   const duplicateParts = [];
+
+//   // Only track duplicates when disallowed
+//   const partSeen = allowDuplicates ? null : new Map();
+//   const partRows = allowDuplicates ? null : new Map();
+
+//   const cleaned = data.map((row, i) => {
+//     const PartNumber = row.PartNumber;
+//     const Qty = row.Qty;
+
+//     // Missing fields
+//     const details = [];
+//     if (isBlank(PartNumber)) details.push({ field: "PartNumber", message: "PartNumber is required" });
+//     if (isBlank(Qty)) details.push({ field: "Qty", message: "Qty is required" });
+//     if (details.length) missingCells.push({ index: i, conflictBy: "MissingCell", details, row });
+
+//     // Char rule
+//     if (!isBlank(PartNumber) && !partRegex.test(String(PartNumber))) {
+//       invalidPartChars.push({
+//         index: i,
+//         conflictBy: "InvalidPartNumber",
+//         field: "PartNumber",
+//         value: PartNumber,
+//         message: "PartNumber must be alphanumeric only (no spaces or special characters)",
+//         row
+//       });
+//     }
+
+//     // Qty must be > 0 (only when Qty is present; NaN/blank handled above)
+//     const qtyNum = Number(Qty);
+//     if (!isBlank(Qty) && (Number.isNaN(qtyNum) || qtyNum <= 0)) {
+//       invalidQty.push({
+//         index: i,
+//         conflictBy: "InvalidQty",
+//         field: "Qty",
+//         value: Qty,
+//         message: "Qty must be greater than 0",
+//         row
+//       });
+//     }
+
+//     // Track for duplicates only if not allowed
+//     if (!allowDuplicates && !isBlank(PartNumber)) {
+//       const key = norm(PartNumber);
+//       partSeen.set(key, (partSeen.get(key) || 0) + 1);
+//       if (!partRows.has(key)) partRows.set(key, []);
+//       partRows.get(key).push(i);
+//     }
+
+//     return {
+//       ...row,
+//       PartNumber: isBlank(PartNumber) ? PartNumber : String(PartNumber).trim(),
+//       Qty: isBlank(Qty) ? Qty : qtyNum
+//     };
+//   });
+
+//   // Expand duplicate errors if disallowed
+//   if (!allowDuplicates) {
+//     for (const [key, count] of partSeen.entries()) {
+//       if (count > 1) {
+//         const idxs = partRows.get(key) || [];
+//         for (const i of idxs) {
+//           const value = cleaned[i].PartNumber;
+//           duplicateParts.push({
+//             index: i,
+//             conflictBy: "DuplicatePartNumber",
+//             field: "PartNumber",
+//             value,
+//             message: "Duplicate PartNumber",
+//             row: data[i]
+//           });
+//         }
+//       }
+//     }
+//   }
+
+//   const errors = [];
+//   if (missingCells.length) errors.push({ conflictBy: "MissingCell", items: missingCells });
+//   if (invalidPartChars.length) errors.push({ conflictBy: "InvalidPartNumber", items: invalidPartChars });
+//   if (invalidQty.length) errors.push({ conflictBy: "InvalidQty", items: invalidQty }); // <-- NEW
+//   if (duplicateParts.length) errors.push({ conflictBy: "DuplicatePartNumber", items: duplicateParts });
+
+//   return { cleaned, errors };
+// }
+
+export function validateCommonRows(data, { allowDuplicates = false } = {}) {
+  const isBlank = v =>
+    v == null ||
+    (typeof v === "string" && v.trim() === "") ||
+    (typeof v === "number" && Number.isNaN(v));
+
+  const norm = s => String(s ?? "").trim().toLowerCase();
+  const partRegex = /^[A-Za-z0-9]+$/;
+
+  // For duplicates (only if not allowed)
+  const partSeen = allowDuplicates ? null : new Map();
+  const partRows = allowDuplicates ? null : new Map();
+
+  const flatErrors = []; // <-- single flat array
+
+  const cleaned = data.map((row, i) => {
+    const PartNumber = row.PartNumber;
+    const QtyRaw = row.Qty;
+    const qtyNum = Number(QtyRaw);
+
+    // --- Missing checks
+    if (isBlank(PartNumber)) {
+      flatErrors.push({
+        index: i,
+        PartNumber: PartNumber ?? null,
+        row,
+        field: "PartNumber",
+        type: "MissingCell",
+        message: "PartNumber is required"
+      });
+    }
+    if (isBlank(QtyRaw)) {
+      flatErrors.push({
+        index: i,
+        PartNumber: PartNumber ?? null,
+        row,
+        field: "Qty",
+        type: "MissingCell",
+        message: "Qty is required"
+      });
+    }
+
+    // --- Character rule for PartNumber
+    if (!isBlank(PartNumber) && !partRegex.test(String(PartNumber))) {
+      flatErrors.push({
+        index: i,
+        PartNumber: String(PartNumber).trim(),
+        row,
+        field: "PartNumber",
+        type: "InvalidPartNumber",
+        message: "Parts contain special characters"
+      });
+    }
+
+    // --- Qty > 0 rule
+    if (!isBlank(QtyRaw) && (Number.isNaN(qtyNum) || qtyNum <= 0)) {
+      flatErrors.push({
+        index: i,
+        PartNumber: !isBlank(PartNumber) ? String(PartNumber).trim() : null,
+        row,
+        field: "Qty",
+        type: "InvalidQty",
+        message: "Qty should be greater than 0"
+      });
+    }
+
+    // --- Prepare duplicate tracking
+    if (!allowDuplicates && !isBlank(PartNumber)) {
+      const key = norm(PartNumber);
+      partSeen.set(key, (partSeen.get(key) || 0) + 1);
+      if (!partRows.has(key)) partRows.set(key, []);
+      partRows.get(key).push(i);
+    }
+
+    return {
+      ...row,
+      PartNumber: isBlank(PartNumber) ? PartNumber : String(PartNumber).trim(),
+      Qty: isBlank(QtyRaw) ? QtyRaw : qtyNum
+    };
+  });
+
+  // --- Emit duplicate rows as flat errors
+  if (!allowDuplicates) {
+    for (const [key, count] of partSeen.entries()) {
+      if (count > 1) {
+        const idxs = partRows.get(key) || [];
+        for (const i of idxs) {
+          flatErrors.push({
+            index: i,
+            PartNumber: cleaned[i].PartNumber ?? null,
+            row: data[i],
+            field: "PartNumber",
+            type: "DuplicatePartNumber",
+            message: "Duplicate part found"
+          });
+        }
+      }
+    }
+  }
+  // console.log(flatErrors);
+    
+  return { cleaned, errors: flatErrors };
+}
+
+export const partBrandMappingCheck = async (BrandId, Data) => {
+  try {
+    const pool = await getPool1();
+    const query = `
+      SELECT brandid, partnumber1 PartNumber
+      FROM z_scope.dbo.Part_Master
+      WHERE brandid = @BrandId
+    `;
+    const result = await pool.request()
+      .input("BrandId", sql.Int, BrandId)
+      .query(query);
+
+    const mapped = new Set(
+      (result.recordset || []).map(r => String(r.PartNumber ?? "").trim().toLowerCase())
+    );
+    const unmatched = [];
+    Data.forEach((item, index) => {
+      const pn = String(item.PartNumber ?? "").trim().toLowerCase();
+      if (pn && !mapped.has(pn)) {
+        unmatched.push({PartNumber: item.PartNumber });
+      }
+    });
+
+    return unmatched;
+  } catch (error) {
+    console.error(`Error in partBrandMappingCheck: ${error.message}`);
+    throw error;
+  }
+};
+
+export function orderTypeCheck(ordertype){
+  const REQUIRED_OrderType = ["Normal", "Co-Dealer", "Urgent", "Transfer"]
+  if(!REQUIRED_OrderType.includes(ordertype)){
+    return false;
+  }
+  return true
+}
+
+// strict string normalizer: stringify → replace unicode spaces → trim → collapse → lowercase
+const S = (v) =>
+  (v === null || v === undefined ? "" : String(v))
+    .replace(/[\u00A0\u1680\u180E\u2000-\u200B\u202F\u205F\u3000]/g, " ")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
+/**
+ * Return unique invalid names/codes for the SAME LocationId.
+ * Everything is compared as strings.
+ */
+// export function findInvalidPartiesByLocation(data, mapping) {
+//   // loc -> { names:Set<string>, codes:Set<string> }
+//   const validByLoc = new Map();
+
+//   for (const m of Array.isArray(mapping) ? mapping : []) {
+//     const loc = S(m.LocationId ?? m.locationid ?? m.LOCATIONID);
+//     if (!loc) continue;
+//     const name = S(m.PartyName ?? m.partyname ?? m.Party_Name);
+//     const code = S(m.PartyCode ?? m.partycode ?? m.Party_Code);
+
+//     if (!validByLoc.has(loc)) validByLoc.set(loc, { names: new Set(), codes: new Set() });
+//     if (name) validByLoc.get(loc).names.add(name);
+//     if (code) validByLoc.get(loc).codes.add(code);
+//   }
+
+//   const seenName = new Set();
+//   const seenCode = new Set();
+//   const invalidPartyNames = [];
+//   const invalidPartyCodes = [];
+
+//   for (const row of Array.isArray(data) ? data : []) {
+//     const loc = S(row.LocationId ?? row.locationid);
+//     const valids = validByLoc.get(loc);
+//     if (!valids) continue; // no mapping for this location → don't flag
+
+//     const nameRaw = row.PartyName;
+//     const codeRaw = row.PartyCode;
+//     const nameKey = S(nameRaw);
+//     const codeKey = S(codeRaw);
+
+//     if (nameKey && !valids.names.has(nameKey) && !seenName.has(nameKey)) {
+//       seenName.add(nameKey);
+//       invalidPartyNames.push(nameRaw); // preserve original
+//     }
+//     if (codeKey && !valids.codes.has(codeKey) && !seenCode.has(codeKey)) {
+//       seenCode.add(codeKey);
+//       invalidPartyCodes.push(codeRaw);
+//     }
+//   }
+
+//   return { invalidPartyNames, invalidPartyCodes };
+// }
+
+
+// strict string normalizer
+// const S = (v) =>
+//   (v == null ? "" : String(v))
+//     .replace(/[\u00A0\u1680\u180E\u2000-\u200B\u202F\u205F\u3000]/g, " ")
+//     .trim()
+//     .replace(/\s+/g, " ")
+//     .toLowerCase();
+
+/**
+ * First collect errors; if any → return them.
+ * If none → return mapped rows with PartyId (PartyName/PartyCode removed).
+ *
+ * mapping: [{ Id, PartyName, PartyCode?, LocationId }, ...]
+ * data:    [{ PartyName?, PartyCode?, LocationId, ... }, ...]
+ *
+ * Return shape:
+ *  - { ok:false, invalidPartyNames:[], invalidPartyCodes:[], mismatches:[] }
+ *  - { ok:true,  mapped:[...] }
+ */
+export function mapPartiesOrCollectInvalidFirst(data, mapping) {
+  // Build per-location lookups (string keys)
+  const byLocName = new Map(); // loc -> Map<nameKey, PartyId>
+  const byLocCode = new Map(); // loc -> Map<codeKey, PartyId>
+
+  for (const m of Array.isArray(mapping) ? mapping : []) {
+    const loc = S(m.LocationId ?? m.locationid ?? m.LOCATIONID);
+    if (!loc) continue;
+    const id = m.PartyId ?? m.PartyID ?? m.Id ?? m.id;
+    const nameKey = S(m.PartyName ?? m.partyname ?? m.Party_Name);
+    const codeKey = S(m.PartyCode ?? m.partycode ?? m.Party_Code);
+
+    if (!byLocName.has(loc)) byLocName.set(loc, new Map());
+    if (!byLocCode.has(loc)) byLocCode.set(loc, new Map());
+    if (nameKey) byLocName.get(loc).set(nameKey, id);
+    if (codeKey) byLocCode.get(loc).set(codeKey, id);
+  }
+
+  const invalidPartyNames = new Set();
+  const invalidPartyCodes = new Set();
+  const mismatches = [];
+
+  // 1) Validate
+  for (const r of Array.isArray(data) ? data : []) {
+    const loc = S(r.LocationId ?? r.locationid);
+    const nameKey = S(r.PartyName);
+    const codeKey = S(r.PartyCode);
+
+    const nameId = byLocName.get(loc)?.get(nameKey) ?? null;
+    const codeId = byLocCode.get(loc)?.get(codeKey) ?? null;
+
+    if (nameKey && codeKey && nameId && codeId && nameId !== codeId) {
+      mismatches.push({ PartyName: r.PartyName, PartyCode: r.PartyCode, LocationId: r.LocationId });
+      continue;
+    }
+    if (!nameId && !codeId) {
+      if (codeKey) invalidPartyCodes.add(String(r.PartyCode));
+      else if (nameKey) invalidPartyNames.add(String(r.PartyName));
+    }
+  }
+
+  if (mismatches.length || invalidPartyNames.size || invalidPartyCodes.size) {
+    return {
+      ok: false,
+      invalidPartyNames: [...invalidPartyNames],
+      invalidPartyCodes: [...invalidPartyCodes],
+      mismatches
+    };
+  }
+
+  // 2) Map
+  const mapped = [];
+  for (const r of data) {
+    const loc = S(r.LocationId ?? r.locationid);
+    const codeId = byLocCode.get(loc)?.get(S(r.PartyCode)) ?? null;
+    const nameId = byLocName.get(loc)?.get(S(r.PartyName)) ?? null;
+    const partyId = codeId ?? nameId; // prefer code if present
+    const out = { ...r, PartyId: partyId };
+    delete out.PartyName;
+    delete out.PartyCode;
+    mapped.push(out);
+  }
+
+  return { ok: true, mapped };
+}
+
+/**
+ * Returns { cleanData, errors }
+ * - Errors are ONLY:
+ *   { message: "Cell Empty", data: [...] }
+ *   { message: "Qty is Zero", data: [...] }
+ * - PartNumber is sanitized (special chars removed) in cleanData.
+ *
+ * @param {Array<object>} data
+ * @param {object} cfg
+ * @param {string[]} cfg.required - fields that must be non-blank
+ * @param {string[]} [cfg.qtyFields=["Qty"]] - fields that must be > 0 numeric
+ * @param {boolean} [cfg.coerceQty=true] - coerce qty fields to Number in cleanData
+ * @param {string} [cfg.partField="PartNumber"] - field to sanitize by removing specials
+ */
+export function validateAndClean(data, {
+  required,
+  qtyFields = ["Qty"],
+  coerceQty = true,
+  partField = "PartNumber",
+} = {}) {
+  
+  const isBlank = v =>
+    v == null ||
+    (typeof v === "string" && v.trim() === "") ||
+    (typeof v === "number" && Number.isNaN(v));
+
+  const stripSpecials = s => String(s ?? "").replace(/[^A-Za-z0-9]/g, "").trim();
+
+  const cellEmptyRows = [];
+  const qtyZeroRows = [];
+
+  const cleanData = data.map(row => {
+    const r = { ...row };
+
+    // sanitize PartNumber (no error, just clean)
+    if (partField in r && !isBlank(r[partField])) {
+      r[partField] = stripSpecials(r[partField]);
+    }
+
+    // collect "Cell Empty" if ANY required is blank (after sanitization for PartNumber)
+    if (Array.isArray(required) && required.some(f => isBlank(r[f]))) {
+      cellEmptyRows.push(row); // push original row as requested
+    }
+
+    // check qty fields
+    if (Array.isArray(qtyFields) && qtyFields.length) {
+      let anyBadQty = false;
+      for (const f of qtyFields) {
+        const val = r[f];
+        if (!isBlank(val)) {
+          const num = Number(val);
+          if (coerceQty) r[f] = num; // reflect numeric in cleanData
+          if (!Number.isFinite(num) || num <= 0) {
+            anyBadQty = true;
+          }
+        } else {
+          // blank qty counts as zero/bad
+          anyBadQty = true;
+        }
+      }
+      if (anyBadQty) qtyZeroRows.push(row); // original row
+    }
+
+    return r;
+  });
+
+  const errors = [];
+  if (cellEmptyRows.length) errors.push({ message: "Cell Empty", data: cellEmptyRows });
+  if (qtyZeroRows.length) errors.push({ message: "Qty is Zero", data: qtyZeroRows });
+
+  return { cleanData, errors };
+}
+
+/**
+ * Group by PartyId + PartNumber, sum Qty, and concat non-empty Remarks (comma-separated).
+ * Keeps the first occurrence's other fields.
+ */
+/**
+ * Consolidate rows:
+ * - If groupByParty = true  -> group by (PartyId + PartNumber)
+ * - If groupByParty = false -> group by (PartNumber) only
+ * - Sums Qty
+ * - Concats non-empty Remarks (comma-separated, de-duped)
+ * - Preserves the first row's other fields for each group
+ */
+export function consolidateLines(rows, { groupByParty = true } = {}) {
+  const keyOf = r => {
+    const pn = String(r.PartNumber).trim();
+    return groupByParty ? `${String(r.PartyId)}|${pn}` : pn;
+  };
+
+  const out = [];
+  const pos = new Map(); // key -> index in out
+
+  for (const r of rows) {
+    const key = keyOf(r);
+    const qty = Number(r.Qty);
+    if (!Number.isFinite(qty)) continue; // or throw
+
+    const remark = (r.Remarks ?? "").toString().trim();
+
+    if (pos.has(key)) {
+      const idx = pos.get(key);
+      out[idx].Qty += qty;
+
+      if (remark) {
+        if (!out[idx].__remarks) out[idx].__remarks = new Set();
+        out[idx].__remarks.add(remark);
+      }
+    } else {
+      const clone = {
+        ...r,
+        PartNumber: String(r.PartNumber).trim(),
+        Qty: qty
+      };
+      if (remark) clone.__remarks = new Set([remark]);
+      out.push(clone);
+      pos.set(key, out.length - 1);
+    }
+  }
+
+  // finalize remarks
+  for (const o of out) {
+    if (o.__remarks && o.__remarks.size) {
+      o.Remarks = Array.from(o.__remarks).join(", ");
+    }
+    delete o.__remarks;
+  }
+
+  return out;
+}
+
+// helper: split formattedData into valid vs invalid using a key (default PartNumber)
+export function splitByInvalid (formattedData, invalidParts, key = 'PartNumber') {
+  const norm = v => (v === null || v === undefined) ? '' : String(v).trim().toUpperCase();
+
+  // Build a set of invalid keys (supports [{PartNumber: 'x'}] or ['x', 123, ...])
+  const invalidKeySet = new Set(
+    (invalidParts || []).map(p => {
+      if (p && typeof p === 'object' && key in p) return norm(p[key]);
+      return norm(p);
+    })
+  );
+
+  // Separate lists and also keep a normalized lookup to echo exact invalid rows we skipped
+  const validData = [];
+  const skipped = [];
+
+  for (const row of formattedData || []) {
+    const k = norm(row?.[key]);
+    if (invalidKeySet.has(k)) skipped.push(row);
+    else validData.push(row);
+  }
+  return { validData, skipped };
+};
+
+const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj ?? {}, key);
+export function payloadValidator(body, { requirePartyId = false } = {}) {
+const errors = [];
+
+  // --- Top-level keys
+  const missingTop = [];
+  if (!hasOwn(body, "BrandId")) missingTop.push("BrandId");
+  if (!hasOwn(body, "payload")) missingTop.push("payload");
+
+  if (missingTop.length) {
+    errors.push({ message: "Missing Values", data: missingTop });
+    return { ok: false, errors };
+  }
+
+  // payload must be an array key-wise; if not array, treat "payload" as missing structure
+  const rows = Array.isArray(body.payload) ? body.payload : [];
+  if (!rows.length) {
+    // "payload" key exists but is empty/invalid: choose to flag the rows' required keys as missing
+    errors.push({ message: "Missing Values", data: ["payload[] items"] });
+    return { ok: false, errors };
+  }
+
+  // --- Row-level required keys
+  const baseRequired = ["LocationId", "OrderType", "PartNumber", "userId", "Qty"];
+  const required = requirePartyId ? [...baseRequired, "PartyId"] : baseRequired;
+
+  // collect union of missing keys across all rows
+  const missingRowKeys = new Set();
+  for (const r of rows) {
+    for (const k of required) {
+      if (!hasOwn(r, k)) missingRowKeys.add(k);
+    }
+  }
+
+  if (missingRowKeys.size) {
+    errors.push({ message: "Missing Values", data: Array.from(missingRowKeys) });
+    return { ok: false, errors };
+  }
+
+
+  return { ok: true, errors: [] };
+}
+
+
+export function mapPartyIds(rows, master) {
+  const norm = v => (v == null ? '' : String(v).trim().toLowerCase());
+
+  // Build lookups per LocationId
+  const byLoc = new Map(); // key: loc -> {code->Id, name->Id}
+  for (const p of master) {
+    const loc = String(p.LocationId);
+    const code = norm(p.PartyCode);
+    const name = norm(p.PartyName);
+    if (!byLoc.has(loc)) byLoc.set(loc, { code: new Map(), name: new Map() });
+
+    if (code) byLoc.get(loc).code.set(code, p.Id);
+    if (name) byLoc.get(loc).name.set(name, p.Id);
+  }
+
+  const mapped = [];
+  const unmatched = [];
+  const conflicts = [];
+
+  for (const r of rows) {
+    const loc = String(r.LocationId);
+    const look = byLoc.get(loc);
+    const codeKey = norm(r.PartyCode);
+    const nameKey = norm(r.PartyName);
+
+    let idByCode = null, idByName = null;
+
+    if (look) {
+      if (codeKey) idByCode = look.code.get(codeKey) ?? null;
+      if (nameKey) idByName = look.name.get(nameKey) ?? null;
+    }
+
+    // prefer code; fall back to name
+    const chosenId = idByCode ?? idByName ?? null;
+
+    // conflict if both exist but different
+    if (idByCode && idByName && idByCode !== idByName) {
+      conflicts.push({
+        message: 'PartyCode and PartyName map to different PartyIds for this Location',
+        row: r,
+        idByCode,
+        idByName
+      });
+    }
+
+    const out = { ...r, PartyId: chosenId };
+    mapped.push(out);
+
+    if (!chosenId) {
+      unmatched.push({
+        reason: 'No match in master for this LocationId',
+        row: r,
+      });
+    }
+  }
+
+  return { mapped, unmatched, conflicts };
+}
+
+
+// mapped[0].PartyId -> 89
+// unmatched -> [] for this example
+// conflicts -> [] for this example

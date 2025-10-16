@@ -2,37 +2,38 @@ import { getPool1 } from "../../db/db.js";
 import sql from 'mssql'
 import { ApiError } from "../../utils/ApiError.js";
 
-const viewPartyService = async (LocationId) => {
-    try {
-        const pool = await getPool1()
-        const query = `use [z_scope] select Id,  PartyName , PartyCode , CreatedAt , Status from AAP_SPMPartyMaster where LocationId = @LocationId`
-        const result = await pool.request().input('LocationId', sql.Int, LocationId).query(query)
-        return result.recordset
-    }
-    catch (error) {
-        throw new ApiError(500, error.message, []);
+const viewPartyService = async (LocationId, Status) => {
+  try {
+    const pool = await getPool1()
+    const query = `use [z_scope] select Id,  PartyName , PartyCode , CreatedAt , Status from AAP_SPMPartyMaster where LocationId = @LocationId and (@Status is NULL OR Status = @Status)  `
+    const result = await pool.request()
+      .input('LocationId', sql.Int, LocationId)
+      .input('Status', sql.Bit, Status ?? null).query(query)
+    return result.recordset
+  }
+  catch (error) {
+    throw new ApiError(500, error.message, []);
 
-    }
+  }
 }
 
 const viewAdvisorService = async (LocationId) => {
-    try {
-        const pool = await getPool1()
-        const query = `use [z_scope] select Id, Advisor , PhoneNo , Email , CreatedAt , Status from AAP_SPMAdvisorMaster where LocationId = @LocationId`
-        const result = await pool.request().input('LocationId', sql.Int, LocationId).query(query)
-        return result.recordset
-    }
-    catch (error) {
-        throw new ApiError(500, error.message, []);
+  try {
+    const pool = await getPool1()
+    const query = `use [z_scope] select Id, Advisor , PhoneNo , Email , CreatedAt , Status from AAP_SPMAdvisorMaster where LocationId = @LocationId`
+    const result = await pool.request().input('LocationId', sql.Int, LocationId).query(query)
+    return result.recordset
+  }
+  catch (error) {
+    throw new ApiError(500, error.message, []);
 
-    }
+  }
 }
 
 const updatePartyService = async (Id, PartyName, PartyCode, status) => {
   try {
     const pool = await getPool1();
 
-    // Validate Id
     const idInt = Number(Id);
     if (!Number.isInteger(idInt)) {
       throw new ApiError(400, 'Invalid Id', []);
@@ -41,8 +42,6 @@ const updatePartyService = async (Id, PartyName, PartyCode, status) => {
     const req = pool.request().input('Id', sql.Int, idInt);
     const setParts = [];
 
-    // Only update when the value is NOT null/undefined.
-    // Note: empty string "" WILL update (as requested, we only skip nulls).
     if (PartyName !== null && PartyName !== undefined) {
       req.input('PartyName', sql.VarChar(30), String(PartyName).trim());
       setParts.push('PartyName = @PartyName');
@@ -54,15 +53,10 @@ const updatePartyService = async (Id, PartyName, PartyCode, status) => {
     }
 
     if (status !== null && status !== undefined) {
-      // If Status column is BIT in SQL Server:
       req.input('Status', sql.Bit, Number(status) ? 1 : 0);
-      // If it's a VARCHAR/TINYINT instead, use one of:
-      // req.input('Status', sql.TinyInt, Number(status));
-      // req.input('Status', sql.VarChar(20), String(status).trim());
       setParts.push('Status = @Status');
     }
 
-    // Nothing to update if all were null/undefined
     if (setParts.length === 0) return 0;
 
     const query = `
@@ -74,10 +68,9 @@ const updatePartyService = async (Id, PartyName, PartyCode, status) => {
       FROM [z_scope].dbo.AAP_SPMPartyMaster
       WHERE Id = @Id;
     `;
-    
+
     const result = await req.query(query);
-    
-    // rowsAffected[0] gives the UPDATE count; the SELECT follows
+
     return {
       updatedCount: result.rowsAffected?.[0] ?? 0,
       updatedRow: result.recordsets?.[1]?.[0] || result.recordset?.[0] || null
@@ -113,8 +106,8 @@ const updateAdvisorService = async (
 
     // --- normalize inputs (null/undefined => skip) ---
     const advisorVal = normAdvisor(Advisor);
-    const phoneVal   = normPhone(PhoneNo);
-    const emailVal   = normEmail(Email);
+    const phoneVal = normPhone(PhoneNo);
+    const emailVal = normEmail(Email);
 
     // Status: if provided (including 0), coerce to BIT 0/1
     const statusProvided = Status !== null && Status !== undefined;
@@ -167,8 +160,17 @@ const updateAdvisorService = async (
   }
 };
 
+const existingPartyNameandCodeService = async (Id)=>{
+try {
+    const pool = await getPool1()
+    const query = `select PartyName , PartyCode from z_scope..AAP_SPMPartyMaster where LocationId = (select LocationId from z_scope..AAP_SPMPartyMaster where Id = @Id)`
+    const result = await pool.request().input(`Id`,sql.Int,Id).query(query)
+    return result.recordset
+} catch (error) {
+  throw new ApiError(500,`Failed to get Existing PartyName and Code`,[],error.message)
+}
+}
 
 
 
-
-export { viewPartyService, viewAdvisorService, updatePartyService ,updateAdvisorService }
+export { viewPartyService, viewAdvisorService, updatePartyService, updateAdvisorService , existingPartyNameandCodeService }
