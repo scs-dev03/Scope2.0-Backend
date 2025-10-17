@@ -211,7 +211,7 @@ const vehicleSearch = async (req, res) => {
             : (filter === 'Open' ? 'N' : filter);
 
         // console.log(dealerid,vehicleno ,alltimestk, converted , issued);
-        const check = await vehicledealercheck(vehicleno, dealerid)
+        const check = await vehicledealercheck(vehicleno, dealerid , locationid)
         if (check == 0) {
             return res.status(400).json({
                 message: `Invalid Vehicle Number`
@@ -219,7 +219,7 @@ const vehicleSearch = async (req, res) => {
         }
         const [data1, data2, data3] = await Promise.all([
             vehicleSearchService(dealerid, locationid, vehicleno, alltimestk, converted, issued, pageno, pagesize),
-            vehicleScore(dealerid, vehicleno),
+            vehicleScore(dealerid,locationid, vehicleno),
             //  vehicleSearchPagination(pageno,pagesize,dealerid,vehicleno,alltimestk,issued,converted)
         ])
 

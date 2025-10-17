@@ -1134,12 +1134,14 @@ SELECT count(part_number1)  OVER() as Count,
 FROM data2 d2
 LEFT JOIN data d ON d.latest = d2.Latest
 LEFT JOIN groupstock gs ON gs.Latest = d2.Latest
+Where LocationID = @LocationId
 order by value desc
 OFFSET @offset ROWS
 FETCH NEXT @pagesize ROWS ONLY;
 `
     const result = await pool.request()
       .input('vehicleno', vehicleno)
+      .input('LocationId',sql.Int,locationid)
       .input('filter', filter)
       .input('alltimenonstk', alltimenonstk)
       .input('issued', issued)
@@ -1186,9 +1188,9 @@ const predictiveVehicleSearchService = async (dealerid, vehicleno) => {
   }
 }
 
-const vehicledealercheck = async (vehicleno, dealerid) => {
+const vehicledealercheck = async (vehicleno, dealerid, locationid) => {
   const pool = await getPool2()
-  const query = `select * from z_scope..Create_Order_Request_TD001_${dealerid} where vehiclenumber = '${vehicleno}'`
+  const query = `select * from z_scope..Create_Order_Request_TD001_${dealerid} where vehiclenumber = '${vehicleno}' and LocationId = ${locationid}`
   const result = await pool.request().query(query)
   // console.log(result.recordset);
   // returns 1 if there’s at least one row, otherwise 0
@@ -1277,7 +1279,7 @@ group by l.Part
   }
 }
 
-const vehicleScore = async (dealerid, vehiclenumber) => {
+const vehicleScore = async (dealerid,locationid, vehiclenumber) => {
   try {
     const pool = await getPool2()
     const query =
@@ -1296,7 +1298,7 @@ const vehicleScore = async (dealerid, vehiclenumber) => {
 		  AS OutStockTotal
 	  FROM create_order_request_td001_${dealerid} AS co
 	  JOIN CurrentStock1 AS cs1
-		ON cs1.LocationID = co.LocationID
+		ON cs1.LocationID = ${locationid}--co.LocationID
 	  LEFT JOIN CurrentStock2 AS cs2
 		ON cs2.StockCode   = cs1.tCode
 	   AND cs2.PartNumber = co.Part_Number1	
