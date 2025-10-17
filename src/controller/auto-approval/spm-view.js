@@ -1,5 +1,5 @@
-import { partyAlreadyExistsCheck } from "../../services/auto-approval/spm-uploadService.js"
-import { existingPartyNameandCodeService, updateAdvisorService, updatePartyService, viewAdvisorService, viewPartyService } from "../../services/auto-approval/spm-viewService.js"
+import { findAdvisorOnLocation, partyAlreadyExistsCheck } from "../../services/auto-approval/spm-uploadService.js"
+import { existingAdvisor, existingPartyNameandCodeService, updateAdvisorService, updatePartyService, viewAdvisorService, viewPartyService } from "../../services/auto-approval/spm-viewService.js"
 import { ApiError } from "../../utils/ApiError.js"
 import { ApiResponse } from "../../utils/ApiResponse.js"
 
@@ -52,11 +52,11 @@ const updateParty = async (req, res) => {
             .map(obj => obj.PartyCode)
             .filter(code => code !== null && code !== undefined);
 
-        if(partyNames.includes(PartyName)){
-            return res.status(400).json(new ApiError(400,`PartyName Already Exists`))
+        if (partyNames.includes(PartyName)) {
+            return res.status(400).json(new ApiError(400, `PartyName Already Exists`))
         }
-        if(partyCodes.includes(PartyCode)){
-            return res.status(400).json(new ApiError(400,`PartyCode Already Exists`))
+        if (partyCodes.includes(PartyCode)) {
+            return res.status(400).json(new ApiError(400, `PartyCode Already Exists`))
         }
 
         const result = await updatePartyService(Id, PartyName, PartyCode, status)
@@ -83,6 +83,86 @@ const updateAdvisor = async (req, res) => {
             if (!(s === 0 || s === 1)) {
                 return res.status(400).json(new ApiError(400, 'Status must be 0 or 1 when provided.', [], ''));
             }
+        }
+
+        // const existing = await existingAdvisor(Id)
+        // const existingAdvisorName = existing[0]
+        // const existingAdvisorDetails = existing[1]
+        // // console.log(existingAdvisorName,existingAdvisorDetails);
+
+        // const advisorNames = existingAdvisorName
+        //     .map(obj => obj.Advisor)
+        //     .filter(name => name !== null && name !== undefined);
+        // console.log(advisorNames);
+        // console.log(Advisor.toLowerCase());
+
+        // if (advisorNames.includes(Advisor)) {
+        //     return res.status(400).json(new ApiError(400, `Advisor Already Exists`))
+        // }
+        // const existingPhoneNo = existingAdvisorDetails
+        //     .map(obj => obj.PhoneNo)
+        //     .filter(name => name !== null && name !== undefined);
+
+        // if (existingPhoneNo.includes(PhoneNo)) {
+        //     return res.status(400).json(new ApiError(400, `PhoneNo Already Exists`))
+        // }
+        // const existingEmails = existingAdvisorDetails
+        //     .map(obj => obj.Email)
+        //     .filter(name => name !== null && name !== undefined);
+
+        // if (existingEmails.includes(Email)) {
+        //     return res.status(400).json(new ApiError(400, `Email Already Exists`))
+        // }
+
+        const normStr = s =>
+            s == null ? null : String(s).trim().replace(/\s+/g, ' ').toLowerCase();
+
+        const normPhone = s =>
+            s == null ? null : String(s).replace(/\D/g, ''); // keep digits only
+
+        const normEmail = s =>
+            s == null ? null : String(s).trim().toLowerCase();
+
+        // ----- your code -----
+        const existing = await existingAdvisor(Id);
+        const existingAdvisorName = existing[0];     // [{ Advisor, Id }, ...]
+        const existingAdvisorDetails = existing[1];  // [{ PhoneNo, Email, Id }, ...]
+
+        // Build fast lookup sets (ignore nulls)
+        const advisorSet = new Set(
+            existingAdvisorName
+                .map(o => normStr(o.Advisor))
+                .filter(Boolean)
+        );
+
+        const phoneSet = new Set(
+            existingAdvisorDetails
+                .map(o => normPhone(o.PhoneNo))
+                .filter(Boolean)
+        );
+
+        const emailSet = new Set(
+            existingAdvisorDetails
+                .map(o => normEmail(o.Email))
+                .filter(Boolean)
+        );
+
+        // Normalize incoming values
+        const inAdvisor = normStr(Advisor);
+        const inPhone = normPhone(PhoneNo);
+        const inEmail = normEmail(Email);
+
+        // Case-insensitive / normalized checks
+        if (inAdvisor && advisorSet.has(inAdvisor)) {
+            return res.status(400).json(new ApiError(400, 'Advisor Already Exists'));
+        }
+
+        if (inPhone && phoneSet.has(inPhone)) {
+            return res.status(400).json(new ApiError(400, 'PhoneNo Already Exists'));
+        }
+
+        if (inEmail && emailSet.has(inEmail)) {
+            return res.status(400).json(new ApiError(400, 'Email Already Exists'));
         }
 
         const result = await updateAdvisorService({ Id, Advisor, PhoneNo, Email, Status });

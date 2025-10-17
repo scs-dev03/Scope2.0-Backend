@@ -5,7 +5,7 @@ import { ApiError } from "../../utils/ApiError.js";
 const viewPartyService = async (LocationId, Status) => {
   try {
     const pool = await getPool1()
-    const query = `use [z_scope] select Id,  PartyName , PartyCode , CreatedAt , Status from AAP_SPMPartyMaster where LocationId = @LocationId and (@Status is NULL OR Status = @Status)  `
+    const query = `use [z_scope] select Id,  PartyName , PartyCode , CreatedAt , Status from AAP_SPMPartyMaster where LocationId = @LocationId and (@Status is NULL OR Status = @Status) Order BY Id Desc `
     const result = await pool.request()
       .input('LocationId', sql.Int, LocationId)
       .input('Status', sql.Bit, Status ?? null).query(query)
@@ -20,7 +20,7 @@ const viewPartyService = async (LocationId, Status) => {
 const viewAdvisorService = async (LocationId) => {
   try {
     const pool = await getPool1()
-    const query = `use [z_scope] select Id, Advisor , PhoneNo , Email , CreatedAt , Status from AAP_SPMAdvisorMaster where LocationId = @LocationId`
+    const query = `use [z_scope] select Id, Advisor , PhoneNo , Email , CreatedAt , Status from AAP_SPMAdvisorMaster where LocationId = @LocationId Order By Id Desc`
     const result = await pool.request().input('LocationId', sql.Int, LocationId).query(query)
     return result.recordset
   }
@@ -160,17 +160,39 @@ const updateAdvisorService = async (
   }
 };
 
-const existingPartyNameandCodeService = async (Id)=>{
-try {
+const existingPartyNameandCodeService = async (Id) => {
+  try {
     const pool = await getPool1()
-    const query = `select PartyName , PartyCode from z_scope..AAP_SPMPartyMaster where LocationId = (select LocationId from z_scope..AAP_SPMPartyMaster where Id = @Id)`
-    const result = await pool.request().input(`Id`,sql.Int,Id).query(query)
+    const query = `select PartyName , PartyCode from z_scope..AAP_SPMPartyMaster where LocationId = (select LocationId from z_scope..AAP_SPMPartyMaster where Id = @Id) and Id <> @Id`
+    const result = await pool.request().input(`Id`, sql.Int, Id).query(query)
     return result.recordset
-} catch (error) {
-  throw new ApiError(500,`Failed to get Existing PartyName and Code`,[],error.message)
+  } catch (error) {
+    throw new ApiError(500, `Failed to get Existing PartyName and Code`, [], error.message)
+  }
 }
+
+const existingAdvisor = async (Id) => {
+  try {
+    const pool = await getPool1()
+    const query = `select Advisor from AAP_SPMAdvisorMaster where LocationId = (Select LocationId from AAP_SPMAdvisorMaster where Id = @Id) and Id <> @Id 
+     select PhoneNo , Email from AAP_SPMAdvisorMaster where Id <> @Id `
+    const result = await pool.request().input('Id', sql.Int, Id).query(query)
+    // console.log(result.recordset);
+    return result.recordsets
+  } catch (error) {
+    throw new ApiError(400, error.message)
+  }
 }
+// const existingAdvisorDetails = async (Id) => {
+//   try {
+//     const pool = await getPool1()
+//     const query = `select PhoneNo , Email from AAP_SPMAdvisorMaster where LocationId = (Select LocationId from AAP_SPMAdvisorMaster where Id = @Id) and Id <> @Id `
+//     const result = await pool.request().input('Id', sql.Int, Id).query(query)
+//     // console.log(result.recordset);
+//     return result.recordset
+//   } catch (error) {
+//     throw new ApiError(400, error.message)
+//   }
+// }
 
-
-
-export { viewPartyService, viewAdvisorService, updatePartyService, updateAdvisorService , existingPartyNameandCodeService }
+export { viewPartyService, viewAdvisorService, updatePartyService, updateAdvisorService, existingPartyNameandCodeService, existingAdvisor }
