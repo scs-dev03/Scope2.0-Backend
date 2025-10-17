@@ -22,7 +22,7 @@ try {
 
         await transaction.begin()
         const {Dealerid , LocationId , bigid , remarkid , remark , advancevalue ,vehiclenumber , partnumber , userid} = req.body
-        if(!Dealerid ||  !LocationId || !bigid || !remarkid || !remark==null || !advancevalue == null || !vehiclenumber || !partnumber ||  !userid){
+        if(!Dealerid ||  !LocationId || !bigid || !remarkid  || !remark==null || !advancevalue == null || !vehiclenumber || !partnumber ||  !userid){
             return res.status(400).json({message:`Dealerid , Locationid , bigid , remarkid , remark , advancevalue ,vehiclenumber , partnumber , userid are required`})
         }
         

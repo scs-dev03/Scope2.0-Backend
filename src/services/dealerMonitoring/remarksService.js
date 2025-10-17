@@ -1,126 +1,138 @@
 import { getPool2 } from "../../db/db.js";
 import sql from 'mssql'
 
-const remarkmasterService = async(type)=>{
-try {
-        const pool = await getPool2()
-        const query = `select Id,Remark from z_scope..PPNIRemarkMaster where RemarkFor = @type`
-        const result = await pool.request()
-                                .input('type',sql.VarChar,type)
-                                .query(query)
-    
-        return result
-} catch (error) {
-    throw new Error(`remarkmasterService failed : ${error.message}`);
-    
-}
-}
-
-const partremarkInsertion = async(Dealerid,Locationid,bigid,remarkid,remark,advancevalue,url,vehiclenumber , partnumber , userid , transaction)=>{
+const remarkmasterService = async (type) => {
   try {
-        const pool = await getPool2()
-        const query = `use [z_scope] 
+    const pool = await getPool2()
+    const query = `select Id,Remark from z_scope..PPNIRemarkMaster where RemarkFor = @type`
+    const result = await pool.request()
+      .input('type', sql.VarChar, type)
+      .query(query)
+
+    return result
+  } catch (error) {
+    throw new Error(`remarkmasterService failed : ${error.message}`);
+
+  }
+}
+const asNullableIntStrict = (v, field = 'value') => {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    if (s === '' || s === 'null' || s === 'undefined') return null;
+    if (/^-?\d+$/.test(s)) return parseInt(s, 10);
+    throw new Error(`${field} must be an integer or null`);
+  }
+  if (Number.isInteger(v)) return v;
+  throw new Error(`${field} must be an integer or null`);
+};
+const partremarkInsertion = async (Dealerid, Locationid, bigid, remarkid, remark, advancevalue, url, vehiclenumber, partnumber, userid, transaction) => {
+  // console.log('remarkid:', remarkid, 'type:', typeof remarkid, 'isNaN:', Number.isNaN(remarkid));
+
+  try {
+    const pool = await getPool2()
+    const query = `use [z_scope] 
                       Insert into PartRemark(Dealerid,Locationid,Approvalid,partnumber,vehicleno,Image,advancevalue,remarkid,details,Createdby)
                       Values(@Dealerid,@Locationid,@bigid,@partnumber,@vehiclenumber,@url,@advancevalue,@remarkid,@remark,@userid) `
-  
-      const normalize = (val) => (val === "" || val === undefined ? null : val);
 
-      const result = await pool.request()
-                              .input('Dealerid',sql.Int,Dealerid)
-                              .input('Locationid',sql.Int,Locationid)
-                              .input('bigid',sql.Int,bigid)
-                              .input('remarkid',sql.Int,remarkid)
-                              .input('remark',sql.VarChar,normalize(remark) ?? null)
-                              .input('advancevalue',sql.Int,advancevalue ?? null)
-                              .input('url',sql.NVarChar, url ?? null)
-                              .input('vehiclenumber',sql.VarChar,vehiclenumber)
-                              .input('partnumber',sql.VarChar,partnumber)
-                              .input('userid',sql.Int,userid)
-                              .query(query)
-        await transaction.commit()   
+    const normalize = (val) => (val === "" || val === undefined ? null : val);
+
+    const result = await pool.request()
+      .input('Dealerid', sql.Int, Dealerid)
+      .input('Locationid', sql.Int, Locationid)
+      .input('bigid', sql.Int, bigid)
+      .input('remarkid', sql.Int, asNullableIntStrict(remarkid))
+      .input('remark', sql.VarChar, normalize(remark) ?? null)
+      .input('advancevalue', sql.Int, advancevalue ?? null)
+      .input('url', sql.NVarChar, url ?? null)
+      .input('vehiclenumber', sql.VarChar, vehiclenumber)
+      .input('partnumber', sql.VarChar, partnumber)
+      .input('userid', sql.Int, userid)
+      .query(query)
+    await transaction.commit()
   } catch (error) {
     await transaction.rollback()
     throw new Error(`partremarkInsertion falied: ${error.message}`);
-    
+
   }
 }
 
-const vehicleremarkInsertion = async(Dealerid,Locationid,remarkid,remark,advancevalue,url,vehiclenumber, userid , transaction)=>{
+const vehicleremarkInsertion = async (Dealerid, Locationid, remarkid, remark, advancevalue, url, vehiclenumber, userid, transaction) => {
   try {
-        const pool = await getPool2()
-        const query = `use [z_scope] 
+    const pool = await getPool2()
+    const query = `use [z_scope] 
                       Insert into VehicleRemark(Dealerid,Locationid,vehicleno,Image,advancevalue,remarkid,details,Createdby)
                       Values(@Dealerid,@Locationid,@vehiclenumber,@url,@advancevalue,@remarkid,@remark,@userid) `
-  
-      const result = await pool.request()
-                              .input('Dealerid',sql.Int,Dealerid)
-                              .input('Locationid',sql.Int,Locationid)
-                              .input('remarkid',sql.Int,remarkid)
-                              .input('remark',sql.VarChar,remark ?? null)
-                              .input('advancevalue',sql.Int,advancevalue ?? null)
-                              .input('url',sql.NVarChar,url ?? null)
-                              .input('vehiclenumber',sql.VarChar,vehiclenumber)
-                              .input('userid',sql.Int,userid)
-                              .query(query)
-        await transaction.commit()   
+
+    const result = await pool.request()
+      .input('Dealerid', sql.Int, Dealerid)
+      .input('Locationid', sql.Int, Locationid)
+      .input('remarkid', sql.Int, asNullableIntStrict(remarkid))
+      .input('remark', sql.VarChar, remark ?? null)
+      .input('advancevalue', sql.Int, advancevalue ?? null)
+      .input('url', sql.NVarChar, url ?? null)
+      .input('vehiclenumber', sql.VarChar, vehiclenumber)
+      .input('userid', sql.Int, userid)
+      .query(query)
+    await transaction.commit()
   } catch (error) {
     await transaction.rollback()
     throw new Error(`vehicleremarkInsertion falied: ${error.message}`);
-    
+
   }
 }
 
-const ppnipartremarkInsertion = async(Dealerid,Locationid,bigid,remarkid,remark,advancevalue,url,vehiclenumber , partnumber , userid , transaction)=>{
+const ppnipartremarkInsertion = async (Dealerid, Locationid, bigid, remarkid, remark, advancevalue, url, vehiclenumber, partnumber, userid, transaction) => {
   try {
-        const pool = await getPool2()
-        const query = `use [z_scope] 
+    const pool = await getPool2()
+    const query = `use [z_scope] 
                       Insert into PPNIPartRemark(Dealerid,Locationid,Approvalid,partnumber,vehicleno,Image,advancevalue,remarkid,details,Createdby)
                       Values(@Dealerid,@Locationid,@bigid,@partnumber,@vehiclenumber,@url,@advancevalue,@remarkid,@remark,@userid) `
 
-      const normalize = (val) => (val === "" || val === undefined ? null : val);
+    const normalize = (val) => (val === "" || val === undefined ? null : val);
 
-      const result = await pool.request()
-                              .input('Dealerid',sql.Int,Dealerid)
-                              .input('Locationid',sql.Int,Locationid)
-                              .input('bigid',sql.Int,bigid)
-                              .input('remarkid',sql.Int,remarkid)
-                              .input('remark',sql.VarChar,normalize(remark) ?? null)
-                              .input('advancevalue',sql.Int,advancevalue ?? null)
-                              .input('url',sql.NVarChar, url ?? null)
-                              .input('vehiclenumber',sql.VarChar,vehiclenumber)
-                              .input('partnumber',sql.VarChar,partnumber)
-                              .input('userid',sql.Int,userid)
-                              .query(query)
-        await transaction.commit()   
+    const result = await pool.request()
+      .input('Dealerid', sql.Int, Dealerid)
+      .input('Locationid', sql.Int, Locationid)
+      .input('bigid', sql.Int, bigid)
+      .input('remarkid', sql.Int, asNullableIntStrict(remarkid))
+      .input('remark', sql.VarChar, normalize(remark) ?? null)
+      .input('advancevalue', sql.Int, advancevalue ?? null)
+      .input('url', sql.NVarChar, url ?? null)
+      .input('vehiclenumber', sql.VarChar, vehiclenumber)
+      .input('partnumber', sql.VarChar, partnumber)
+      .input('userid', sql.Int, userid)
+      .query(query)
+    await transaction.commit()
   } catch (error) {
     await transaction.rollback()
     throw new Error(`ppnipartremarkInsertion falied: ${error.message}`);
-    
+
   }
 }
 
-const ppnivehicleremarkInsertion = async(Dealerid,Locationid,remarkid,remark,advancevalue,url,vehiclenumber, userid , transaction)=>{
+const ppnivehicleremarkInsertion = async (Dealerid, Locationid, remarkid, remark, advancevalue, url, vehiclenumber, userid, transaction) => {
   try {
-        const pool = await getPool2()
-        const query = `use [z_scope] 
+    const pool = await getPool2()
+    const query = `use [z_scope] 
                       Insert into PPNIVehicleRemark(Dealerid,Locationid,vehicleno,Image,advancevalue,remarkid,details,Createdby)
                       Values(@Dealerid,@Locationid,@vehiclenumber,@url,@advancevalue,@remarkid,@remark,@userid) `
-      const normalize = (val) => (val === "" || val === undefined ? null : val);
-      const result = await pool.request()
-                              .input('Dealerid',sql.Int,Dealerid)
-                              .input('Locationid',sql.Int,Locationid)
-                              .input('remarkid',sql.Int,remarkid)
-                              .input('remark',sql.VarChar,normalize(remark) ?? null)
-                              .input('advancevalue',sql.Int,advancevalue ?? null)
-                              .input('url',sql.NVarChar,url ?? null)
-                              .input('vehiclenumber',sql.VarChar,vehiclenumber)
-                              .input('userid',sql.Int,userid)
-                              .query(query)
-        await transaction.commit()   
+    const normalize = (val) => (val === "" || val === undefined ? null : val);
+    const result = await pool.request()
+      .input('Dealerid', sql.Int, Dealerid)
+      .input('Locationid', sql.Int, Locationid)
+      .input('remarkid', sql.Int, asNullableIntStrict(remarkid))
+      .input('remark', sql.VarChar, normalize(remark) ?? null)
+      .input('advancevalue', sql.Int, advancevalue ?? null)
+      .input('url', sql.NVarChar, url ?? null)
+      .input('vehiclenumber', sql.VarChar, vehiclenumber)
+      .input('userid', sql.Int, userid)
+      .query(query)
+    await transaction.commit()
   } catch (error) {
     await transaction.rollback()
     throw new Error(`ppnivehicleremarkInsertion falied: ${error.message}`);
-    
+
   }
 }
-export {remarkmasterService,partremarkInsertion ,vehicleremarkInsertion , ppnipartremarkInsertion, ppnivehicleremarkInsertion}
+export { remarkmasterService, partremarkInsertion, vehicleremarkInsertion, ppnipartremarkInsertion, ppnivehicleremarkInsertion }
