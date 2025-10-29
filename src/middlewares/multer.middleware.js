@@ -49,7 +49,24 @@ const fileFilterImg= (req, file, cb) => {
   limits: { fileSize: 5 * 1024 * 1024 }, // Optional: File size limit (5MB)
 });
 
+const fileFilter = (req, file, cb) => {
+  if (file.fieldname === 'file') {
+    // excel only
+    const ok = /excel|spreadsheetml/.test(file.mimetype) || /\.(xlsx|xls|csv)$/i.test(file.originalname);
+    return cb(ok ? null : new Error('Only Excel/CSV allowed in "file" field'), ok);
+  }
+  if (file.fieldname === 'image') {
+    const ok = /^image\//.test(file.mimetype);
+    return cb(ok ? null : new Error('Only images allowed in "image" field'), ok);
+  }
+  cb(new Error('Unexpected field: ' + file.fieldname));
+};
 
+const uploadBoth = multer({ storage, fileFilter })
+  .fields([
+    { name: 'file',  maxCount: 1 },   // Excel
+    { name: 'image', maxCount: 1 }    // Image
+  ]);
 
 // AWS S3 Client
 const s3Client = new S3Client({
@@ -85,4 +102,4 @@ const uploadToS3 = async (file) => {
 };
 
 
-export {upload,uploadImg,uploadToS3}
+export {upload,uploadImg,uploadToS3,uploadBoth}

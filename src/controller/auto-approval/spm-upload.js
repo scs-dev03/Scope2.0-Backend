@@ -3,10 +3,11 @@ import { insertApprovals, insertSpmParty, insertadvisorParty } from "../../servi
 import fs from 'fs'
 import { ApiResponse } from "../../utils/ApiResponse.js";
 import { ApiError } from "../../utils/ApiError.js";
-import { spmBulkCSUpload, spmMultiCSUpload, spmBulkWSUpload, spmBulkVehicleUpload, stockViewService, partyAlreadyExistsCheck, getduplicatesArray, advisorAlreadyExistsCheck, findAdvisorOnLocation } from "../../services/auto-approval/spm-uploadService.js";
+import { spmBulkCSUpload, spmMultiCSUpload, spmBulkWSUpload, spmBulkVehicleUpload, stockViewService, partyAlreadyExistsCheck, getduplicatesArray, advisorAlreadyExistsCheck, findAdvisorOnLocation, mappingVehicleOrder, vehicleViewService, spmMultiVehicleUpload } from "../../services/auto-approval/spm-uploadService.js";
 import { partyNameCodeMapping } from '../../services/auto-approval/spm-uploadService.js'
-import { validateHeaders, findRowIssues, getDuplicatesByKey, getDuplicateGroups, normalizePartyRows, partyKey, isBlank, validateExcelRows, validatePartyExcelRows, partBrandMappingCheck, mapPartiesOrCollectInvalidFirst, orderTypeCheck, consolidateLines, payloadValidator, splitByInvalid, mapPartyIds } from '../../utils/validator.js';
-import { log } from "console";
+import { validateHeaders, findRowIssues, getDuplicatesByKey, getDuplicateGroups, normalizePartyRows, partyKey, isBlank, validateExcelRows, validatePartyExcelRows, partBrandMappingCheck, mapPartiesOrCollectInvalidFirst, orderTypeCheck, consolidateLines, payloadValidator, splitByInvalid, mapPartyIds, consolidateByVehicle } from '../../utils/validator.js';
+import { uploadToS3 } from "../../middlewares/multer.middleware.js";
+
 
 
 const stockuploadCs = async (req, res) => {
@@ -57,9 +58,13 @@ const stockuploadCs = async (req, res) => {
         if (invalidParty.ok === false) {
           return res.status(400).json(new ApiError(400, 'Excel Contains Invalid Parties', invalidParty))
         }
-        const cleanedData = consolidateLines(invalidParty.mapped, { groupByParty: true })
 
-        const result = await stockViewService(cleanedData, BrandId)
+        const { grouped, errors } = consolidateLines(invalidParty.mapped, { groupByParty: true });
+        if (errors.length) {
+          return res.status(400).json(new ApiError(400, "Data validation failed", errors, ""));
+        }
+
+        const result = await stockViewService(grouped, BrandId)
 
         return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, "File Uploaded SuccessFully"));
       } catch (error) {
@@ -83,10 +88,14 @@ const stockuploadCs = async (req, res) => {
         // return res.status(200).json(new ApiResponse(200, result, "File Uploaded SuccessFully"));
         const { validData, skipped: notinMaster } = splitByInvalid(data, invalidParts, 'PartNumber');
 
-        const clubbedData = consolidateLines(validData, { groupByParty: false })
-        const result = await stockViewService(clubbedData, BrandId)
+        const { grouped, errors } = consolidateLines(validData, { groupByParty: false });
+        if (errors.length) {
+          return res.status(400).json(new ApiError(400, "Data validation failed", errors, ""));
+        }
 
-        return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, 'Parts Submitted'));
+        const result = await stockViewService(grouped, BrandId)
+
+        return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, 'Data Fetched Successfully'));
       } catch (error) {
         return sendError(error);
       }
@@ -94,7 +103,7 @@ const stockuploadCs = async (req, res) => {
   } catch (error) {
     return sendError(error);
   }
-};
+}
 
 const stockuploadWs = async (req, res) => {
   try {
@@ -114,40 +123,65 @@ const stockuploadWs = async (req, res) => {
     const data = await spmBulkWSUpload(LocationId, OrderType, file.path, userId)
 
     const invalidParts = await partBrandMappingCheck(BrandId, data)
-    // if (invalidParts.length > 0) {
-    //   return res.status(400).json(new ApiError(400, 'Excel Contains Invalid PartNumbers', invalidParts))
-    // }
-
-    // const formattedData = consolidateLines(data, { groupByParty: false })
-    // const result = await stockViewService(formattedData, BrandId)
 
     // res.status(200).json(new ApiResponse(200, result, "File Uploaded SuccessFully"))
     const { validData, skipped: notinMaster } = splitByInvalid(data, invalidParts, 'PartNumber');
 
-    const clubbedData = consolidateLines(validData, { groupByParty: false })
-    const result = await stockViewService(clubbedData, BrandId)
+    // const clubbedData = consolidateLines(validData, { groupByParty: false })
+    // const result = await stockViewService(clubbedData, BrandId)
 
-    return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, 'Parts Submitted'));
+    const { grouped, errors } = consolidateLines(validData, { groupByParty: false });
+    if (errors.length) {
+      return res.status(400).json(new ApiError(400, "Data validation failed", errors, ""));
+    }
+
+    const result = await stockViewService(grouped, BrandId)
+
+    return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, 'Data Fetched Successfully'));
   } catch (error) {
     return res.status(500).json(new ApiError(error.statusCode || 500, error.message, error.errors || []));
   }
 }
 
 const vehicleUpload = async (req, res) => {
+  const sendError = (err) => {
+    const status = Number(err?.statusCode ?? err?.status) || 400; // or 500 if you prefer
+    // Wrap non-ApiError into your ApiError shape
+    if (!(err instanceof ApiError)) {
+      return res.status(status).json(new ApiError(status, err?.message || 'Unexpected error', [], ''));
+    }
+    return res.status(status).json(err);
+  };
   try {
     const file = req.file
     if (!file) {
-      return res.status(400).json(new ApiError(400, error?.message || "File Not Attached"));
+      return res.status(400).json(new ApiError(400, "File Not Attached"));
     }
-    const { LocationId, userId } = req.body
+    const { LocationId, userId, BrandId, DealerId } = req.body
     if (!LocationId || !userId) {
-      return res.status(400).json(new ApiError(400, `LocationId and userId  is required`, [], ''))
+      return res.status(400).json(new ApiError(400, `LocationId BrandId , DealerId and userId  is required`, [], ''))
     }
     const data = await spmBulkVehicleUpload(file.path, LocationId, userId)
-    await insertApprovals(data)
-    res.status(200).json(`Bulk Insertion Successful`)
+
+    const invalidParts = await partBrandMappingCheck(BrandId, data)
+    const { validData, skipped: notinMaster } = splitByInvalid(data, invalidParts, 'PartNumber');
+
+    const { grouped, errors } = consolidateByVehicle(validData);
+    if (errors.length) {
+      return res.status(400).json(new ApiError(400, "Data validation failed", errors, ""));
+    }
+
+    // Can be used Further
+    // const mappedData = await mappingVehicleOrder(grouped)
+
+    const result = await vehicleViewService(grouped, BrandId, DealerId)
+
+    res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, `Data Fetched Successfully`))
+
   } catch (error) {
-    return res.status(error.statusCode).json(error);
+
+    return sendError(error);
+
   }
 }
 
@@ -330,9 +364,10 @@ const singleUploadCs = async (req, res) => {
     const { validData, skipped: notinMaster } = splitByInvalid(formattedData, invalidParts, 'PartNumber');
 
     const clubbedData = consolidateLines(validData, { groupByParty: false })
-    const result = await stockViewService(clubbedData, BrandId)
 
-    return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, 'Parts Submitted'));
+    const result = await stockViewService(clubbedData.grouped, BrandId)
+
+    return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, 'Data Fetched Successfully'));
 
     // return res.status(200).json(new ApiResponse(200, result, `Parts Submmitted`));
   } catch (error) {
@@ -368,9 +403,9 @@ const singleUploadWS = async (req, res) => {
     const { validData, skipped: notinMaster } = splitByInvalid(formattedData, invalidParts, 'PartNumber');
 
     const clubbedData = consolidateLines(validData, { groupByParty: false })
-    const result = await stockViewService(clubbedData, BrandId)
+    const result = await stockViewService(clubbedData.grouped, BrandId)
 
-    return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, 'Parts Submitted'));
+    return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, 'Data Fetched Successfully'));
   } catch (error) {
     const status = (error && error.statusCode) || 500;
     return res.status(status).json(new ApiError(status, `Unable to record stock request`, error.message));
@@ -379,76 +414,115 @@ const singleUploadWS = async (req, res) => {
 
 const vehicleUploadSingle = async (req, res) => {
   try {
-    const {
-      LocationId,
-      userId,
-      VehicleNumber,
-      VehicleModel,
-      JobType,
-      Advisor,
-      OrderType,
-      PartNumber,
-      Qty,
-      Remarks,
-      AdvanceValue,
-      Estimate,
-      JobCardNumber
-    } = req.body;
+    const excelFile = req.files?.file?.[0] || null;
+    const imageFile = req.files?.image?.[0] || null;
+    
+    const { LocationId, userId, VehicleNumber, VehicleModel, JobCardNumber, JobType, OrderType, Estimate, AdvanceValue, BrandId, DealerId, Advisor } = req.body
+    // console.log(LocationId , userId , VehicleNumber , VehicleModel , JobCardNumber , JobType , OrderType , Estimate , AdvanceValue , BrandId , DealerId);
 
-    if (!LocationId || !userId) {
-      return res.status(400).json(
-        new ApiError(400, "LocationId and userId are required", [], "")
-      );
+    if (!excelFile || !LocationId || !BrandId || !DealerId || !userId || !VehicleModel || !VehicleNumber || !JobType || !OrderType) {
+      return res.status(400).json(new ApiError(400, `Excel , LocationId , userId , VehicleNumber , VehicleModel , JobCardNumber , JobType , OrderType , BrandId , DealerId are Required`))
+    }
+    // if ((AdvanceValue == null || AdvanceValue === "") && (Estimate == null || Estimate === "")) {
+    //   return res.status(400).json(
+    //     new ApiError(400, "At least one of AdvanceValue or Estimate is required", [], "")
+    //   );
+    // }
+
+   let url = null;
+
+if (imageFile) {
+  try {
+    const s3Data = await uploadToS3(imageFile);
+    url = s3Data?.url ?? null;      // if upload succeeds, use URL; else null
+  } catch (error) {
+    // Only fail if image was actually provided and upload failed
+    throw new ApiError(500, error.message);
+  }
+}
+    const data = await spmMultiVehicleUpload(excelFile.path, { LocationId, userId, VehicleNumber, VehicleModel, JobCardNumber, JobType, OrderType, Estimate, AdvanceValue, url, Advisor })
+
+    const invalidParts = await partBrandMappingCheck(BrandId, data)
+    const { validData, skipped: notinMaster } = splitByInvalid(data, invalidParts, 'PartNumber');
+
+    const { grouped, errors } = consolidateByVehicle(validData);
+    if (errors.length) {
+      return res.status(400).json(new ApiError(400, "Data validation failed", errors, ""));
     }
 
-    const REQUIRED_ALWAYS = ["VehicleNumber", "VehicleModel", "JobType", "Advisor", "OrderType", "PartNumber", "Qty"];
-    const missing = REQUIRED_ALWAYS.filter(field => !req.body[field]);
-    if (missing.length) {
-      return res.status(400).json(
-        new ApiError(400, "Missing required fields", missing, "")
-      );
-    }
+    const result = await vehicleViewService(grouped, BrandId, DealerId)
 
-    //one of Advance Value / Estimate 
-    if ((AdvanceValue == null || AdvanceValue === "") && (Estimate == null || Estimate === "")) {
-      return res.status(400).json(
-        new ApiError(400, "At least one of AdvanceValue or Estimate is required", [], "")
-      );
-    }
-
-    // Validate OrderType
-    const ALLOWED = ["Normal", "Urgent", "Co-Dealer", "Transfer"];
-    const norm = v => String(v ?? "").trim().toLowerCase();
-    if (!ALLOWED.map(norm).includes(norm(OrderType))) {
-      return res.status(400).json(
-        new ApiError(400, `Invalid OrderType. Allowed: ${ALLOWED.join(", ")}`, [], "")
-      );
-    }
-
-    const formattedData = {
-      VehicleNumber,
-      VehicleModel,
-      JobType,
-      Advisor,
-      OrderType,
-      PartNumber,
-      Qty,
-      Remarks: Remarks,
-      AdvanceValue: AdvanceValue || null,
-      Estimate: Estimate || null,
-      JobCardNumber: JobCardNumber || null,
-      LocationId,
-      Type: "V",
-      UploadedBy: userId
-    };
-
-    await insertApprovals([formattedData]);
-
-    res.status(200).json("Single Vehicle Insertion Successful");
+    res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, `Data Fetched Successfully`))
   } catch (error) {
     return res.status(error.statusCode || 500).json(error);
   }
 };
+
+const addVehicle = async (req, res) => {
+  try {
+    const { BrandId, payload } = req.body
+    // console.log(`payload`, payload);
+
+    const file = req.file;
+
+    let s3Data;
+    try {
+      s3Data = await uploadToS3(file)
+      // console.log(url);
+
+    } catch (error) {
+      throw new ApiError(500, error.message);
+    }
+
+    let rows;
+    try {
+      const parsed = typeof payload === 'string' ? JSON.parse(payload) : payload;
+      rows = Array.isArray(parsed) ? parsed : [parsed];
+    } catch (e) {
+      return res.status(400).json({ message: 'Invalid JSON in payload' });
+    }
+
+    const clean = v => (typeof v === 'string' ? v.replace(/^'+/, '').trim() : v);
+    const num = v => (v === '' || v == null ? null : Number(v));
+
+
+    // console.log("rows", rows);
+
+    const formattedData = rows.map(r => ({
+      LocationId: num(r.LocationId),
+      VehicleNumber: clean(r.VehicleNumber),
+      VehicleModel: clean(r.VehicleModel),
+      JobCardNumber: clean(r.JobCardNumber),
+      JobType: clean(r.JobType),
+      Advisor: clean(r.Advisor),
+      OrderType: clean(r.OrderType),
+      PartNumber: clean(r.PartNumber),
+      Qty: num(r.Qty),
+      Remarks: clean(r.Remarks),
+      Estimate: num(r.Estimate),
+      AdvanceValue: num(r.AdvanceValue),
+      url: s3Data.url,
+      Type: 'V'
+    }));
+
+    // console.log(`formattedData`,formattedData);
+
+    const invalidParts = await partBrandMappingCheck(BrandId, formattedData)
+
+    const { validData, skipped: notinMaster } = splitByInvalid(formattedData, invalidParts, 'PartNumber');
+
+    const { grouped, errors } = consolidateByVehicle(validData);
+    if (errors.length) {
+      return res.status(400).json(new ApiError(400, "Data validation failed", errors, ""));
+    }
+
+    const result = await vehicleViewService(grouped, BrandId)
+
+    res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }))
+  } catch (error) {
+    res.status(500).json(error.message)
+  }
+}
 
 const spmPartyUploadSingle = async (req, res) => {
   try {
@@ -540,7 +614,7 @@ const spmAdvisorUploadSingle = async (req, res) => {
         new ApiError(400, "Some records already exist", existing, "")
       );
     }
-    console.log(existing);
+    // console.log(existing);
 
     const advisorExists = await findAdvisorOnLocation(formattedData, 'dbo.AAP_SPMAdvisorMaster')
     if (advisorExists.length) {
@@ -578,33 +652,39 @@ const stockView = async (req, res) => {
 
 const orderInsertion = async (req, res) => {
   try {
-    const { userId,type, payload } = req.body
+    const { userId, type, payload } = req.body
 
-    const LocationId = payload[0].LocationId
-    const partyMappingData = await partyNameCodeMapping(LocationId)
-    const { mapped, unmatched, conflicts } = mapPartyIds(payload, partyMappingData);
-    
     // console.log(`mapped`,mapped);
-    
+
     let formattedData = {};
 
     if (type === "S") {
+    const LocationId = payload[0].LocationId
+    const partyMappingData = await partyNameCodeMapping(LocationId)
+    const { mapped, unmatched, conflicts } = mapPartyIds(payload, partyMappingData);
       formattedData = mapped.map((row) => ({
         ...row,
-        UploadedBy:userId,
+        UploadedBy: userId,
         Type: type
       }))
     }
     else {
-      // WILL BE DONE FOR VEHICLE APPROVALS
-      formattedData = payload
+      // const LocationId = payload[0].LocationId
+      const mappedData = await mappingVehicleOrder(payload)
+     console.log(mappedData.mapped);
+      mappedData.mapped
+      formattedData = mappedData.mapped.map((row) => ({
+        ...row,
+        UploadedBy: userId,
+        Type: type
+      }))
     }
 
     const result = await insertApprovals(formattedData)
-    res.status(200).json(new ApiResponse(200, formattedData ,'Insertion Successfull'))
+    res.status(200).json(new ApiResponse(200, formattedData, 'Insertion Successfull'))
   } catch (error) {
     res.status(500).json(new ApiError(500, `Unable to Insert Approvals`, [error.message], error.message))
   }
 }
 
-export { orderInsertion, stockView, stockuploadCs, stockuploadWs, vehicleUpload, spmPartyUpload, spmAdvisorUpload, singleUploadCs, singleUploadWS, vehicleUploadSingle, spmPartyUploadSingle, spmAdvisorUploadSingle }
+export { addVehicle, orderInsertion, stockView, stockuploadCs, stockuploadWs, vehicleUpload, spmPartyUpload, spmAdvisorUpload, singleUploadCs, singleUploadWS, vehicleUploadSingle, spmPartyUploadSingle, spmAdvisorUploadSingle }

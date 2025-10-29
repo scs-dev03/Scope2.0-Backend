@@ -1,5 +1,6 @@
 import { getPool1 } from "../db/db.js";
 import sql from 'mssql'
+import { ApiError } from "./ApiError.js";
 
 // normalize helpers
 // export const normStr = (v, max = 30) =>
@@ -606,7 +607,7 @@ export const partBrandMappingCheck = async (BrandId, Data) => {
     return unmatched;
   } catch (error) {
     console.error(`Error in partBrandMappingCheck: ${error.message}`);
-    throw error;
+    throw new ApiError(500,error.message);
   }
 };
 
@@ -827,23 +828,11 @@ export function validateAndClean(data, {
 
   const errors = [];
   if (cellEmptyRows.length) errors.push({ message: "Cell Empty", data: cellEmptyRows });
-  if (qtyZeroRows.length) errors.push({ message: "Qty is Zero", data: qtyZeroRows });
+  if (qtyZeroRows.length) errors.push({ message: "Qty is Zero or More than 1000", data: qtyZeroRows });
 
   return { cleanData, errors };
 }
 
-/**
- * Group by PartyId + PartNumber, sum Qty, and concat non-empty Remarks (comma-separated).
- * Keeps the first occurrence's other fields.
- */
-/**
- * Consolidate rows:
- * - If groupByParty = true  -> group by (PartyId + PartNumber)
- * - If groupByParty = false -> group by (PartNumber) only
- * - Sums Qty
- * - Concats non-empty Remarks (comma-separated, de-duped)
- * - Preserves the first row's other fields for each group
- */
 export function consolidateLines(rows, { groupByParty = true } = {}) {
   const keyOf = r => {
     const pn = String(r.PartNumber).trim();
@@ -888,7 +877,23 @@ export function consolidateLines(rows, { groupByParty = true } = {}) {
     delete o.__remarks;
   }
 
-  return out;
+   // validate max per group
+  const offenders = out
+    .filter(g => Number.isFinite(g.Qty) && g.Qty > 1000)
+    .map(g => ({
+      // return minimal info in error payload
+      PartyId: groupByParty ? g.PartyId : undefined,
+      PartNumber: g.PartNumber,
+      Qty: g.Qty
+    }));
+
+  const errors = offenders.length
+    ? [{ message: `Qty exceeds 1000`, data: offenders }]
+    : [];
+
+  return { grouped: out, errors };
+
+  // return out;
 }
 
 // helper: split formattedData into valid vs invalid using a key (default PartNumber)
@@ -1018,7 +1023,170 @@ export function mapPartyIds(rows, master) {
   return { mapped, unmatched, conflicts };
 }
 
+export function validateAndCleanVehicle(
+  data,
+  {
+    required,
+    qtyFields = ["Qty"],
+    coerceQty = true,
+    partField = "PartNumber",
 
-// mapped[0].PartyId -> 89
-// unmatched -> [] for this example
-// conflicts -> [] for this example
+    // NEW: columns where we should allow spaces and '-' (hyphen) when sanitizing
+    allowSpacesDashIn = [], // e.g. ["Remarks", "PartyName"]
+  } = {}
+) {
+  const isBlank = v =>
+    v == null ||
+    (typeof v === "string" && v.trim() === "") ||
+    (typeof v === "number" && Number.isNaN(v));
+
+  // remove EVERYTHING except letters & digits
+  const stripAlnumOnly = s => String(s ?? "").replace(/[^A-Za-z0-9]/g, "");
+
+  // remove everything except letters, digits, space, hyphen
+  const stripAlnumSpaceDash = s =>
+    String(s ?? "").replace(/[^A-Za-z0-9 \-]/g, "");
+
+  const cellEmptyRows = [];
+  const qtyZeroRows = [];
+
+  const cleanData = data.map(row => {
+    const r = { ...row };
+
+    // --- 1) TRIM all string columns (left & right) ---
+    for (const k of Object.keys(r)) {
+      if (typeof r[k] === "string") {
+        r[k] = r[k].trim();
+      }
+    }
+
+    // --- 2) SANITIZE selective columns ---
+    // PartNumber: keep only A–Z, a–z, 0–9 (original behavior)
+    if (partField in r && !isBlank(r[partField])) {
+      r[partField] = stripAlnumOnly(r[partField]);
+    }
+
+    // For any configured columns: allow spaces and hyphen, strip other specials
+    for (const col of allowSpacesDashIn) {
+      if (col in r && !isBlank(r[col]) && typeof r[col] === "string") {
+        r[col] = stripAlnumSpaceDash(r[col]).trim(); // trim again after stripping
+      }
+    }
+
+    // --- Required fields check (using trimmed values) ---
+    if (Array.isArray(required) && required.some(f => isBlank(r[f]))) {
+      cellEmptyRows.push(row); // push ORIGINAL row for reporting
+    }
+
+    // --- Qty validation ---
+    if (Array.isArray(qtyFields) && qtyFields.length) {
+      let anyBadQty = false;
+      for (const f of qtyFields) {
+        const val = r[f];
+        if (!isBlank(val)) {
+          // ensure we convert from trimmed string if needed
+          const num = Number(
+            typeof val === "string" ? val.trim() : val
+          );
+
+          if (coerceQty) r[f] = num;
+
+          if (!Number.isFinite(num) || num <= 0) {
+            anyBadQty = true;
+          }
+        } else {
+          anyBadQty = true; // blank qty => bad
+        }
+      }
+      if (anyBadQty) qtyZeroRows.push(row); // ORIGINAL row
+    }
+
+    return r;
+  });
+
+  const errors = [];
+  if (cellEmptyRows.length)
+    errors.push({ message: "Cell Empty", data: cellEmptyRows });
+  if (qtyZeroRows.length)
+    errors.push({ message: "Qty is Zero or More than 1000", data: qtyZeroRows }); // message kept same as your version
+
+  return { cleanData, errors };
+}
+
+export function consolidateByVehicle(rows, {
+  jobcardField = "JobCardNumber",  // non-mandatory
+  maxQtyPerGroup = 1000,           // cap to validate after grouping
+} = {}) {
+
+  const keyOf = (r) => {
+    const veh = String(r.VehicleNumber ?? "").trim();
+    const jc  = String(r[jobcardField] ?? "").trim(); // allowed to be blank
+    const pn  = String(r.PartNumber ?? "").trim();
+    return `${veh}|${jc}|${pn}`;
+  };
+
+  const out = [];
+  const pos = new Map(); // key -> index in out
+
+  for (const _r of rows) {
+    // shallow clone & trim all string fields
+    const r = { ... _r };
+    for (const k of Object.keys(r)) {
+      if (typeof r[k] === "string") r[k] = r[k].trim();
+    }
+
+    // normalize basic fields used in grouping / math
+    const key = keyOf(r);
+    const qty = Number(r.Qty);
+    if (!Number.isFinite(qty)) continue; // or throw new Error("Invalid Qty")
+
+    const remark = (r.Remarks ?? "").toString().trim();
+
+    if (pos.has(key)) {
+      const idx = pos.get(key);
+      out[idx].Qty += qty;
+
+      if (remark) {
+        if (!out[idx].__remarks) out[idx].__remarks = new Set();
+        out[idx].__remarks.add(remark);
+      }
+    } else {
+      // keep the first row's other fields (Advisor, Model, etc.)
+      const clone = {
+        ...r,
+        VehicleNumber: String(r.VehicleNumber ?? "").trim(),
+        [jobcardField]: String(r[jobcardField] ?? "").trim(), // may be ""
+        PartNumber: String(r.PartNumber ?? "").trim(),
+        Qty: qty
+      };
+      if (remark) clone.__remarks = new Set([remark]);
+
+      out.push(clone);
+      pos.set(key, out.length - 1);
+    }
+  }
+
+  // finalize remarks (unique + comma-joined) and clean temp
+  for (const o of out) {
+    if (o.__remarks && o.__remarks.size) {
+      o.Remarks = Array.from(o.__remarks).join(", ");
+    }
+    delete o.__remarks;
+  }
+
+  // validate max per group
+  const offenders = out
+    .filter(g => Number.isFinite(g.Qty) && g.Qty > maxQtyPerGroup)
+    .map(g => ({
+      VehicleNumber: g.VehicleNumber,
+      [jobcardField]: g[jobcardField], // may be ""
+      PartNumber: g.PartNumber,
+      Qty: g.Qty
+    }));
+
+  const errors = offenders.length
+    ? [{ message: `Qty exceeds ${maxQtyPerGroup}`, data: offenders }]
+    : [];
+
+  return { grouped: out, errors };
+}

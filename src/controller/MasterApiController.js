@@ -566,11 +566,22 @@ const spmhomepage = async (req, res) => {
 const ordertype = async (req, res) => {
   try {
     const pool = await getPool1()
-    const query = `use z_scope select Name from ordertypemaster`
-    const result = await pool.request().query(query)  
-    res.status(200).json(new ApiResponse(200,result.recordset,`Data Fetched Successfully`) )
+    const query = `use z_scope select Id,Name from ordertypemaster`
+    const result = await pool.request().query(query)
+    res.status(200).json(new ApiResponse(200, result.recordset, `Data Fetched Successfully`))
   } catch (error) {
     throw new ApiError(500, 'Unable to Get Ordertype', [error.message])
   }
 }
-export { ordertype, spmhomepage, pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules }
+
+const jobtype = async (req, res) => {
+  try {
+    const pool = await getPool1()
+    const query = `use z_scope select bigid Id,jobcart_type Jobtype from Job_Card_Type where status = 1`
+    const result = await pool.request().query(query)
+    res.status(200).json(new ApiResponse(200, result.recordset, `Data Fetched Successfully`))
+  } catch (error) {
+    throw new ApiError(500, 'Unable to Get Jobtype', [error.message])
+  }
+}
+export { jobtype,ordertype, spmhomepage, pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules }

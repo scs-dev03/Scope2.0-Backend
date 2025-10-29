@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { upload } from "../../middlewares/multer.middleware.js";
-import { spmAdvisorUpload, spmPartyUpload, stockuploadCs  , vehicleUpload , stockuploadWs, singleUploadCs,vehicleUploadSingle,spmPartyUploadSingle,spmAdvisorUploadSingle, stockView, singleUploadWS, orderInsertion} from "../../controller/auto-approval/spm-upload.js";
+import { upload, uploadBoth, uploadImg } from "../../middlewares/multer.middleware.js";
+import { spmAdvisorUpload, spmPartyUpload, stockuploadCs  , vehicleUpload , stockuploadWs, singleUploadCs,vehicleUploadSingle,spmPartyUploadSingle,spmAdvisorUploadSingle, stockView, singleUploadWS, orderInsertion, addVehicle} from "../../controller/auto-approval/spm-upload.js";
 
 
 const router = Router()
@@ -11,7 +11,8 @@ router.route('/partyupload').post(upload.single('file'),spmPartyUpload)
 router.route('/addadvisor').post(spmAdvisorUploadSingle);
 router.route('/advisorupload').post(upload.single('file'),spmAdvisorUpload)
 
-router.route('/addvehicle').post(vehicleUploadSingle);
+router.route('/add-vehicle').post(uploadImg.single('image'),addVehicle);
+router.route('/multi-vehicle').post(uploadBoth,vehicleUploadSingle);
 router.route('/vehicleupload').post(upload.single('file'),vehicleUpload)
 
 router.route('/addstk-cs').post(singleUploadCs)

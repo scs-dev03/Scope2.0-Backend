@@ -31,6 +31,7 @@ const insertApprovals = async (data) => {
 
         table.columns.add('LocationId', sql.Int, { nullable: false });
         table.columns.add('PartNumber', sql.VarChar(50), { nullable: false });
+        table.columns.add('PartId', sql.Int, { nullable: true });
         // table.columns.add('Latest', sql.VarChar(50), { nullable: true });
         table.columns.add('isSubstitution', sql.VarChar(1), { nullable: true });
         table.columns.add('PartDesc', sql.VarChar(50), { nullable: true });
@@ -42,7 +43,7 @@ const insertApprovals = async (data) => {
         table.columns.add('JobCardNumber', sql.VarChar(40), { nullable: true });
         table.columns.add('JobTypeId', sql.Int, { nullable: true });
         table.columns.add('Advisor', sql.VarChar(20), { nullable: true });
-        table.columns.add('OrderType', sql.VarChar(10), { nullable: true });
+        table.columns.add('OrderTypeId', sql.Int, { nullable: true });
         table.columns.add('PartyId', sql.Int, { nullable: true });
         table.columns.add('Stock', sql.Decimal(18, 2), { nullable: true });
         table.columns.add('GroupStock', sql.Decimal(18, 2), { nullable: true });
@@ -61,6 +62,7 @@ const insertApprovals = async (data) => {
             table.rows.add(
                 row.LocationId,
                 row.PartNumber,
+                row.PartId,
                 // row.Latest,
                 row.isSubstitution,
                 row.PartDesc,
@@ -72,11 +74,11 @@ const insertApprovals = async (data) => {
                 row.JobCardNumber,
                 row.JobTypeId,
                 row.Advisor,
-                row.OrderType,
+                row.OrderTypeId,
                 row.PartyId,
                 row.Stock,
                 row.GroupStock,
-                row.Receipt,
+                row.url,
                 row.Price,
                 row.OrderValue,
                 row.OrderDate,

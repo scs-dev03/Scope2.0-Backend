@@ -3,7 +3,7 @@ import fs from 'fs'
 import { getPool1 } from "../../db/db.js";
 import { ApiError } from "../../utils/ApiError.js";
 import sql from 'mssql'
-import { validateCommonRows, orderTypeCheck, validateAndClean } from "../../utils/validator.js";
+import { validateCommonRows, orderTypeCheck, validateAndClean, validateAndCleanVehicle , validateHeaders } from "../../utils/validator.js";
 
 // const spmBulkCSUpload = async (LocationId, OrderType, file, userId) => {
 //   let { headers, data } = await readExcel(file);
@@ -125,20 +125,20 @@ const spmBulkCSUpload = async (LocationId, OrderType, file, userId) => {
       throw new ApiError(
         400,
         "Missing headers",
-        [{ message: `Missing Headers PartyName OR PartyCode`, headers :["PartyName","PartyCode"]}],
+        [{ message: `Missing Headers PartyName OR PartyCode`, headers: ["PartyName", "PartyCode"] }],
         ""
       );
     }
 
-    const requiredData =  data.map((row) => ({
-    ...row,
-    LocationId: LocationId,
-    OrderType: OrderType,
-    // PartyId: PartyId,
-    Type: "S",
-    UploadedBy: userId
-  }))
-    
+    const requiredData = data.map((row) => ({
+      ...row,
+      LocationId: LocationId,
+      OrderType: OrderType,
+      // PartyId: PartyId,
+      Type: "S",
+      UploadedBy: userId
+    }))
+
     const { cleanData, errors } = validateAndClean(requiredData, {
       required: ["PartNumber", "Qty"],
       qtyFields: ["Qty"],          // must be > 0
@@ -146,7 +146,7 @@ const spmBulkCSUpload = async (LocationId, OrderType, file, userId) => {
       partField: "PartNumber"      // sanitize this field
     });
     // console.log(cleanData,errors);
-    
+
     if (errors.length) {
       throw new ApiError(400, "Excel validation failed", errors, "");
     }
@@ -176,18 +176,18 @@ const spmMultiCSUpload = async (LocationId, OrderType, PartyId, file, userId) =>
     Type: "S",
     UploadedBy: userId
   }))
-  
+
   const { cleanData, errors } = validateAndClean(formattedData, {
-      required: ["PartNumber", "Qty"],
-      qtyFields: ["Qty"],          // must be > 0
-      coerceQty: true,             // put numeric Qty in cleanData
-      partField: "PartNumber"      // sanitize this field
-    });
-    
-    if (errors.length) {
-      throw new ApiError(400, "Excel validation failed", errors, "");
-    }
-  
+    required: ["PartNumber", "Qty"],
+    qtyFields: ["Qty"],          // must be > 0
+    coerceQty: true,             // put numeric Qty in cleanData
+    partField: "PartNumber"      // sanitize this field
+  });
+
+  if (errors.length) {
+    throw new ApiError(400, "Excel validation failed", errors, "");
+  }
+
   return cleanData
 }
 
@@ -211,18 +211,18 @@ const spmBulkWSUpload = async (LocationId, OrderType, file, userId) => {
   }))
 
   const { cleanData, errors } = validateAndClean(formattedData, {
-      required: ["PartNumber", "Qty"],
-      qtyFields: ["Qty"],          // must be > 0
-      coerceQty: true,             // put numeric Qty in cleanData
-      partField: "PartNumber"      // sanitize this field
-    });
-    // console.log(cleanData,errors);
-    
-    if (errors.length) {
-      throw new ApiError(400, "Excel validation failed", errors, "");
-    }
+    required: ["PartNumber", "Qty"],
+    qtyFields: ["Qty"],          // must be > 0
+    coerceQty: true,             // put numeric Qty in cleanData
+    partField: "PartNumber"      // sanitize this field
+  });
+  // console.log(cleanData,errors);
 
-    return cleanData;
+  if (errors.length) {
+    throw new ApiError(400, "Excel validation failed", errors, "");
+  }
+
+  return cleanData;
 }
 
 // const spmBulkVehicleUpload = async(file, LocationId , userId)=>{
@@ -291,100 +291,96 @@ const spmBulkWSUpload = async (LocationId, OrderType, file, userId) => {
 // }
 
 const spmBulkVehicleUpload = async (file, LocationId, userId) => {
-  let { headers, data } = await readExcel(file); // make sure readExcel uses defval:null
-  fs.unlinkSync(file);
+  try {
+    let { headers, data } = await readExcel(file); // make sure readExcel uses defval:null
+    fs.unlinkSync(file);
+    // console.log(headers,data);
 
-  // --- Header-level checks ---
-  const H = headers.map(h => String(h).trim()); // normalize headers
+    // --- Header-level checks ---
+    // const H = headers.map(h => String(h).trim()); // normalize headers
 
-  const REQUIRED_ALWAYS = [
-    "VehicleNumber", "VehicleModel", "JobType",
-    "Advisor", "OrderType", "PartNumber", "Qty", "Remarks"
-  ];
-  const OR_HEADERS = [["AdvanceValue", "Estimate", "JobCardNumber"]]; // at least one must exist
-
-  const missingHeaders = [
-    ...REQUIRED_ALWAYS.filter(h => !H.includes(h)),
-    ...OR_HEADERS.flatMap(group => group.some(h => H.includes(h)) ? [] : [`${group.join(" or ")}`]),
-  ];
-
-  if (missingHeaders.length) {
-    throw new ApiError(400, "Missing headers", { missingHeaders });
-  }
-
-  // --- Row-level checks ---
-  const isBlank = v =>
-    v == null || (typeof v === "string" && v.trim() === "") || (typeof v === "number" && Number.isNaN(v));
-
-  const rowIssues = [];
-  data.forEach((row, i) => {
-    const idx = i + 2; // if row 1 is header
-    const missing = REQUIRED_ALWAYS.filter(k => isBlank(row[k]));
-    // Enforce: at least one of AdvanceValue or Estimate must be present
-    const bothMissing = isBlank(row.AdvanceValue) && isBlank(row.Estimate);
-    if (missing.length || bothMissing) {
-      const issues = [];
-      if (missing.length) issues.push(...missing.map(f => ({ field: f, message: "Required" })));
-      if (bothMissing) issues.push({ field: "AdvanceValue/Estimate", message: "At least one required" });
-      rowIssues.push({ row: idx, issues, rowData: row });
+    const REQUIRED_HEADERS = [
+      "VehicleNumber", "VehicleModel", "JobType",
+      "Advisor", "OrderType", "PartNumber", "Qty"
+    ];
+    // const OR_HEADERS = [["AdvanceValue", "Estimate", "JobCardNumber"]]; // at least one must exist
+    // const missingHeaders = [
+    //   ...REQUIRED_ALWAYS.filter(h => !H.includes(h)),
+    //   // ...OR_HEADERS.flatMap(group => group.some(h => H.includes(h)) ? [] : [`${group.join(" or ")}`]),
+    // ];
+    const { ok: headersOk, missingHeaders } = validateHeaders(headers, REQUIRED_HEADERS);
+    // console.log(missingHeaders);
+    if (!headersOk) {
+      throw new ApiError(400, "Missing headers", missingHeaders, "")
     }
-  });
 
-  if (rowIssues.length) {
-    throw new ApiError(400, "Data Incomplete", { rowIssues });
-  }
-
-  // const ALLOWED = ["Normal","Urgent","Co-Dealer","Transfer"];
-  // const norm = v => String(v ?? "").trim(); // add .toLowerCase() if case-insensitive
-
-  // // distinct invalid values found in the sheet
-  // const distinctInvalid = [...new Set(
-  //   data.map(r => norm(r.OrderType)).filter(v => v && !ALLOWED.includes(v))
-  // )];
-
-  // // (optional) row-wise issues with row numbers
-  // const invalidRows = data
-  //   .map((r, i) => ({ row: i + 2, value: r.OrderType }))
-  //   .filter(x => !x.norm || !ALLOWED.includes(x.norm));
-
-  // // throw if any invalids
-  // if (invalidRows.length) {
-  //   throw new ApiError(400, "Invalid OrderType", { allowed: ALLOWED, invalidRows });
-  // }
-
-  const ALLOWED = ["Normal", "Urgent", "Co-Dealer", "Transfer"];
-
-  const norm = v =>
-    String(v ?? "")
-      .normalize("NFKC")        // unify unicode
-      .replace(/\s+/g, " ")     // collapse internal spaces
-      .trim()
-      .toLowerCase();
-
-  const allowedSet = new Set(ALLOWED.map(norm));
-
-  const invalidRows = data
-    .map((r, i) => ({ row: i + 2, raw: r.OrderType, norm: norm(r.OrderType) }))
-    .filter(x => !x.norm || !allowedSet.has(x.norm));
-
-  if (invalidRows.length) {
-    throw new ApiError(400, "Invalid OrderType", {
-      allowed: ALLOWED,
-      invalidRows
+    const { cleanData, errors } = validateAndCleanVehicle(data, {
+      required: ["PartNumber", "VehicleNumber", "VehicleModel", "JobType", "OrderType", "Qty"],
+      qtyFields: ["Qty"],
+      coerceQty: true,
+      partField: "PartNumber",
+      allowSpacesDashIn: ["PartNumber", "VehicleNumber"], // these keep spaces & '-'
     });
+    if (errors.length) {
+      throw new ApiError(400, "Excel validation failed", errors, "");
+    }
+
+    // --- Format output ---
+    const formattedData = cleanData.map(row => ({
+      ...row,
+      LocationId,
+      Type: "V",
+      UploadedBy: userId
+    }));
+    // console.log(cleanData);
+
+    return formattedData;
+  } catch (error) {
+    throw new ApiError(400, error.message)
   }
-
-  // --- Format output ---
-  const formattedData = data.map(row => ({
-    ...row,
-    LocationId,
-    Type: "V",
-    UploadedBy: userId
-  }));
-
-  return formattedData;
 };
 
+const spmMultiVehicleUpload = async (excelFile,keys) => {
+  const { headers, data } = await readExcel(excelFile)
+  fs.unlinkSync(excelFile)
+
+  const REQUIRED_HEADERS = ["PartNumber", "Qty"]
+  const { ok: headersOk, missingHeaders } = validateHeaders(headers, REQUIRED_HEADERS);
+  if (!headersOk) {
+    throw new ApiError(400, "Missing headers", missingHeaders, "")
+  }
+
+  const { cleanData, errors } = validateAndCleanVehicle(data, {
+    required: ["PartNumber", "Qty"],
+    qtyFields: ["Qty"],
+    coerceQty: true,
+    partField: "PartNumber",
+    allowSpacesDashIn: ["PartNumber"], // these keep spaces & '-'
+  });
+
+  if (errors.length) {
+    throw new ApiError(400, "Excel validation failed", errors, "");
+  }
+  // --- Format output ---
+    const formattedData = cleanData.map(row => ({
+      ...row,
+      LocationId:keys.LocationId,
+      VehicleNumber:keys.VehicleNumber,
+      VehicleModel:keys.VehicleModel,
+      JobCardNumber:keys.JobCardNumber,
+      JobType:keys.JobType,
+      Advisor:keys.Advisor,
+      OrderType:keys.OrderType,
+      Estimate:keys.Estimate,
+      AdvanceValue:keys.AdvanceValue,
+      url:keys.url,
+      Type: "V",
+      UploadedBy: keys.userId
+    }));
+  // console.log(formattedData);
+  return formattedData
+  
+}
 const partyNameCodeMapping = async (LocationId) => {
   try {
     const pool = await getPool1()
@@ -410,6 +406,24 @@ const stockViewService = async (formattedData, BrandId) => {
       .input('Json', sql.NVarChar(sql.MAX), jsonPayload)
       .input('BrandId', sql.Int, BrandId)
       .execute('dbo.StockView_FromJson')
+
+    return result.recordset
+
+  } catch (error) {
+    throw new ApiError(500, error.message, [])
+  }
+
+}
+const vehicleViewService = async (formattedData, BrandId, DealerId) => {
+  try {
+    const pool = await getPool1()
+    const jsonPayload = JSON.stringify(formattedData);
+
+    const result = await pool.request()
+      .input('Json', sql.NVarChar(sql.MAX), jsonPayload)
+      .input('BrandId', sql.Int, BrandId)
+      .input('DealerId', sql.Int, DealerId)
+      .execute('dbo.VehicleView_FromJson')
 
     return result.recordset
 
@@ -718,4 +732,102 @@ const findAdvisorOnLocation = async (
 //   }
 // }
 
-export { findAdvisorOnLocation, advisorAlreadyExistsCheck, getduplicatesArray, partyAlreadyExistsCheck, stockViewService, spmBulkCSUpload, spmMultiCSUpload, spmBulkWSUpload, spmBulkVehicleUpload, partyNameCodeMapping }
+
+const mappingVehicleOrder = async (data) => {
+  try {
+    const pool = await getPool1()
+    const query = `use z_scope
+                select Id , Name from OrderTypeMaster where Status = 1
+                select bigid , jobcart_type from Job_Card_Type where status = 1`
+
+    const result = await pool.request().query(query)
+    const orderData = result.recordsets[0]
+    const JobTypeData = result.recordsets[1]
+
+    // --- build case-insensitive lookup maps (support names and ids) ---
+    const norm = v => (v == null ? "" : String(v).trim().toLowerCase());
+
+    const orderByName = new Map(orderData.map(o => [norm(o.Name), Number(o.Id)]));
+    const orderById = new Map(orderData.map(o => [String(o.Id), Number(o.Id)]));
+
+    const jobByName = new Map(JobTypeData.map(j => [norm(j.jobcart_type), Number(j.bigid)]));
+    const jobById = new Map(JobTypeData.map(j => [String(j.bigid), Number(j.bigid)]));
+
+    const mapped = [];
+    const errors = [];
+
+    for (const _r of data) {
+      const r = { ..._r };
+
+      // trim all strings
+      for (const k of Object.keys(r)) {
+        if (typeof r[k] === "string") r[k] = r[k].trim();
+      }
+
+      // ---- map OrderType -> OrderTypeId
+      let orderTypeId = null;
+      const rawOrder = r.OrderType;
+      if (rawOrder != null && rawOrder !== "") {
+        const asStr = String(rawOrder).trim();
+        const asNorm = norm(asStr);
+
+        if (!Number.isNaN(Number(asStr)) && orderById.has(String(Number(asStr)))) {
+          orderTypeId = orderById.get(String(Number(asStr)));
+        } else if (orderByName.has(asNorm)) {
+          orderTypeId = orderByName.get(asNorm);
+        } else {
+          errors.push({
+            message: "Unknown OrderType",
+            data: { value: rawOrder, row: r }
+          });
+        }
+      } else {
+        errors.push({ message: "OrderType missing", data: { row: r } });
+      }
+
+      // ---- map JobType -> JobTypeId
+      let jobcardTypeId = null;
+      const rawJob = r.JobType;
+      if (rawJob != null && rawJob !== "") {
+        const asStr = String(rawJob).trim();
+        const asNorm = norm(asStr);
+
+        if (!Number.isNaN(Number(asStr)) && jobById.has(String(Number(asStr)))) {
+          jobcardTypeId = jobById.get(String(Number(asStr)));
+        } else if (jobByName.has(asNorm)) {
+          jobcardTypeId = jobByName.get(asNorm);
+        } else {
+          // salvage digits from values like "252f"
+          const digits = asStr.match(/\d+/)?.[0];
+          if (digits && jobById.has(String(Number(digits)))) {
+            jobcardTypeId = jobById.get(String(Number(digits)));
+          } else {
+            errors.push({
+              message: "Unknown Jobcard Type",
+              data: { value: rawJob, row: r }
+            });
+          }
+        }
+      } else {
+        // optional: treat missing as null (not error). Uncomment to enforce:
+        // errors.push({ message: "JobType missing", data: { row: r } });
+        jobcardTypeId = null;
+      }
+
+      r.OrderTypeId = orderTypeId;
+      r.JobTypeId = jobcardTypeId;
+
+      mapped.push(r);
+    }
+
+    return { mapped, errors };
+  } catch (err) {
+    // surface DB or logic errors in a consistent shape
+    return {
+      mapped: [],
+      errors: [{ message: "mappingVehicleOrder failed", data: { error: err.message } }]
+    };
+  }
+
+}
+export { spmMultiVehicleUpload, vehicleViewService, mappingVehicleOrder, findAdvisorOnLocation, advisorAlreadyExistsCheck, getduplicatesArray, partyAlreadyExistsCheck, stockViewService, spmBulkCSUpload, spmMultiCSUpload, spmBulkWSUpload, spmBulkVehicleUpload, partyNameCodeMapping }
