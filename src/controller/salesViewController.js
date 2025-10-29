@@ -715,4 +715,4 @@ const partBrandMappingCheck = async (Brandid, Data) => {
   }
 };
 
-export { partDetails, getLedger, getPartsAndLedger };
+export { partDetails, getLedger, getPartsAndLedger , partBrandMappingCheck};
