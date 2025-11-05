@@ -1,6 +1,6 @@
 import Router from 'express'
 const router = Router()
-import { getBrands, getDashboard, getDealers, getLocation, getWorkspace, homePageData, latestDates, model, pagination, partNature, partType, seasonal, userInfo, getUserModules, spmhomepage, ordertype, jobtype } from '../controller/MasterApiController.js'
+import { getBrands, getDashboard, getDealers, getLocation, getWorkspace, homePageData, latestDates, model, pagination, partNature, partType, seasonal, userInfo, getUserModules, spmhomepage, ordertype, jobtype, hsncode } from '../controller/MasterApiController.js'
 
 
 router.route('/brands').get(getBrands)
@@ -27,4 +27,5 @@ router.route('/test/:pageno/:pagelimit').post(pagination)
 router.route('/user-modules').post(getUserModules)
 //router.route('/user-modules-r').post(getRawUserModules)
 
+router.route('/hsncode').get(hsncode)
 export default router

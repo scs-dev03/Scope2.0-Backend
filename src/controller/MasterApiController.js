@@ -394,7 +394,7 @@ const getUserModules = async (req, res) => {
       return res.status(400).json({ error: "userId is required" });
     }
 
-    const pool = await getPool2();
+    const pool = await getPool1();
 
     const result = await pool.request()
       .input("userId", sql.Int, userId)
@@ -584,4 +584,14 @@ const jobtype = async (req, res) => {
     throw new ApiError(500, 'Unable to Get Jobtype', [error.message])
   }
 }
-export { jobtype,ordertype, spmhomepage, pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules }
+const hsncode = async(req,res)=>{
+try {
+    const pool = await getPool1()
+    const query = `use z_scope select tcode , description from hsnmaster`
+    const result = await pool.request().query(query)
+    res.status(200).json(new ApiResponse(200,result.recordset, `Data Fetched Successfully`))
+} catch (error) {
+  res.status(500).json(500, 'Unable to Get HSNCode', [error.message])
+}
+}
+export { hsncode,jobtype,ordertype, spmhomepage, pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules }
