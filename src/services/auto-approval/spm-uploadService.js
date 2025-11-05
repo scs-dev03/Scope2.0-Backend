@@ -397,7 +397,7 @@ const partyNameCodeMapping = async (LocationId) => {
   }
 }
 
-const stockViewService = async (formattedData, BrandId) => {
+const stockViewService = async (formattedData, BrandId , DealerId) => {
   try {
     const pool = await getPool1()
     const jsonPayload = JSON.stringify(formattedData);
@@ -405,6 +405,7 @@ const stockViewService = async (formattedData, BrandId) => {
     const result = await pool.request()
       .input('Json', sql.NVarChar(sql.MAX), jsonPayload)
       .input('BrandId', sql.Int, BrandId)
+      .input('DealerId', sql.Int, DealerId)
       .execute('dbo.StockView_FromJson')
 
     return result.recordset

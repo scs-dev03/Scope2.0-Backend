@@ -2,6 +2,18 @@ import { getPool1 } from "../../db/db.js";
 import sql from 'mssql'
 import { ApiError } from "../../utils/ApiError.js";
 
+
+// const formatter = new Intl.DateTimeFormat('en-GB', {
+//     timeZone: 'Asia/Kolkata',
+//     year: 'numeric',
+//     month: '2-digit',
+//     day: '2-digit',
+//     hour: '2-digit',
+//     minute: '2-digit',
+//     second: '2-digit',
+//     hour12: false
+// });
+
 const insertApprovals = async (data) => {
     try {
         const pool = await getPool1()
@@ -42,7 +54,7 @@ const insertApprovals = async (data) => {
         table.columns.add('VehicleModel', sql.VarChar(30), { nullable: true });
         table.columns.add('JobCardNumber', sql.VarChar(40), { nullable: true });
         table.columns.add('JobTypeId', sql.Int, { nullable: true });
-        table.columns.add('Advisor', sql.VarChar(20), { nullable: true });
+        table.columns.add('Advisor', sql.VarChar(30), { nullable: true });
         table.columns.add('OrderTypeId', sql.Int, { nullable: true });
         table.columns.add('PartyId', sql.Int, { nullable: true });
         table.columns.add('Stock', sql.Decimal(18, 2), { nullable: true });
@@ -50,13 +62,19 @@ const insertApprovals = async (data) => {
         table.columns.add('Receipt', sql.NVarChar(sql.MAX), { nullable: true });
         table.columns.add('Price', sql.Decimal(18, 2), { nullable: true });
         table.columns.add('OrderValue', sql.Decimal(18, 2), { nullable: true });
-        table.columns.add('OrderDate', sql.DateTime, { nullable: true });
+        // table.columns.add('OrderDate', sql.DateTime, { nullable: true });
         table.columns.add('AdvanceValue', sql.Int, { nullable: true });
         table.columns.add('Estimate', sql.Int, { nullable: true });
         table.columns.add('NonMoving', sql.Int, { nullable: true });
         table.columns.add('UploadedBy', sql.Int, { nullable: true });
         table.columns.add('Type', sql.VarChar(1), { nullable: true });
 
+        // Current date to be passed as OrderDate
+        // const now = new Date();
+        // const parts = Object.fromEntries(formatter.formatToParts(now).map(p => [p.type, p.value]));
+        // const currentDate = `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
+        // console.log(currentDate);
+        
         // Add rows to the table for bulk insert
         data.forEach((row) => {
             table.rows.add(
@@ -81,7 +99,7 @@ const insertApprovals = async (data) => {
                 row.url,
                 row.Price,
                 row.OrderValue,
-                row.OrderDate,
+                // row.currentDate,
                 row.AdvanceValue,
                 row.Estimate,
                 row.NonMoving,
@@ -99,7 +117,7 @@ const insertApprovals = async (data) => {
         return
 
     } catch (err) {
-        console.error('Error during bulk insert:', err);
+        // console.error('Error during bulk insert:', err);
         // await transaction.rollback();
         throw err; // Re-throw for upstream handling
     }

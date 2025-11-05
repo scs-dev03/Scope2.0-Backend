@@ -1,7 +1,9 @@
+import { json } from "express"
 import { findAdvisorOnLocation, partyAlreadyExistsCheck } from "../../services/auto-approval/spm-uploadService.js"
-import { existingAdvisor, existingPartyNameandCodeService, updateAdvisorService, updatePartyService, viewAdvisorService, viewPartyService } from "../../services/auto-approval/spm-viewService.js"
+import { existingAdvisor, existingPartyNameandCodeService, nonMovingService, orderPlacedService, reorderService, updateAdvisorService, updatePartyService, viewAdvisorService, viewOrderStatusService, viewPartyService } from "../../services/auto-approval/spm-viewService.js"
 import { ApiError } from "../../utils/ApiError.js"
 import { ApiResponse } from "../../utils/ApiResponse.js"
+import { groupStock } from "../../services/dealerMonitoring/dealerMonitoringService.js"
 
 
 
@@ -182,5 +184,127 @@ const updateAdvisor = async (req, res) => {
     }
 };
 
+// const viewOrderStatus = async(req,res)=> {
+//     const {DealerId ,LocationIds , RequestType , From , To , OrderTypeIds , PartNumbers , VehicleNumbers , JobCardNumbers , AdvisorIds , Status} = req.body
+//     const result = await viewOrderStatusService()
+//     res.status(200).json(new ApiResponse(200,result))
+// }
+const viewOrderStatus = async (req, res) => {
+    try {
+        const {
+            DealerId,
+            LocationIds,
+            RequestType,
+            From,
+            To,
+            OrderTypeIds,
+            PartNumbers,
+            VehicleNumbers,
+            JobCardNumbers,
+            AdvisorIds,
+            Status
+        } = req.body;
 
-export { viewParty, viewAdvisor, updateParty, updateAdvisor }
+        // console.log( DealerId, LocationIds, RequestType, From, To, OrderTypeIds, PartNumbers, VehicleNumbers, JobCardNumbers, AdvisorIds, Status);
+        // Handle triple quotes for SQL parameters
+        function formatForSql(array) {
+            if (!Array.isArray(array) || array.length === 0) return "NULL";
+            const joined = array.map(v => `'${v}'`).join(",");
+            return `'${joined.replace(/'/g, "''")}'`;
+        }
+
+        //  // Format parameters using the formatForSql function
+        const formattedLocationIds = formatForSql(LocationIds);
+        const formattedRequestType = formatForSql(RequestType);
+        const formattedOrderTypeIds = formatForSql(OrderTypeIds);
+        const formattedPartNumbers = formatForSql(PartNumbers);
+        const formattedVehicleNumbers = formatForSql(VehicleNumbers);
+        const formattedJobCardNumbers = formatForSql(JobCardNumbers);
+        const formattedAdvisorIds = formatForSql(AdvisorIds);
+        const formattedStatus = formatForSql(Status);
+        
+        const result = await viewOrderStatusService(
+            DealerId,
+            formattedLocationIds,
+            formattedRequestType,
+            From,
+            To,
+            formattedOrderTypeIds,
+            formattedPartNumbers,
+            formattedVehicleNumbers,
+            formattedJobCardNumbers,
+            formattedAdvisorIds,
+            formattedStatus // Pass formatted Status
+        );
+        res.status(200).json(new ApiResponse(200, result));
+    } catch (error) {
+        res.status(500), json(error)
+    }
+};
+
+const orderPlaced = async (req, res) => {
+    try {
+        const { DealerId, bigid, scs_status, orderplace, POnumber } = req.body
+        if (!DealerId || !bigid || scs_status === undefined || !orderplace) {
+            return res.status(400).json(new ApiError(400, `DealerId, bigid , scs_status , orderplace are required`))
+        }
+        if (orderplace === "YES" && (!POnumber || POnumber === undefined)) {
+            return res.status(400).json(new ApiError(400, `Ponumber is required when orderplace is 'YES'`))
+        }
+
+        let tableName;
+        if (scs_status === "Approve" || scs_status === "Decline") {
+            tableName = `create_order_request_td001_${DealerId}`
+        }
+        else {
+            tableName = `CreateOrderRequestPending_td001_${DealerId}`
+        }
+
+        const result = await orderPlacedService(tableName, bigid, orderplace, POnumber)
+        res.status(200).json(new ApiResponse(200, [result.rowsAffected[0]], `Updated Successfully`,))
+    } catch (error) {
+        res.status(500).json(error)
+    }
+}
+
+const reOrder = async (req, res) => {
+    try {
+        const { DealerId, bigid, Remarks } = req.body
+        if (!DealerId || !bigid) {
+            return res.status(400).json(new ApiError(400, `DealerId and Remarks are required`))
+        }
+        const result = await reorderService(DealerId, bigid, Remarks)
+        res.status(200).json(new ApiResponse(200, result, `ReOrder Successfull`))
+    } catch (error) {
+        res.status(500).json(error)
+    }
+}
+
+const nonMoving = async (req, res) => {
+    try {
+        const { partnumber, BrandId, LocationId } = req.body
+        if (!partnumber || !BrandId || !LocationId) {
+            return res.status(400).json(new ApiError(400, `partnumber, BrandId, LocationId are required`))
+        }
+        const result = await nonMovingService(partnumber, BrandId, LocationId)
+        res.status(200).json(new ApiResponse(200, result, `Data Fetched Successfully`))
+    } catch (error) {
+        res.status(500).json(new ApiError(500, error.message))
+    }
+}
+
+const viewgroupStock = async (req, res) => {
+    try {
+        const { BrandId, DealerId, LocationId, PartNumber } = req.body
+        if (!PartNumber || !BrandId || !LocationId || !DealerId) {
+            return res.status(400).json(new ApiError(400, `partnumber, BrandId, LocationId , DealerId are required`))
+        }
+        const result = await groupStock(BrandId, DealerId, LocationId, PartNumber)
+        // console.log(result);
+        res.status(200).json(new ApiResponse(200, result.recordset, `Data Fetched Successfully`))
+    } catch (error) {
+        res.status(500).json(new ApiError(500, error))
+    }
+}
+
+export { viewParty, viewAdvisor, updateParty, updateAdvisor, viewOrderStatus, orderPlaced, reOrder, nonMoving, viewgroupStock }

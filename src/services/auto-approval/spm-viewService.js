@@ -1,6 +1,8 @@
-import { getPool1 } from "../../db/db.js";
+import { getPool1 , getPool2} from "../../db/db.js";
 import sql from 'mssql'
 import { ApiError } from "../../utils/ApiError.js";
+import { login } from "../login/auth.service.js";
+import { orderPlaced } from "../../controller/auto-approval/spm-view.js";
 
 const viewPartyService = async (LocationId, Status) => {
   try {
@@ -195,4 +197,89 @@ const existingAdvisor = async (Id) => {
 //   }
 // }
 
-export { viewPartyService, viewAdvisorService, updatePartyService, updateAdvisorService, existingPartyNameandCodeService, existingAdvisor }
+const viewOrderStatusService = async (
+  DealerId, LocationIds, RequestType, From, To,
+  OrderTypeIds, PartNumbers, VehicleNumbers,
+  JobCardNumbers, AdvisorIds, Status
+) => {
+  try {
+    const pool = await getPool1();
+
+    const query = `
+        use z_scope
+        EXEC dbo.sp_SPMViewOrderStatus_VB
+            @DealerID        = ${DealerId},
+            @LocationIds     = ${LocationIds},  
+            @Type            = ${RequestType},   
+            @From            = '${From}',
+            @To              = '${To}',
+            @OrderTypeIds    = ${OrderTypeIds},
+            @PartNumbers     = ${PartNumbers},   
+            @VehicleNumber   = ${VehicleNumbers},
+            @JobCardNumber   = ${JobCardNumbers},
+            @AdvisorIds      = ${AdvisorIds},    
+            @Status          = ${Status};        
+    `;
+    // console.log(query);
+
+    const result = await pool.request().query(query);
+    return result.recordset;
+  } catch (error) {
+    console.log(error.message);
+    throw new ApiError(500, `Unable to get View Order Status`, [error.message]);
+  }
+};
+
+const orderPlacedService = async (tableName, bigid, orderPlace, POnumber) => {
+  try {
+    const pool = await getPool1()
+    const query = `use z_scope
+      update  ${tableName}
+      set orderplace = @OrderPlace , PONumber = @POnumber
+      where bigid = @bigid`
+
+    const result = await pool.request()
+      .input('OrderPlace', sql.VarChar, orderPlace)
+      .input('POnumber', sql.VarChar, POnumber ?? null)
+      .input('bigid', sql.Int, bigid)
+      .query(query)
+    return result
+  } catch (error) {
+    throw new ApiError(error);
+
+  }
+
+}
+
+const reorderService = async (DealerId, bigid, Remarks) => {
+  try {
+    const pool = await getPool1()
+    const query = `EXEC DBO.USP_OrderStatusReSubmitNT '${bigid}','${Remarks}','${DealerId}'`
+    const result = await pool.request().query(query)
+    return result
+  } catch (error) {
+    throw new ApiError(200, error.message);
+
+  }
+}
+
+const nonMovingService = async (PartNumber, BrandId , LocationId) => {
+  try {
+    const pool = await getPool1()
+    const query = `use z_scope Select   D.work_location LOCATION,ISNULL(SUM(QTY),0)QTY,C.DISCOUNT,E.vcName as Dealer 
+      from CurrentStock1 X1 (NOLOCK) 
+      INNER JOIN  CurrentStock2 X2 (NOLOCK) ON(X1.tCode=X2.StockCode) 
+      INNER JOIN SH_UPLOADNONMOVINGPART C ON(C.locationid =X1.locationid AND C.PARTNUMBER1=X2.partnumber)   
+      INNER JOIN Dealer_Workshop_Master D ON(D.BIGID=X1.locationid)  
+      INNER JOIN Dealer_Master E ON(E.BIGID=d.DealerID)  
+      WHERE  X2.partnumber='${PartNumber}' AND E.Rstatus=1 AND C.AUTOREMOVAL='N' AND X2.QTY>0 AND D.BRANDID='${BrandId}' AND  X1.locationid!='${LocationId}' 
+      GROUP BY D.WORK_LOCATION,C.DISCOUNT,E.vcName`
+    const result = await pool.request().query(query)
+    // console.log(query);
+    
+    return result.recordset
+  } catch (error) {
+    throw new ApiError(500, `Unable to find Non-Moving`, [error.message]);
+  }
+}
+export { viewOrderStatusService, viewPartyService, viewAdvisorService, updatePartyService, updateAdvisorService, existingPartyNameandCodeService, existingAdvisor, orderPlacedService, reorderService ,nonMovingService}
