@@ -1,6 +1,6 @@
 import { json } from "express"
 import { findAdvisorOnLocation, partyAlreadyExistsCheck } from "../../services/auto-approval/spm-uploadService.js"
-import { existingAdvisor, existingPartyNameandCodeService, nonMovingService, orderPlacedService, reorderService, updateAdvisorService, updatePartyService, viewAdvisorService, viewOrderStatusService, viewPartyService } from "../../services/auto-approval/spm-viewService.js"
+import { existingAdvisor, existingPartyNameandCodeService, nonMovingService, orderPlacedService, reorderService, spmDashboardService, updateAdvisorService, updatePartyService, viewAdvisorService, viewOrderStatusService, viewPartyService } from "../../services/auto-approval/spm-viewService.js"
 import { ApiError } from "../../utils/ApiError.js"
 import { ApiResponse } from "../../utils/ApiResponse.js"
 import { groupStock } from "../../services/dealerMonitoring/dealerMonitoringService.js"
@@ -205,24 +205,47 @@ const viewOrderStatus = async (req, res) => {
             Status
         } = req.body;
 
-        // console.log( DealerId, LocationIds, RequestType, From, To, OrderTypeIds, PartNumbers, VehicleNumbers, JobCardNumbers, AdvisorIds, Status);
+        // console.log(DealerId, LocationIds, RequestType, From, To, OrderTypeIds, PartNumbers, VehicleNumbers, JobCardNumbers, AdvisorIds, Status);
         // Handle triple quotes for SQL parameters
-        function formatForSql(array) {
-            if (!Array.isArray(array) || array.length === 0) return "NULL";
-            const joined = array.map(v => `'${v}'`).join(",");
-            return `'${joined.replace(/'/g, "''")}'`;
+        // function formatForSql(array) {
+        //     if (!Array.isArray(array) || array.length === 0) return "NULL";
+        //     const joined = array.map(v => `'${v}'`).join(",");
+        //     return `'${joined.replace(/'/g, "''")}'`;
+        // }
+
+        // function format(arr) {
+        //     if (!Array.isArray(arr) || arr.length === 0) return null;
+        //     // if (!Array.isArray(arr)) return '';
+        //     return arr.join(',');
+        // }
+        function format(arr) {
+            if (!Array.isArray(arr) || arr.length === 0) return null;
+            const s = arr.map(v => String(v).trim()).filter(Boolean).join(',');
+            return s ? `'${s.replace(/'/g, "''")}'` : null;
         }
 
         //  // Format parameters using the formatForSql function
-        const formattedLocationIds = formatForSql(LocationIds);
-        const formattedRequestType = formatForSql(RequestType);
-        const formattedOrderTypeIds = formatForSql(OrderTypeIds);
-        const formattedPartNumbers = formatForSql(PartNumbers);
-        const formattedVehicleNumbers = formatForSql(VehicleNumbers);
-        const formattedJobCardNumbers = formatForSql(JobCardNumbers);
-        const formattedAdvisorIds = formatForSql(AdvisorIds);
-        const formattedStatus = formatForSql(Status);
-        
+        const formattedLocationIds = format(LocationIds);
+        const formattedRequestType = format(RequestType);
+        const formattedOrderTypeIds = format(OrderTypeIds);
+        const formattedPartNumbers = format(PartNumbers);
+        const formattedVehicleNumbers = format(VehicleNumbers);
+        const formattedJobCardNumbers = format(JobCardNumbers);
+        const formattedAdvisorIds = format(AdvisorIds);
+        const formattedStatus = format(Status);
+
+        // console.log(DealerId,
+        //     formattedLocationIds,
+        //     formattedRequestType,
+        //     From,
+        //     To,
+        //     formattedOrderTypeIds,
+        //     formattedPartNumbers,
+        //     formattedVehicleNumbers,
+        //     formattedJobCardNumbers,
+        //     formattedAdvisorIds,
+        //     formattedStatus);
+
         const result = await viewOrderStatusService(
             DealerId,
             formattedLocationIds,
@@ -238,7 +261,7 @@ const viewOrderStatus = async (req, res) => {
         );
         res.status(200).json(new ApiResponse(200, result));
     } catch (error) {
-        res.status(500), json(error)
+        res.status(500).json(error)
     }
 };
 
@@ -307,4 +330,17 @@ const viewgroupStock = async (req, res) => {
     }
 }
 
-export { viewParty, viewAdvisor, updateParty, updateAdvisor, viewOrderStatus, orderPlaced, reOrder, nonMoving, viewgroupStock }
+const spmDashboard = async (req, res) => {
+    try {
+        const { DealerId, LocationId, OrderTypeId, From, To } = req.body
+        if (!DealerId || !From || !To) {
+            return res.status(400).json(new ApiError(400, `DealerId , From and To are required `))
+        }
+        const result = await spmDashboardService(DealerId, LocationId, OrderTypeId, From, To)
+        res.status(200).json(new ApiResponse(200, result, `Data Fetched Successfully`))
+    } catch (error) {
+        res.status(500).json(error)
+    }
+}
+
+export { viewParty, viewAdvisor, updateParty, updateAdvisor, viewOrderStatus, orderPlaced, reOrder, nonMoving, viewgroupStock, spmDashboard }

@@ -117,7 +117,7 @@ const stockuploadWs = async (req, res) => {
     const { LocationId, OrderType, userId, BrandId, DealerId } = req.body
     const file = req.file
     if (!file) {
-      return res.status(400).json(new ApiError(400, errors?.message || "File Not Attached"));
+      return res.status(400).json(new ApiError(400, "File Not Attached"));
     }
     if (!OrderType || !LocationId || !userId || !BrandId) {
       return res.status(400).json(new ApiError(400, `LocationId , userId and  OrderType is required`, [], ''))
@@ -567,7 +567,7 @@ const addVehicle = async (req, res) => {
 
     const result = await vehicleViewService(grouped, BrandId)
 
-    res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, `Data Fetched || Inserted in Not In Master`))
+    res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, `Data Fetched Successfully`))
   } catch (error) {
     res.status(500).json(error.message)
   }

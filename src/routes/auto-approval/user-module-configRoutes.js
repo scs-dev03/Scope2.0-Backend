@@ -6,7 +6,7 @@ import {
 
 const router = Router();
 
-router.post("/viewmoduleconfig", addModuleViewConfig);   
+router.post("/addmoduleconfig", addModuleViewConfig);   
 router.put("/updatemoduleconfig",modifyModuleViewConfig); 
 
 export default router;

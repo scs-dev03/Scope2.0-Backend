@@ -1,8 +1,6 @@
-import { getPool1 , getPool2} from "../../db/db.js";
+import { getPool1, getPool2 } from "../../db/db.js";
 import sql from 'mssql'
 import { ApiError } from "../../utils/ApiError.js";
-import { login } from "../login/auth.service.js";
-import { orderPlaced } from "../../controller/auto-approval/spm-view.js";
 
 const viewPartyService = async (LocationId, Status) => {
   try {
@@ -204,10 +202,9 @@ const viewOrderStatusService = async (
 ) => {
   try {
     const pool = await getPool1();
-
     const query = `
         use z_scope
-        EXEC dbo.sp_SPMViewOrderStatus_VB
+        EXEC dbo.sp_SPMViewOrderStatus2_VB
             @DealerID        = ${DealerId},
             @LocationIds     = ${LocationIds},  
             @Type            = ${RequestType},   
@@ -220,12 +217,9 @@ const viewOrderStatusService = async (
             @AdvisorIds      = ${AdvisorIds},    
             @Status          = ${Status};        
     `;
-    // console.log(query);
-
     const result = await pool.request().query(query);
     return result.recordset;
   } catch (error) {
-    console.log(error.message);
     throw new ApiError(500, `Unable to get View Order Status`, [error.message]);
   }
 };
@@ -263,7 +257,7 @@ const reorderService = async (DealerId, bigid, Remarks) => {
   }
 }
 
-const nonMovingService = async (PartNumber, BrandId , LocationId) => {
+const nonMovingService = async (PartNumber, BrandId, LocationId) => {
   try {
     const pool = await getPool1()
     const query = `use z_scope Select   D.work_location LOCATION,ISNULL(SUM(QTY),0)QTY,C.DISCOUNT,E.vcName as Dealer 
@@ -276,10 +270,70 @@ const nonMovingService = async (PartNumber, BrandId , LocationId) => {
       GROUP BY D.WORK_LOCATION,C.DISCOUNT,E.vcName`
     const result = await pool.request().query(query)
     // console.log(query);
-    
+
     return result.recordset
   } catch (error) {
     throw new ApiError(500, `Unable to find Non-Moving`, [error.message]);
   }
 }
-export { viewOrderStatusService, viewPartyService, viewAdvisorService, updatePartyService, updateAdvisorService, existingPartyNameandCodeService, existingAdvisor, orderPlacedService, reorderService ,nonMovingService}
+
+const spmDashboardService = async (DealerId, LocationId, OrderTypeId, From, To) => {
+try {
+    const pool = await getPool1()
+    const query = `use z_scope
+  declare @PendingCount1 int,@PendingCount2 int
+  DECLARE @Approve int
+  DECLARE @Reject int
+  DECLARE @NotinMaster int
+  Declare @Internal int
+  
+  --Declare @sql nvarchar(max) = N'
+  select @PendingCount1=COUNT(SCS_STATUS) from  createorderrequestpending_td001_${DealerId}
+  where (Dateadded <= @To) and (Dateadded >=@From )
+  AND (@LocationId is null or Locationid = @LocationId)
+  AND (@OrderTypeId is null or OrderTypeId = @OrderTypeId)
+  AND SCS_Status != 'Internal'
+  
+  select @PendingCount2=COUNT(Partnumber)   from temp_createorderrequest_vb
+  where (OrderDate <= @To) and (OrderDate >=@From )
+  AND (@Locationid is null or Locationid = @LocationId)
+  AND (@OrderTypeId is null or OrderTypeId = @OrderTypeId)
+  
+  select @Approve=COUNT(SCS_STATUS)  from  create_order_request_td001_${DealerId} 
+  where (Dateadded <= @To) and (Dateadded >=@From )
+  AND (@Locationid is null or Locationid = @LocationId)
+  AND (@OrderTypeId is null or OrderTypeId = @OrderTypeId)
+  AND SCS_Status = 'Approve'
+  
+  select @Reject=COUNT(SCS_STATUS)  from  create_order_request_td001_${DealerId} 
+  where (Dateadded <= @To) and (Dateadded >=@From )
+  AND (@Locationid is null or Locationid = @LocationId)
+  AND (@OrderTypeId is null or OrderTypeId = @OrderTypeId)
+  AND SCS_Status = 'Decline'
+  
+  select @NotinMaster=COUNT(Partnumber) from Notinmaster
+  where (Addedon <= @To) and (Addedon >=@From )
+  AND (@Locationid is null or Locationid = @LocationId)
+  
+  select @Internal=COUNT(SCS_STATUS) from  createorderrequestpending_td001_${DealerId} 
+  where (Dateadded <= @To) and (Dateadded >=@From )
+  AND (@LocationId is null or Locationid = @LocationId)
+  AND (@OrderTypeId is null or OrderTypeId = @OrderTypeId)
+  AND SCS_Status = 'Internal'
+  
+  select @PendingCount1+@PendingCount2 PendingCount,@NotinMaster NotInMaster , @Approve Approve , @Reject Decline , @Internal Internal
+    `
+    const result = await pool.request()
+    .input('DealerId',sql.Int,DealerId)
+    .input('LocationId',sql.Int,LocationId ?? null)
+    .input('OrderTypeId',sql.Int,OrderTypeId ?? null)
+    .input('From',sql.DateTime,From)
+    .input('To',sql.DateTime,To)
+    .query(query)
+    return result.recordset
+} catch (error) {
+  throw new ApiError(500,error.message)
+}
+  
+}
+export { viewOrderStatusService, viewPartyService, viewAdvisorService, updatePartyService, updateAdvisorService, existingPartyNameandCodeService, existingAdvisor, orderPlacedService, reorderService, nonMovingService, spmDashboardService }
