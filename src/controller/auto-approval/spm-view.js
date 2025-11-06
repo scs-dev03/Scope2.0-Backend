@@ -63,7 +63,7 @@ const updateParty = async (req, res) => {
 
         const result = await updatePartyService(Id, PartyName, PartyCode, status)
         if (result.updatedCount >= 0) {
-            return res.status(200).json(new ApiResponse(200, [result.updatedRow], 'Party Updated Successfully'))
+            return res.status(200).json(new ApiResponse(200, [result.updatedRow], 'Updated Successfully'))
         }
     } catch (error) {
         return res.status(error.statusCode || 500).json(new ApiError(error.statusCode || 500, error.message || 'Unable to Update Party Details', []));
@@ -172,7 +172,7 @@ const updateAdvisor = async (req, res) => {
         if ((result.updatedCount ?? 0) > 0) {
             return res
                 .status(200)
-                .json(new ApiResponse(200, [result.updatedRow], 'Advisor updated successfully'));
+                .json(new ApiResponse(200, [result.updatedRow], 'Updated successfully'));
         }
         return res
             .status(404)

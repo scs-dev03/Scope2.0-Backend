@@ -70,7 +70,7 @@ const stockuploadCs = async (req, res) => {
 
         const result = await stockViewService(grouped, BrandId, DealerId)
 
-        return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, "File Uploaded SuccessFully"));
+        return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, "Data Fetched Successfully "));
       } catch (error) {
         return sendError(error);
       }
@@ -494,6 +494,9 @@ const vehicleUploadSingle = async (req, res) => {
 const addVehicle = async (req, res) => {
   try {
     const { BrandId, DealerId, payload } = req.body
+    if(!BrandId || !DealerId || !payload){
+      res.status(400).json(new ApiError(400,`BrandId , DealerId and payload are required`))
+    }
     const raw = typeof payload === 'string' ? JSON.parse(payload) : payload;
 
     // Accept array or single object
@@ -502,8 +505,10 @@ const addVehicle = async (req, res) => {
     const Addedby = first?.userId
 
     const file = req.file;
+    // console.log(file);
+    
 
-    // let url;
+    let url;
     // try {
     //   const s3Data = await uploadToS3(file)
     //   url = s3Data?.url ?? null;
@@ -511,10 +516,10 @@ const addVehicle = async (req, res) => {
     // } catch (error) {
     //   throw new ApiError(500, error.message);
     // }
-    let url = null;
+    // let url = null;
     if (file) {
       try {
-        const s3Data = await uploadToS3(file); // your uploader should read imageFile.path
+        const s3Data = await uploadToS3(file); 
         url = s3Data?.url ?? null;
       } catch (error) {
         throw new ApiError(500, error.message);
