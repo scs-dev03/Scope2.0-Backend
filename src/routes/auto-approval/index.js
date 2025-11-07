@@ -6,6 +6,8 @@ import userModuleConfigroutes from './user-module-configRoutes.js'
 import rulemgmtroutes from './rule-managementRoute.js'
 import operatorroutes from './OperatorRoutes.js'
 import spmviewroutes from './spm-viewRoute.js'
+import nimroutes from './notinmasterRoute.js'
+
 const router = Router()
 
 router.use('/aa',bucketroutes)
@@ -21,6 +23,7 @@ router.use('/aa',userModuleConfigroutes)
 
 router.use('/aa',rulemgmtroutes)
 
+router.use('/aa/nim',nimroutes)
 
 
 
