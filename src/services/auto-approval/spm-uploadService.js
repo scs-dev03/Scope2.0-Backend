@@ -3,7 +3,7 @@ import fs from 'fs'
 import { getPool1 } from "../../db/db.js";
 import { ApiError } from "../../utils/ApiError.js";
 import sql from 'mssql'
-import { validateCommonRows, orderTypeCheck, validateAndClean, validateAndCleanVehicle , validateHeaders } from "../../utils/validator.js";
+import { validateCommonRows, orderTypeCheck, validateAndClean, validateAndCleanVehicle, validateHeaders } from "../../utils/validator.js";
 
 // const spmBulkCSUpload = async (LocationId, OrderType, file, userId) => {
 //   let { headers, data } = await readExcel(file);
@@ -340,7 +340,7 @@ const spmBulkVehicleUpload = async (file, LocationId, userId) => {
   }
 };
 
-const spmMultiVehicleUpload = async (excelFile,keys) => {
+const spmMultiVehicleUpload = async (excelFile, keys) => {
   const { headers, data } = await readExcel(excelFile)
   fs.unlinkSync(excelFile)
 
@@ -362,25 +362,26 @@ const spmMultiVehicleUpload = async (excelFile,keys) => {
     throw new ApiError(400, "Excel validation failed", errors, "");
   }
   // --- Format output ---
-    const formattedData = cleanData.map(row => ({
-      ...row,
-      LocationId:keys.LocationId,
-      VehicleNumber:keys.VehicleNumber,
-      VehicleModel:keys.VehicleModel,
-      JobCardNumber:keys.JobCardNumber,
-      JobType:keys.JobType,
-      Advisor:keys.Advisor,
-      OrderType:keys.OrderType,
-      Estimate:keys.Estimate,
-      AdvanceValue:keys.AdvanceValue,
-      url:keys.url,
-      Type: "V",
-      UploadedBy: keys.userId
-    }));
+  const formattedData = cleanData.map(row => ({
+    ...row,
+    LocationId: keys.LocationId,
+    VehicleNumber: keys.VehicleNumber,
+    VehicleModel: keys.VehicleModel,
+    JobCardNumber: keys.JobCardNumber,
+    JobType: keys.JobType,
+    Advisor: keys.Advisor,
+    OrderType: keys.OrderType,
+    Estimate: keys.Estimate,
+    AdvanceValue: keys.AdvanceValue,
+    url: keys.url,
+    Type: "V",
+    UploadedBy: keys.userId
+  }));
   // console.log(formattedData);
   return formattedData
-  
+
 }
+
 const partyNameCodeMapping = async (LocationId) => {
   try {
     const pool = await getPool1()
@@ -397,7 +398,7 @@ const partyNameCodeMapping = async (LocationId) => {
   }
 }
 
-const stockViewService = async (formattedData, BrandId , DealerId) => {
+const stockViewService = async (formattedData, BrandId, DealerId) => {
   try {
     const pool = await getPool1()
     const jsonPayload = JSON.stringify(formattedData);
@@ -406,7 +407,7 @@ const stockViewService = async (formattedData, BrandId , DealerId) => {
       .input('Json', sql.NVarChar(sql.MAX), jsonPayload)
       .input('BrandId', sql.Int, BrandId)
       .input('DealerId', sql.Int, DealerId)
-      .execute('dbo.StockView_FromJson')
+      .execute('dbo.StockView_FromJsoncolor')
 
     return result.recordset
 
@@ -415,23 +416,23 @@ const stockViewService = async (formattedData, BrandId , DealerId) => {
   }
 
 }
+
 const vehicleViewService = async (formattedData, BrandId, DealerId) => {
   try {
     const pool = await getPool1()
     const jsonPayload = JSON.stringify(formattedData);
 
     const result = await pool.request()
-      .input('Json', sql.NVarChar(sql.MAX), jsonPayload)
-      .input('BrandId', sql.Int, BrandId)
+      .input('Json', sql.VarChar(sql.MAX), jsonPayload)
       .input('DealerId', sql.Int, DealerId)
-      .execute('dbo.VehicleView_FromJson')
+      .input('BrandId', sql.Int, BrandId)
+      .execute('dbo.VehicleView_FromJsoncolor')
 
     return result.recordset
 
   } catch (error) {
     throw new ApiError(500, error.message, [])
   }
-
 }
 
 const partyAlreadyExistsCheck = async (data) => {
@@ -831,4 +832,5 @@ const mappingVehicleOrder = async (data) => {
   }
 
 }
+
 export { spmMultiVehicleUpload, vehicleViewService, mappingVehicleOrder, findAdvisorOnLocation, advisorAlreadyExistsCheck, getduplicatesArray, partyAlreadyExistsCheck, stockViewService, spmBulkCSUpload, spmMultiCSUpload, spmBulkWSUpload, spmBulkVehicleUpload, partyNameCodeMapping }

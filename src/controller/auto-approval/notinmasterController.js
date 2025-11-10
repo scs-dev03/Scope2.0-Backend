@@ -1,7 +1,10 @@
 import { uploadToS3 } from "../../middlewares/multer.middleware.js"
-import { addNotinMasterService, viewNotInMasterService } from "../../services/auto-approval/notinmasterService.js"
+import { addNotinMasterService, mappingParttypeHSNCode, uploadNotinMasterService, viewNotInMasterService } from "../../services/auto-approval/notinmasterService.js"
 import { ApiError } from "../../utils/ApiError.js"
 import { ApiResponse } from "../../utils/ApiResponse.js"
+import { validateHeaders } from "../../utils/validator.js"
+import { readExcel } from "../../utils/vonHelper.js"
+import fs from 'fs'
 
 const viewNotInMaster = async (req, res) => {
     try {
@@ -48,7 +51,7 @@ const addNotinMaster = async (req, res) => {
         }
         const result = await addNotinMasterService({
             Id, BrandId, DealerId, LocationId, PartNumber, PartDesc, MRP, LandedCost, MOQ,
-            PartTypeId, Model, GSTPer, QtyPerVehicle, HSNID, Status, Detailsby, Remarks, LatestPartNumber , url
+            PartTypeId, Model, GSTPer, QtyPerVehicle, HSNID, Status, Detailsby, Remarks, LatestPartNumber, url
         });
         // console.log(result);
 
@@ -62,4 +65,59 @@ const addNotinMaster = async (req, res) => {
     }
 }
 
-export { viewNotInMaster, addNotinMaster }
+const uploadNotinMaster = async (req, res) => {
+    const { BrandId, userId } = req.body
+    const file = req.file
+
+    if (!BrandId || !userId) {
+        return res.status(400).json(new ApiError(400, `BrandId and userId is Required`))
+    }
+    if (!file) {
+        return res.status(400).json(new ApiError(400, `file is Required`))
+    }
+    const { headers, data } = await readExcel(file.path)
+    const REQUIRED_HEADERS = ["PartNumber", "PartDesc", "MRP", "LandedCost", "MOQ", "Model"]
+    fs.unlinkSync(file.path);
+
+    const { ok: headersOk, missingHeaders } = validateHeaders(headers, REQUIRED_HEADERS);
+    if (!headersOk) {
+        return res.status(400).json(
+            new ApiError(400, "Missing headers", missingHeaders, "")
+        );
+    }
+    // helper: treat undefined/null/"" (or whitespace-only) as missing
+    const isEmpty = v =>
+        v === undefined || v === null || (typeof v === "string" && v.trim() === "");
+
+    // optional: trim all string cells
+    const cleaned = data.map(row =>
+        Object.fromEntries(
+            Object.entries(row).map(([k, v]) => [k, typeof v === "string" ? v.trim() : v])
+        )
+    );
+
+    // validate each row for required cells
+    const rowErrors = [];
+    cleaned.forEach((row, idx) => {
+        const missingCols = REQUIRED_HEADERS.filter(col => isEmpty(row[col]));
+        if (missingCols.length) {
+            // +2 because row 1 = header, row 2 = first data row
+            rowErrors.push({ rowNumber: idx + 2, missingColumns: missingCols });
+        }
+    });
+
+    if (rowErrors.length) {
+        return res.status(400).json(
+            new ApiError(400, "Missing required cell values", rowErrors, "")
+        );
+    }
+    const { mapped, errors } = await mappingParttypeHSNCode(data)
+    if (errors.length) {
+        return res.status(400).json(new ApiError(400, `Invalid PartType or HSNcode`, errors))
+    }
+    const result = await uploadNotinMasterService(BrandId, mapped , userId)
+
+    res.status(200).json(new ApiResponse(200, result, `Uploaded Successfully`))
+
+}
+export { viewNotInMaster, addNotinMaster, uploadNotinMaster }

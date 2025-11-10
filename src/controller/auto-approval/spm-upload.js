@@ -67,7 +67,8 @@ const stockuploadCs = async (req, res) => {
         if (errors.length) {
           return res.status(400).json(new ApiError(400, "Data validation failed", errors, ""));
         }
-
+        // console.log(grouped);
+        
         const result = await stockViewService(grouped, BrandId, DealerId)
 
         return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, "Data Fetched Successfully "));
@@ -99,8 +100,9 @@ const stockuploadCs = async (req, res) => {
         if (errors.length) {
           return res.status(400).json(new ApiError(400, "Data validation failed", errors, ""));
         }
-
-        const result = await stockViewService(grouped, BrandId)
+        // console.log(grouped);
+        
+        const result = await stockViewService(grouped, BrandId, DealerId)
 
         return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, 'Data Fetched Successfully'));
       } catch (error) {
@@ -144,7 +146,7 @@ const stockuploadWs = async (req, res) => {
       return res.status(400).json(new ApiError(400, "Data validation failed", errors, ""));
     }
 
-    const result = await stockViewService(grouped, BrandId)
+    const result = await stockViewService(grouped, BrandId, DealerId)
 
     return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, 'Data Fetched Successfully'));
   } catch (error) {
@@ -187,7 +189,9 @@ const vehicleUpload = async (req, res) => {
     // const mappedData = await mappingVehicleOrder(grouped)
 
     const result = await vehicleViewService(grouped, BrandId, DealerId)
-
+    // console.log(result);
+    
+    
     res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, `Data Fetched Successfully`))
 
   } catch (error) {
@@ -570,8 +574,9 @@ const addVehicle = async (req, res) => {
       return res.status(400).json(new ApiError(400, "Data validation failed", errors, ""));
     }
 
-    const result = await vehicleViewService(grouped, BrandId)
-
+    const result = await vehicleViewService(grouped, BrandId, DealerId)
+    // console.log(result);
+    
     res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, `Data Fetched Successfully`))
   } catch (error) {
     res.status(500).json(error.message)
