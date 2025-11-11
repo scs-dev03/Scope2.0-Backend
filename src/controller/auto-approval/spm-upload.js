@@ -68,7 +68,7 @@ const stockuploadCs = async (req, res) => {
           return res.status(400).json(new ApiError(400, "Data validation failed", errors, ""));
         }
         // console.log(grouped);
-        
+
         const result = await stockViewService(grouped, BrandId, DealerId)
 
         return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, "Data Fetched Successfully "));
@@ -101,7 +101,7 @@ const stockuploadCs = async (req, res) => {
           return res.status(400).json(new ApiError(400, "Data validation failed", errors, ""));
         }
         // console.log(grouped);
-        
+
         const result = await stockViewService(grouped, BrandId, DealerId)
 
         return res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, 'Data Fetched Successfully'));
@@ -190,8 +190,8 @@ const vehicleUpload = async (req, res) => {
 
     const result = await vehicleViewService(grouped, BrandId, DealerId)
     // console.log(result);
-    
-    
+
+
     res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, `Data Fetched Successfully`))
 
   } catch (error) {
@@ -304,6 +304,7 @@ const spmAdvisorUpload = async (req, res) => {
     const REQUIRED_HEADERS = ["Advisor", "PhoneNo", "Email"];
     const { headers, data } = await readExcel(file.path)
     fs.unlinkSync(file.path)
+    // console.log(`data`,data);
 
 
     // 1) Header validation
@@ -314,27 +315,34 @@ const spmAdvisorUpload = async (req, res) => {
       );
     }
     const check = validateExcelRows(data);
+    // console.log(check);
+
     if (!check.isValid) {
       // Build a concise error payload
       const problems = [];
-      if (check.issues.missingAdvisor.length) {
-        problems.push({
-          type: "MissingAdvisor",
-          rows: check.issues.missingAdvisor
-        });
-      }
-      if (check.issues.duplicateAdvisors.length) {
-        problems.push({
-          type: "DuplicateAdvisors",
-          items: check.issues.duplicateAdvisors
-        });
-      }
-      if (check.issues.duplicateRows.length) {
-        problems.push({
-          type: "ExactDuplicateRows",
-          items: check.issues.duplicateRows
-        });
-      }
+
+      // helpers
+      const pushRows = (arr, message) => {
+        if (Array.isArray(arr) && arr.length) problems.push({ message, rows: arr });
+      };
+      const pushItems = (arr, message) => {
+        if (Array.isArray(arr) && arr.length) problems.push({ message, items: arr });
+      };
+
+      // missing / length rules
+      pushRows(check.issues.missingAdvisor, "MissingAdvisor");
+      pushRows(check.issues.advisorTooLong, "AdvisorNameTooLong");     // > 30 chars
+      pushRows(check.issues.invalidPhoneLength, "PhoneMoreThan10Digits");  // > 10 digits
+
+      // duplicates
+      pushItems(check.issues.duplicateAdvisors, "DuplicateAdvisors");     // case-insensitive
+      pushItems(check.issues.duplicateRows, "ExactDuplicateRows");    // Advisor+Phone+Email
+      pushItems(check.issues.duplicatePhones, "DuplicatePhones");       // digits-only
+      pushItems(check.issues.duplicateEmails, "DuplicateEmails");       // lowercased
+
+
+      // console.log(`problems`,problems);
+
       return res.status(400).json(new ApiError(400, "Excel Contains Duplicate Values", problems));
     }
     const formattedData = data.map(row => ({
@@ -355,6 +363,8 @@ const spmAdvisorUpload = async (req, res) => {
         new ApiError(400, "Some records already exist", advisorExists, "")
       );
     }
+    // console.log(`formattedData`, formattedData);
+
     await insertadvisorParty(formattedData);
     res.status(200).json(new ApiResponse(200, [], `Bulk Insertion Successfull`))
   } catch (error) {
@@ -481,7 +491,7 @@ const vehicleUploadSingle = async (req, res) => {
 
     //inserting in not in master
     await insertPartNumbers(BrandId, DealerId, userId, notinMaster)
-    
+
     const { grouped, errors } = consolidateByVehicle(validData);
     if (errors.length) {
       return res.status(400).json(new ApiError(400, "Data validation failed", errors, ""));
@@ -498,8 +508,8 @@ const vehicleUploadSingle = async (req, res) => {
 const addVehicle = async (req, res) => {
   try {
     const { BrandId, DealerId, payload } = req.body
-    if(!BrandId || !DealerId || !payload){
-      res.status(400).json(new ApiError(400,`BrandId , DealerId and payload are required`))
+    if (!BrandId || !DealerId || !payload) {
+      res.status(400).json(new ApiError(400, `BrandId , DealerId and payload are required`))
     }
     const raw = typeof payload === 'string' ? JSON.parse(payload) : payload;
 
@@ -510,7 +520,7 @@ const addVehicle = async (req, res) => {
 
     const file = req.file;
     // console.log(file);
-    
+
 
     let url;
     // try {
@@ -523,7 +533,7 @@ const addVehicle = async (req, res) => {
     // let url = null;
     if (file) {
       try {
-        const s3Data = await uploadToS3(file); 
+        const s3Data = await uploadToS3(file);
         url = s3Data?.url ?? null;
       } catch (error) {
         throw new ApiError(500, error.message);
@@ -576,7 +586,7 @@ const addVehicle = async (req, res) => {
 
     const result = await vehicleViewService(grouped, BrandId, DealerId)
     // console.log(result);
-    
+
     res.status(200).json(new ApiResponse(200, { result, notinMaster: notinMaster || [] }, `Data Fetched Successfully`))
   } catch (error) {
     res.status(500).json(error.message)

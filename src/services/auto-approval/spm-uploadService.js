@@ -143,9 +143,12 @@ const spmBulkCSUpload = async (LocationId, OrderType, file, userId) => {
       required: ["PartNumber", "Qty"],
       qtyFields: ["Qty"],          // must be > 0
       coerceQty: true,             // put numeric Qty in cleanData
-      partField: "PartNumber"      // sanitize this field
+      partField: "PartNumber",      // sanitize this field
+      partyEitherRequired: true,           // <— controlled by caller
+      partyFields: { name: "PartyName", code: "PartyCode" },
+      sanitizePartyFields: true
     });
-    // console.log(cleanData,errors);
+    // console.log(cleanData, errors);
 
     if (errors.length) {
       throw new ApiError(400, "Excel validation failed", errors, "");

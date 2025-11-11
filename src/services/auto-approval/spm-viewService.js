@@ -17,11 +17,14 @@ const viewPartyService = async (LocationId, Status) => {
   }
 }
 
-const viewAdvisorService = async (LocationId) => {
+const viewAdvisorService = async (LocationId, Status) => {
   try {
     const pool = await getPool1()
-    const query = `use [z_scope] select Id, Advisor , PhoneNo , Email , CreatedAt , Status from AAP_SPMAdvisorMaster where LocationId = @LocationId Order By Id Desc`
-    const result = await pool.request().input('LocationId', sql.Int, LocationId).query(query)
+    const query = `use [z_scope] select Id, Advisor , PhoneNo , Email , CreatedAt , Status from AAP_SPMAdvisorMaster where LocationId = @LocationId and (@Status is NULL OR Status = @Status) Order By Id Desc`
+    const result = await pool.request()
+      .input('LocationId', sql.Int, LocationId)
+      .input('Status', sql.Bit, Status ?? null)
+      .query(query)
     return result.recordset
   }
   catch (error) {
@@ -204,7 +207,7 @@ const viewOrderStatusService = async (
     const pool = await getPool1();
     const query = `
         use z_scope
-        EXEC dbo.sp_SPMViewOrderStatus2_VB
+        EXEC dbo.sp_SPMViewOrderStatustest_VB
             @DealerID        = ${DealerId},
             @LocationIds     = ${LocationIds},  
             @Type            = ${RequestType},   
@@ -217,6 +220,8 @@ const viewOrderStatusService = async (
             @AdvisorIds      = ${AdvisorIds},    
             @Status          = ${Status};        
     `;
+    // console.log(query);
+    
     const result = await pool.request().query(query);
     return result.recordset;
   } catch (error) {
@@ -278,7 +283,7 @@ const nonMovingService = async (PartNumber, BrandId, LocationId) => {
 }
 
 const spmDashboardService = async (DealerId, LocationId, OrderTypeId, From, To) => {
-try {
+  try {
     const pool = await getPool1()
     const query = `use z_scope
   declare @PendingCount1 int,@PendingCount2 int
@@ -324,16 +329,16 @@ try {
   select @PendingCount1+@PendingCount2 PendingCount,@NotinMaster NotInMaster , @Approve Approve , @Reject Decline , @Internal Internal
     `
     const result = await pool.request()
-    .input('DealerId',sql.Int,DealerId)
-    .input('LocationId',sql.Int,LocationId ?? null)
-    .input('OrderTypeId',sql.Int,OrderTypeId ?? null)
-    .input('From',sql.DateTime,From)
-    .input('To',sql.DateTime,To)
-    .query(query)
+      .input('DealerId', sql.Int, DealerId)
+      .input('LocationId', sql.Int, LocationId ?? null)
+      .input('OrderTypeId', sql.Int, OrderTypeId ?? null)
+      .input('From', sql.DateTime, From)
+      .input('To', sql.DateTime, To)
+      .query(query)
     return result.recordset
-} catch (error) {
-  throw new ApiError(500,error.message)
-}
-  
+  } catch (error) {
+    throw new ApiError(500, error.message)
+  }
+
 }
 export { viewOrderStatusService, viewPartyService, viewAdvisorService, updatePartyService, updateAdvisorService, existingPartyNameandCodeService, existingAdvisor, orderPlacedService, reorderService, nonMovingService, spmDashboardService }

@@ -22,11 +22,11 @@ const viewParty = async (req, res) => {
 
 const viewAdvisor = async (req, res) => {
     try {
-        const { LocationId } = req.body
+        const { LocationId , Status} = req.body
         if (!LocationId) {
             return res.status(400).json(new ApiError(400, 'LocationId is Required', []))
         }
-        const data = await viewAdvisorService(LocationId)
+        const data = await viewAdvisorService(LocationId , Status)
         res.status(200).json(new ApiResponse(200, data, 'Data Fetched Successfully'))
     } catch (error) {
         res.status(500).json(new ApiError(500, error, []))

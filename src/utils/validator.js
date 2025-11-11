@@ -129,12 +129,18 @@ export function getDuplicateGroups(arr, keyFn) {
 export const partyKey = (o) =>
   `${(normStr(o.PartyCode) ?? "").toLowerCase()}|${(normStr(o.PartyName) ?? "").toLowerCase()}`;
 
+
+function cleanPartyField(value, maxLen = 30) {
+  const s = String(value ?? '').trim()
+    .replace(/[^A-Za-z0-9 \-]/g, ''); // remove everything except space and '-'
+  return s.length > maxLen ? s.slice(0, maxLen) : s;
+}
 // normalize Party rows (trim + cap length)
 export function normalizePartyRows(rows) {
   return rows.map(r => ({
     ...r,
-    PartyCode: normStr(r.PartyCode, 30),
-    PartyName: normStr(r.PartyName, 30),
+    PartyCode: cleanPartyField(r.PartyCode, 30),
+    PartyName: cleanPartyField(r.PartyName, 30),
   }));
 }
 
@@ -187,56 +193,161 @@ export const excelRowOf = (dataIndex, headerRow = 1) => headerRow + 1 + dataInde
 // ------------------------------------
 // Advisor-specific in-file validations
 // ------------------------------------
+// export function validateExcelRows(rows) {
+//   const issues = {
+//     missingAdvisor: [],    // row numbers with missing Advisor
+//     duplicateAdvisors: [], // { advisor, rows:[...] }
+//     duplicateRows: []      // { key, rows:[...] }
+//   };
+
+//   const seenAdvisorToRows = new Map(); // advisorLower -> [rowNums]
+//   const seenRowKeyToRows = new Map();  // JSON key -> [rowNums]
+
+//   (rows || []).forEach((raw, i) => {
+//     // Row numbers as in Excel: header = row 1, first data row = 2
+//     const rowNum = excelRowOf(i);
+
+//     const advisor = normStr(raw?.Advisor, 20);
+//     const advisorKey = normLower(raw?.Advisor, 10);
+//     const phone = (normPhone(raw?.PhoneNo, 10) ?? "");  // use "" for map keys
+//     const email = normLower(normEmail(raw?.Email, 320) ?? "", 320);
+
+//     if (!advisor) issues.missingAdvisor.push(rowNum);
+
+//     // Track duplicate advisors
+//     if (advisorKey) {
+//       if (!seenAdvisorToRows.has(advisorKey)) seenAdvisorToRows.set(advisorKey, []);
+//       seenAdvisorToRows.get(advisorKey).push(rowNum);
+//     }
+
+//     // Track exact duplicate rows (Advisor+PhoneNo+Email)
+//     const rowKey = JSON.stringify({ advisor: advisorKey, phone, email });
+//     if (!seenRowKeyToRows.has(rowKey)) seenRowKeyToRows.set(rowKey, []);
+//     seenRowKeyToRows.get(rowKey).push(rowNum);
+//   });
+
+//   // Populate duplicates (Advisor)
+//   for (const [advKey, rowsArr] of seenAdvisorToRows.entries()) {
+//     if (rowsArr.length > 1) {
+//       issues.duplicateAdvisors.push({ advisor: advKey, rows: rowsArr });
+//     }
+//   }
+//   // Populate duplicates (exact row)
+//   for (const [key, rowsArr] of seenRowKeyToRows.entries()) {
+//     if (rowsArr.length > 1) {
+//       issues.duplicateRows.push({ key, rows: rowsArr });
+//     }
+//   }
+
+//   const isValid =
+//     issues.missingAdvisor.length === 0 &&
+//     issues.duplicateAdvisors.length === 0 &&
+//     issues.duplicateRows.length === 0;
+
+//   return { isValid, issues };
+// }
+
 export function validateExcelRows(rows) {
   const issues = {
-    missingAdvisor: [],    // row numbers with missing Advisor
-    duplicateAdvisors: [], // { advisor, rows:[...] }
-    duplicateRows: []      // { key, rows:[...] }
+    missingAdvisor: [],          // row numbers
+    advisorTooLong: [],          // row numbers
+    invalidPhoneLength: [],      // row numbers
+    duplicateAdvisors: [],       // { advisor, rows:[...] }
+    duplicateRows: [],           // { key, rows:[...] }
+    duplicatePhones: [],         // { phone, rows:[...] }
+    duplicateEmails: []          // { email, rows:[...] }
   };
 
+  // --- helpers ---
+  const excelRowOf = (i) => i + 2; // header row = 1; first data row = 2
+
+  const normStr = (v) => (v == null ? '' : String(v).trim());
+  const normLower = (v) => normStr(v).toLowerCase();
+
+  // Keep digits only
+  const digitsOnly = (v) => normStr(v).replace(/\D+/g, '');
+  // Normalize email to lower; very light sanity trim
+  const normEmail = (v) => {
+    const e = normLower(v);
+    return e || ''; // empty if missing
+  };
+
+  // --- trackers ---
   const seenAdvisorToRows = new Map(); // advisorLower -> [rowNums]
   const seenRowKeyToRows = new Map();  // JSON key -> [rowNums]
+  const seenPhoneToRows   = new Map(); // digitsOnly -> [rowNums]
+  const seenEmailToRows   = new Map(); // lower -> [rowNums]
 
   (rows || []).forEach((raw, i) => {
-    // Row numbers as in Excel: header = row 1, first data row = 2
     const rowNum = excelRowOf(i);
 
-    const advisor = normStr(raw?.Advisor, 100);
-    const advisorKey = normLower(raw?.Advisor, 100);
-    const phone = (normPhone(raw?.PhoneNo, 20) ?? "");  // use "" for map keys
-    const email = normLower(normEmail(raw?.Email, 320) ?? "", 320);
+    const advisorRaw = normStr(raw?.Advisor);
+    const advisorKey = normLower(raw?.Advisor);
+    const phoneRaw   = raw?.PhoneNo;
+    const emailRaw   = raw?.Email;
 
-    if (!advisor) issues.missingAdvisor.push(rowNum);
+    const phoneKey = digitsOnly(phoneRaw); // e.g. "9876543210" or ""
+    const emailKey = normEmail(emailRaw);  // e.g. "a@b.com" or ""
 
-    // Track duplicate advisors
+    // Missing advisor?
+    if (!advisorRaw) issues.missingAdvisor.push(rowNum);
+
+    // Advisor length > 30?
+    if (advisorRaw && advisorRaw.length > 30) {
+      issues.advisorTooLong.push(rowNum);
+    }
+
+    // Phone present must be <= 10 digits
+    if (phoneKey && phoneKey.length > 10) {
+      issues.invalidPhoneLength.push(rowNum);
+    }
+
+    // Track duplicate advisors (ignore blank)
     if (advisorKey) {
       if (!seenAdvisorToRows.has(advisorKey)) seenAdvisorToRows.set(advisorKey, []);
       seenAdvisorToRows.get(advisorKey).push(rowNum);
     }
 
-    // Track exact duplicate rows (Advisor+PhoneNo+Email)
-    const rowKey = JSON.stringify({ advisor: advisorKey, phone, email });
+    // Track duplicate phones (only if non-empty)
+    if (phoneKey) {
+      if (!seenPhoneToRows.has(phoneKey)) seenPhoneToRows.set(phoneKey, []);
+      seenPhoneToRows.get(phoneKey).push(rowNum);
+    }
+
+    // Track duplicate emails (only if non-empty)
+    if (emailKey) {
+      if (!seenEmailToRows.has(emailKey)) seenEmailToRows.set(emailKey, []);
+      seenEmailToRows.get(emailKey).push(rowNum);
+    }
+
+    // Track exact duplicate rows (Advisor+Phone+Email normalized)
+    const rowKey = JSON.stringify({ advisor: advisorKey, phone: phoneKey, email: emailKey });
     if (!seenRowKeyToRows.has(rowKey)) seenRowKeyToRows.set(rowKey, []);
     seenRowKeyToRows.get(rowKey).push(rowNum);
   });
 
-  // Populate duplicates (Advisor)
-  for (const [advKey, rowsArr] of seenAdvisorToRows.entries()) {
-    if (rowsArr.length > 1) {
-      issues.duplicateAdvisors.push({ advisor: advKey, rows: rowsArr });
-    }
+  // Summaries
+  for (const [adv, rowsArr] of seenAdvisorToRows.entries()) {
+    if (rowsArr.length > 1) issues.duplicateAdvisors.push({ advisor: adv, rows: rowsArr });
   }
-  // Populate duplicates (exact row)
+  for (const [ph, rowsArr] of seenPhoneToRows.entries()) {
+    if (rowsArr.length > 1) issues.duplicatePhones.push({ phone: ph, rows: rowsArr });
+  }
+  for (const [em, rowsArr] of seenEmailToRows.entries()) {
+    if (rowsArr.length > 1) issues.duplicateEmails.push({ email: em, rows: rowsArr });
+  }
   for (const [key, rowsArr] of seenRowKeyToRows.entries()) {
-    if (rowsArr.length > 1) {
-      issues.duplicateRows.push({ key, rows: rowsArr });
-    }
+    if (rowsArr.length > 1) issues.duplicateRows.push({ key, rows: rowsArr });
   }
 
   const isValid =
     issues.missingAdvisor.length === 0 &&
+    issues.advisorTooLong.length === 0 &&
+    issues.invalidPhoneLength.length === 0 &&
     issues.duplicateAdvisors.length === 0 &&
-    issues.duplicateRows.length === 0;
+    issues.duplicateRows.length === 0 &&
+    issues.duplicatePhones.length === 0 &&
+    issues.duplicateEmails.length === 0;
 
   return { isValid, issues };
 }
@@ -774,13 +885,79 @@ export function mapPartiesOrCollectInvalidFirst(data, mapping) {
  * @param {boolean} [cfg.coerceQty=true] - coerce qty fields to Number in cleanData
  * @param {string} [cfg.partField="PartNumber"] - field to sanitize by removing specials
  */
-export function validateAndClean(data, {
-  required,
-  qtyFields = ["Qty"],
-  coerceQty = true,
-  partField = "PartNumber",
-} = {}) {
+// export function validateAndClean(data, {
+//   required,
+//   qtyFields = ["Qty"],
+//   coerceQty = true,
+//   partField = "PartNumber",
+// } = {}) {
   
+//   const isBlank = v =>
+//     v == null ||
+//     (typeof v === "string" && v.trim() === "") ||
+//     (typeof v === "number" && Number.isNaN(v));
+
+//   const stripSpecials = s => String(s ?? "").replace(/[^A-Za-z0-9]/g, "").trim();
+
+//   const cellEmptyRows = [];
+//   const qtyZeroRows = [];
+
+//   const cleanData = data.map(row => {
+//     const r = { ...row };
+
+//     // sanitize PartNumber (no error, just clean)
+//     if (partField in r && !isBlank(r[partField])) {
+//       r[partField] = stripSpecials(r[partField]);
+//     }
+
+//     // collect "Cell Empty" if ANY required is blank (after sanitization for PartNumber)
+//     if (Array.isArray(required) && required.some(f => isBlank(r[f]))) {
+//       cellEmptyRows.push(row); // push original row as requested
+//     }
+
+//     // check qty fields
+//     if (Array.isArray(qtyFields) && qtyFields.length) {
+//       let anyBadQty = false;
+//       for (const f of qtyFields) {
+//         const val = r[f];
+//         if (!isBlank(val)) {
+//           const num = Number(val);
+//           if (coerceQty) r[f] = num; // reflect numeric in cleanData
+//           if (!Number.isFinite(num) || num <= 0) {
+//             anyBadQty = true;
+//           }
+//         } else {
+//           // blank qty counts as zero/bad
+//           anyBadQty = true;
+//         }
+//       }
+//       if (anyBadQty) qtyZeroRows.push(row); // original row
+//     }
+
+//     return r;
+//   });
+
+//   const errors = [];
+//   if (cellEmptyRows.length) errors.push({ message: "Cell Empty", data: cellEmptyRows });
+//   if (qtyZeroRows.length) errors.push({ message: "Qty is Zero or More than 1000", data: qtyZeroRows });
+
+//   return { cleanData, errors };
+// }
+
+export function validateAndClean(
+  data,
+  {
+    required,
+    qtyFields = ["Qty"],
+    coerceQty = true,
+    partField = "PartNumber",
+
+    // NEW: party requirement config
+    partyEitherRequired = false,                 // enable/disable this rule
+    partyFields = { name: "PartyName", code: "PartyCode" }, // which fields
+    sanitizePartyFields = true                   // apply stripSpecials to party fields
+  } = {}
+) {
   const isBlank = v =>
     v == null ||
     (typeof v === "string" && v.trim() === "") ||
@@ -790,6 +967,7 @@ export function validateAndClean(data, {
 
   const cellEmptyRows = [];
   const qtyZeroRows = [];
+  const partyEitherMissingRows = []; // NEW
 
   const cleanData = data.map(row => {
     const r = { ...row };
@@ -799,9 +977,39 @@ export function validateAndClean(data, {
       r[partField] = stripSpecials(r[partField]);
     }
 
+    // --- NEW: sanitize party fields (optional) ---
+    const nameField = partyFields?.name ?? "PartyName";
+    const codeField = partyFields?.code ?? "PartyCode";
+
+    if (sanitizePartyFields) {
+      if (nameField in r && !isBlank(r[nameField])) {
+        r[nameField] = stripSpecials(r[nameField]);
+      }
+      if (codeField in r && !isBlank(r[codeField])) {
+        r[codeField] = stripSpecials(r[codeField]);
+      }
+    } else {
+      // still trim if not sanitizing specials
+      if (nameField in r && !isBlank(r[nameField])) {
+        r[nameField] = String(r[nameField]).trim();
+      }
+      if (codeField in r && !isBlank(r[codeField])) {
+        r[codeField] = String(r[codeField]).trim();
+      }
+    }
+
     // collect "Cell Empty" if ANY required is blank (after sanitization for PartNumber)
     if (Array.isArray(required) && required.some(f => isBlank(r[f]))) {
       cellEmptyRows.push(row); // push original row as requested
+    }
+
+    // --- NEW: either PartyName or PartyCode must be present (if enabled) ---
+    if (partyEitherRequired) {
+      const partyNameBlank = isBlank(r[nameField]);
+      const partyCodeBlank = isBlank(r[codeField]);
+      if (partyNameBlank && partyCodeBlank) {
+        partyEitherMissingRows.push(row); // push original row
+      }
     }
 
     // check qty fields
@@ -827,8 +1035,19 @@ export function validateAndClean(data, {
   });
 
   const errors = [];
-  if (cellEmptyRows.length) errors.push({ message: "Cell Empty", data: cellEmptyRows });
-  if (qtyZeroRows.length) errors.push({ message: "Qty is Zero or More than 1000", data: qtyZeroRows });
+  if (cellEmptyRows.length) {
+    errors.push({ message: "Cell Empty", data: cellEmptyRows });
+  }
+  if (qtyZeroRows.length) {
+    errors.push({ message: "Qty is Zero or More than 1000", data: qtyZeroRows });
+  }
+  // NEW: error for party requirement violation
+  if (partyEitherMissingRows.length) {
+    errors.push({
+      message: `Either ${partyFields?.name ?? "PartyName"} or ${partyFields?.code ?? "PartyCode"} is required`,
+      data: partyEitherMissingRows
+    });
+  }
 
   return { cleanData, errors };
 }
