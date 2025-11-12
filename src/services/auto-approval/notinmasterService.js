@@ -45,6 +45,7 @@ import { ApiError } from "../../utils/ApiError.js";
 const now = new Date();
 const addedTime = new Date(now.getTime() + (5 * 60 + 30) * 60 * 1000); // add 5h 30m
 
+
 const pad = n => n.toString().padStart(2, '0');
 const y = addedTime.getFullYear();
 const m = pad(addedTime.getMonth() + 1);
@@ -166,6 +167,7 @@ const addNotinMasterService = async (data) => {
       HSNID            = @HSNID,
       Status           = @Status,
       DaetailsAddedby  = @Detailsby,
+      DaetailsAddedon  = @DetailsAddedOn,
       Remarks          = @Remarks,
       LatestPartNumber = @LatestPartNumber,
       Image            = @url
@@ -189,6 +191,7 @@ const addNotinMasterService = async (data) => {
     .input('HSNID', sql.Int, data.HSNID == null ? null : Number(data.HSNID))
     .input('Status', sql.VarChar(50), String(data.Status).trim())
     .input('Detailsby', sql.Int, data.Detailsby == null ? null : Number(data.Detailsby))
+    .input('DetailsAddedOn', sql.DateTime, currentDate == null ? null : currentDate)
     .input('Remarks', sql.VarChar(500), data.Remarks == null ? null : String(data.Remarks).trim())
     .input('LatestPartNumber', sql.VarChar(30), data.LatestPartNumber == null ? null : String(data.LatestPartNumber).trim())
     .input('url', sql.NVarChar(sql.MAX), data.url == null ? null : String(data.url).trim());
@@ -251,7 +254,7 @@ const uploadNotinMasterService = async (BrandId, data, userId) => {
     tbl.columns.add('LatestPartNumber', sql.VarChar(30), { nullable: true });
     tbl.columns.add('DaetailsAddedby', sql.Int, { nullable: true });
     tbl.columns.add('DaetailsAddedon', sql.DateTime, { nullable: true });
-    
+
     for (const r of data || []) {
       tbl.rows.add(
         safeBrandId,
@@ -423,5 +426,39 @@ const mappingParttypeHSNCode = async (data) => {
   }
 }
 
+const adminActionService = async (Id, Status, Approvedby, Remarks) => {
+ try {
+   const pool = await getPool1()
+   if (Status == 2) {
+     const result = await pool.request()
+       .input('Id', sql.Int, Id)
+       .input('Status', sql.Int, 2)
+       .input('userId', sql.Int, Approvedby)
+       .input('Remarks', sql.VarChar(100), Remarks ?? null)
+       .execute(`dbo.sp_AdminNotInMaster`)
 
-export { insertPartNumbers, viewNotInMasterService, addNotinMasterService, uploadNotinMasterService, mappingParttypeHSNCode }
+       return result
+   }
+   else {
+     const query = `  use z_scope  
+         UPDATE n
+         SET n.Status = @Status,
+         n.SCSRemarks = @Remarks,
+ 		    n.ApprovedBy = @userId
+         FROM dbo.NotInMaster AS n
+         WHERE partnumber in (select partnumber from NotInMaster where id = @id) and BrandId = (select brandid from NotInMaster where id = @id);`
+ 
+     const result = await pool.request()
+       .input('Id', sql.Int, Id)
+       .input('Status', sql.Int, 3)
+       .input('userId', sql.Int, Approvedby)
+       .input('Remarks', sql.VarChar(100), Remarks ?? null)
+       .query(query)
+
+       return result
+   }
+ } catch (error) {
+    throw new ApiError(500,error.message)
+ }
+}
+export { insertPartNumbers, viewNotInMasterService, addNotinMasterService, uploadNotinMasterService, mappingParttypeHSNCode, adminActionService }

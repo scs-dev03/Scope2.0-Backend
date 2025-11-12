@@ -1,5 +1,5 @@
 import { uploadToS3 } from "../../middlewares/multer.middleware.js"
-import { addNotinMasterService, mappingParttypeHSNCode, uploadNotinMasterService, viewNotInMasterService } from "../../services/auto-approval/notinmasterService.js"
+import { addNotinMasterService, adminActionService, mappingParttypeHSNCode, uploadNotinMasterService, viewNotInMasterService } from "../../services/auto-approval/notinmasterService.js"
 import { ApiError } from "../../utils/ApiError.js"
 import { ApiResponse } from "../../utils/ApiResponse.js"
 import { validateHeaders } from "../../utils/validator.js"
@@ -15,7 +15,7 @@ const viewNotInMaster = async (req, res) => {
         // }
         if (Status !== null && Status !== undefined) {
             const s = Number(Status);
-            if (!(s === 0 || s === 1 || s === 2)) {
+            if (!(s === 0 || s === 1 || s === 2 || s===3)) {
                 return res.status(400).json(new ApiError(400, 'Status must be 0 or 1 when provided.', [], ''));
             }
         }
@@ -115,9 +115,35 @@ const uploadNotinMaster = async (req, res) => {
     if (errors.length) {
         return res.status(400).json(new ApiError(400, `Invalid PartType or HSNcode`, errors))
     }
-    const result = await uploadNotinMasterService(BrandId, mapped , userId)
+    const result = await uploadNotinMasterService(BrandId, mapped, userId)
 
     res.status(200).json(new ApiResponse(200, result, `Uploaded Successfully`))
 
 }
-export { viewNotInMaster, addNotinMaster, uploadNotinMaster }
+
+const adminAction = async (req, res) => {
+    try {
+        const { Id, Status, Approvedby, Remarks } = req.body
+        if (!Id || !Status || !Approvedby) {
+            return res.status(400).json(new ApiError(400, `Id , Status and Approved is Required`))
+        }
+        
+        if (!Status == 2 || !Status == 3) {
+            return res.status(400).json(new ApiError(400, `Status only can be 2 or 3.(2-> 'Approved' , 3 -> 'Decline')`))
+        }
+        const result = await adminActionService(Id, Status , Approvedby , Remarks)
+
+        let message
+        if(result.recordsets.length == 0){
+            message = `Part Declined`
+        }
+        else(
+            message =  `Part Approved and Inserted into PartMaster`
+        )
+        
+        res.status(200).json(new ApiResponse(200,result.recordset,message))
+    } catch (error) {
+        res.status(500).json(new ApiError(error.statusCode || 500, error.message))
+    }
+}
+export { viewNotInMaster, addNotinMaster, uploadNotinMaster, adminAction }
