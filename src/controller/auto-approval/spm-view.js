@@ -223,7 +223,8 @@ const viewOrderStatus = async (req, res) => {
             const s = arr.map(v => String(v).trim()).filter(Boolean).join(',');
             return s ? `'${s.replace(/'/g, "''")}'` : null;
         }
-
+        // console.log(OrderTypeIds);
+        
         //  // Format parameters using the formatForSql function
         const formattedLocationIds = format(LocationIds);
         const formattedRequestType = format(RequestType);
@@ -245,7 +246,8 @@ const viewOrderStatus = async (req, res) => {
         //     formattedJobCardNumbers,
         //     formattedAdvisorIds,
         //     formattedStatus);
-
+        // console.log(formattedOrderTypeIds);
+        
         const result = await viewOrderStatusService(
             DealerId,
             formattedLocationIds,
@@ -323,7 +325,7 @@ const viewgroupStock = async (req, res) => {
             return res.status(400).json(new ApiError(400, `partnumber, BrandId, LocationId , DealerId are required`))
         }
         const result = await groupStock(BrandId, DealerId, LocationId, PartNumber)
-        // console.log(result);
+        console.log(result);
         res.status(200).json(new ApiResponse(200, result.recordset, `Data Fetched Successfully`))
     } catch (error) {
         res.status(500).json(new ApiError(500, error))

@@ -193,69 +193,25 @@ export const excelRowOf = (dataIndex, headerRow = 1) => headerRow + 1 + dataInde
 // ------------------------------------
 // Advisor-specific in-file validations
 // ------------------------------------
-// export function validateExcelRows(rows) {
-//   const issues = {
-//     missingAdvisor: [],    // row numbers with missing Advisor
-//     duplicateAdvisors: [], // { advisor, rows:[...] }
-//     duplicateRows: []      // { key, rows:[...] }
-//   };
-
-//   const seenAdvisorToRows = new Map(); // advisorLower -> [rowNums]
-//   const seenRowKeyToRows = new Map();  // JSON key -> [rowNums]
-
-//   (rows || []).forEach((raw, i) => {
-//     // Row numbers as in Excel: header = row 1, first data row = 2
-//     const rowNum = excelRowOf(i);
-
-//     const advisor = normStr(raw?.Advisor, 20);
-//     const advisorKey = normLower(raw?.Advisor, 10);
-//     const phone = (normPhone(raw?.PhoneNo, 10) ?? "");  // use "" for map keys
-//     const email = normLower(normEmail(raw?.Email, 320) ?? "", 320);
-
-//     if (!advisor) issues.missingAdvisor.push(rowNum);
-
-//     // Track duplicate advisors
-//     if (advisorKey) {
-//       if (!seenAdvisorToRows.has(advisorKey)) seenAdvisorToRows.set(advisorKey, []);
-//       seenAdvisorToRows.get(advisorKey).push(rowNum);
-//     }
-
-//     // Track exact duplicate rows (Advisor+PhoneNo+Email)
-//     const rowKey = JSON.stringify({ advisor: advisorKey, phone, email });
-//     if (!seenRowKeyToRows.has(rowKey)) seenRowKeyToRows.set(rowKey, []);
-//     seenRowKeyToRows.get(rowKey).push(rowNum);
-//   });
-
-//   // Populate duplicates (Advisor)
-//   for (const [advKey, rowsArr] of seenAdvisorToRows.entries()) {
-//     if (rowsArr.length > 1) {
-//       issues.duplicateAdvisors.push({ advisor: advKey, rows: rowsArr });
-//     }
-//   }
-//   // Populate duplicates (exact row)
-//   for (const [key, rowsArr] of seenRowKeyToRows.entries()) {
-//     if (rowsArr.length > 1) {
-//       issues.duplicateRows.push({ key, rows: rowsArr });
-//     }
-//   }
-
-//   const isValid =
-//     issues.missingAdvisor.length === 0 &&
-//     issues.duplicateAdvisors.length === 0 &&
-//     issues.duplicateRows.length === 0;
-
-//   return { isValid, issues };
-// }
 
 export function validateExcelRows(rows) {
   const issues = {
-    missingAdvisor: [],          // row numbers
-    advisorTooLong: [],          // row numbers
-    invalidPhoneLength: [],      // row numbers
+    // Row-only arrays (existing)
+    missingAdvisor: [],          // [row]
+    advisorTooLong: [],          // [row]
+    invalidPhoneLength: [],      // [row]
+
+    // New: row + value details
+    missingAdvisorValues: [],    // [{ row, value }]
+    advisorTooLongValues: [],    // [{ row, value }]
+    invalidPhoneValues: [],      // [{ row, value }]
+
     duplicateAdvisors: [],       // { advisor, rows:[...] }
-    duplicateRows: [],           // { key, rows:[...] }
     duplicatePhones: [],         // { phone, rows:[...] }
-    duplicateEmails: []          // { email, rows:[...] }
+    duplicateEmails: [],         // { email, rows:[...] }
+
+    duplicateRows: [],           // { key, rows:[...] }  (JSON key)
+    duplicateRowDetails: []      // { advisor, phone, email, rows:[...] }
   };
 
   // --- helpers ---
@@ -264,42 +220,43 @@ export function validateExcelRows(rows) {
   const normStr = (v) => (v == null ? '' : String(v).trim());
   const normLower = (v) => normStr(v).toLowerCase();
 
-  // Keep digits only
-  const digitsOnly = (v) => normStr(v).replace(/\D+/g, '');
-  // Normalize email to lower; very light sanity trim
   const normEmail = (v) => {
     const e = normLower(v);
     return e || ''; // empty if missing
   };
 
   // --- trackers ---
-  const seenAdvisorToRows = new Map(); // advisorLower -> [rowNums]
-  const seenRowKeyToRows = new Map();  // JSON key -> [rowNums]
-  const seenPhoneToRows   = new Map(); // digitsOnly -> [rowNums]
-  const seenEmailToRows   = new Map(); // lower -> [rowNums]
+  const seenAdvisorToRows = new Map();  // advisorLower -> [rowNums]
+  const seenRowKeyToRows = new Map();   // rowKey(JSON) -> [rowNums]
+  const seenRowKeyToObj  = new Map();   // rowKey(JSON) -> { advisor, phone, email }
+
+  const seenPhoneToRows  = new Map();   // phone (10-digit string) -> [rowNums]
+  const seenEmailToRows  = new Map();   // lower -> [rowNums]
 
   (rows || []).forEach((raw, i) => {
     const rowNum = excelRowOf(i);
 
     const advisorRaw = normStr(raw?.Advisor);
     const advisorKey = normLower(raw?.Advisor);
-    const phoneRaw   = raw?.PhoneNo;
-    const emailRaw   = raw?.Email;
 
-    const phoneKey = digitsOnly(phoneRaw); // e.g. "9876543210" or ""
-    const emailKey = normEmail(emailRaw);  // e.g. "a@b.com" or ""
+    const phoneRaw = raw?.PhoneNo;
+    const phoneStr = normStr(phoneRaw);
 
-    // Missing advisor?
-    if (!advisorRaw) issues.missingAdvisor.push(rowNum);
+    const emailRaw = raw?.Email;
+    const emailKey = normEmail(emailRaw);
 
-    // Advisor length > 30?
-    if (advisorRaw && advisorRaw.length > 30) {
-      issues.advisorTooLong.push(rowNum);
+    // --- Advisor checks ---
+
+    // Missing advisor
+    if (!advisorRaw) {
+      issues.missingAdvisor.push(rowNum);
+      issues.missingAdvisorValues.push({ row: rowNum, value: advisorRaw }); // will be ''
     }
 
-    // Phone present must be <= 10 digits
-    if (phoneKey && phoneKey.length > 10) {
-      issues.invalidPhoneLength.push(rowNum);
+    // Advisor length > 30
+    if (advisorRaw && advisorRaw.length > 30) {
+      issues.advisorTooLong.push(rowNum);
+      issues.advisorTooLongValues.push({ row: rowNum, value: advisorRaw });
     }
 
     // Track duplicate advisors (ignore blank)
@@ -308,36 +265,81 @@ export function validateExcelRows(rows) {
       seenAdvisorToRows.get(advisorKey).push(rowNum);
     }
 
-    // Track duplicate phones (only if non-empty)
-    if (phoneKey) {
+    // --- Phone checks ---
+
+    // Phone present must be numeric and exactly 10 digits
+    if (phoneStr) {
+      const isTenDigitNumeric = /^\d{10}$/.test(phoneStr);
+      if (!isTenDigitNumeric) {
+        issues.invalidPhoneLength.push(rowNum);
+        issues.invalidPhoneValues.push({
+          row: rowNum,
+          value: phoneRaw // original value from Excel
+        });
+      }
+    }
+
+    // Track duplicate phones (only if non-empty and valid 10-digit numeric)
+    if (phoneStr && /^\d{10}$/.test(phoneStr)) {
+      const phoneKey = phoneStr;
       if (!seenPhoneToRows.has(phoneKey)) seenPhoneToRows.set(phoneKey, []);
       seenPhoneToRows.get(phoneKey).push(rowNum);
     }
 
-    // Track duplicate emails (only if non-empty)
+    // --- Email duplicates (no format validation here, only dupes) ---
+
     if (emailKey) {
       if (!seenEmailToRows.has(emailKey)) seenEmailToRows.set(emailKey, []);
       seenEmailToRows.get(emailKey).push(rowNum);
     }
 
-    // Track exact duplicate rows (Advisor+Phone+Email normalized)
-    const rowKey = JSON.stringify({ advisor: advisorKey, phone: phoneKey, email: emailKey });
-    if (!seenRowKeyToRows.has(rowKey)) seenRowKeyToRows.set(rowKey, []);
+    // --- Exact duplicate rows: Advisor + Phone + Email normalized ---
+
+    const rowKeyObj = {
+      advisor: advisorKey,
+      phone: phoneStr ? phoneStr : '',
+      email: emailKey
+    };
+    const rowKey = JSON.stringify(rowKeyObj);
+
+    if (!seenRowKeyToRows.has(rowKey)) {
+      seenRowKeyToRows.set(rowKey, []);
+      seenRowKeyToObj.set(rowKey, rowKeyObj);
+    }
     seenRowKeyToRows.get(rowKey).push(rowNum);
   });
 
-  // Summaries
+  // --- Summaries (duplicates) ---
+
   for (const [adv, rowsArr] of seenAdvisorToRows.entries()) {
-    if (rowsArr.length > 1) issues.duplicateAdvisors.push({ advisor: adv, rows: rowsArr });
+    if (rowsArr.length > 1) {
+      issues.duplicateAdvisors.push({ advisor: adv, rows: rowsArr });
+    }
   }
+
   for (const [ph, rowsArr] of seenPhoneToRows.entries()) {
-    if (rowsArr.length > 1) issues.duplicatePhones.push({ phone: ph, rows: rowsArr });
+    if (rowsArr.length > 1) {
+      issues.duplicatePhones.push({ phone: ph, rows: rowsArr });
+    }
   }
+
   for (const [em, rowsArr] of seenEmailToRows.entries()) {
-    if (rowsArr.length > 1) issues.duplicateEmails.push({ email: em, rows: rowsArr });
+    if (rowsArr.length > 1) {
+      issues.duplicateEmails.push({ email: em, rows: rowsArr });
+    }
   }
+
   for (const [key, rowsArr] of seenRowKeyToRows.entries()) {
-    if (rowsArr.length > 1) issues.duplicateRows.push({ key, rows: rowsArr });
+    if (rowsArr.length > 1) {
+      const obj = seenRowKeyToObj.get(key) || {};
+      issues.duplicateRows.push({ key, rows: rowsArr });
+      issues.duplicateRowDetails.push({
+        advisor: obj.advisor,
+        phone: obj.phone,
+        email: obj.email,
+        rows: rowsArr
+      });
+    }
   }
 
   const isValid =
@@ -351,6 +353,7 @@ export function validateExcelRows(rows) {
 
   return { isValid, issues };
 }
+
 
 // ---- Keys for single-column duplicate checks (case/trim insensitive)
 export const partyCodeKeyOnly = (o) =>
@@ -688,7 +691,7 @@ export function validateCommonRows(data, { allowDuplicates = false } = {}) {
     }
   }
   // console.log(flatErrors);
-    
+
   return { cleaned, errors: flatErrors };
 }
 
@@ -711,20 +714,20 @@ export const partBrandMappingCheck = async (BrandId, Data) => {
     Data.forEach((item, index) => {
       const pn = String(item.PartNumber ?? "").trim().toLowerCase();
       if (pn && !mapped.has(pn)) {
-        unmatched.push({PartNumber: item.PartNumber });
+        unmatched.push({ PartNumber: item.PartNumber });
       }
     });
 
     return unmatched;
   } catch (error) {
     console.error(`Error in partBrandMappingCheck: ${error.message}`);
-    throw new ApiError(500,error.message);
+    throw new ApiError(500, error.message);
   }
 };
 
-export function orderTypeCheck(ordertype){
+export function orderTypeCheck(ordertype) {
   const REQUIRED_OrderType = ["Normal", "Co-Dealer", "Urgent", "Transfer"]
-  if(!REQUIRED_OrderType.includes(ordertype)){
+  if (!REQUIRED_OrderType.includes(ordertype)) {
     return false;
   }
   return true
@@ -891,7 +894,7 @@ export function mapPartiesOrCollectInvalidFirst(data, mapping) {
 //   coerceQty = true,
 //   partField = "PartNumber",
 // } = {}) {
-  
+
 //   const isBlank = v =>
 //     v == null ||
 //     (typeof v === "string" && v.trim() === "") ||
@@ -1096,7 +1099,7 @@ export function consolidateLines(rows, { groupByParty = true } = {}) {
     delete o.__remarks;
   }
 
-   // validate max per group
+  // validate max per group
   const offenders = out
     .filter(g => Number.isFinite(g.Qty) && g.Qty > 1000)
     .map(g => ({
@@ -1116,7 +1119,7 @@ export function consolidateLines(rows, { groupByParty = true } = {}) {
 }
 
 // helper: split formattedData into valid vs invalid using a key (default PartNumber)
-export function splitByInvalid (formattedData, invalidParts, key = 'PartNumber') {
+export function splitByInvalid(formattedData, invalidParts, key = 'PartNumber') {
   const norm = v => (v === null || v === undefined) ? '' : String(v).trim().toUpperCase();
 
   // Build a set of invalid keys (supports [{PartNumber: 'x'}] or ['x', 123, ...])
@@ -1141,7 +1144,7 @@ export function splitByInvalid (formattedData, invalidParts, key = 'PartNumber')
 
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj ?? {}, key);
 export function payloadValidator(body, { requirePartyId = false } = {}) {
-const errors = [];
+  const errors = [];
 
   // --- Top-level keys
   const missingTop = [];
@@ -1339,8 +1342,8 @@ export function consolidateByVehicle(rows, {
 
   const keyOf = (r) => {
     const veh = String(r.VehicleNumber ?? "").trim();
-    const jc  = String(r[jobcardField] ?? "").trim(); // allowed to be blank
-    const pn  = String(r.PartNumber ?? "").trim();
+    const jc = String(r[jobcardField] ?? "").trim(); // allowed to be blank
+    const pn = String(r.PartNumber ?? "").trim();
     return `${veh}|${jc}|${pn}`;
   };
 
@@ -1349,7 +1352,7 @@ export function consolidateByVehicle(rows, {
 
   for (const _r of rows) {
     // shallow clone & trim all string fields
-    const r = { ... _r };
+    const r = { ..._r };
     for (const k of Object.keys(r)) {
       if (typeof r[k] === "string") r[k] = r[k].trim();
     }

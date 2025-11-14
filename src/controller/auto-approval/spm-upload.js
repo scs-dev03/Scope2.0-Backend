@@ -331,8 +331,8 @@ const spmAdvisorUpload = async (req, res) => {
 
       // missing / length rules
       pushRows(check.issues.missingAdvisor, "MissingAdvisor");
-      pushRows(check.issues.advisorTooLong, "AdvisorNameTooLong");     // > 30 chars
-      pushRows(check.issues.invalidPhoneLength, "PhoneMoreThan10Digits");  // > 10 digits
+      pushRows(check.issues.advisorTooLongValues, "AdvisorNameTooLong");     // > 30 chars
+      pushRows(check.issues.invalidPhoneValues, "Invalid PhoneNo");  // > 10 digits OR Non-numeric character found
 
       // duplicates
       pushItems(check.issues.duplicateAdvisors, "DuplicateAdvisors");     // case-insensitive
@@ -343,7 +343,7 @@ const spmAdvisorUpload = async (req, res) => {
 
       // console.log(`problems`,problems);
 
-      return res.status(400).json(new ApiError(400, "Excel Contains Duplicate Values", problems));
+      return res.status(400).json(new ApiError(400, "Excel Contains Invalid Values", problems));
     }
     const formattedData = data.map(row => ({
       ...row,

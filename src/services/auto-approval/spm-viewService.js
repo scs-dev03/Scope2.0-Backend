@@ -317,7 +317,7 @@ const spmDashboardService = async (DealerId, LocationId, OrderTypeId, From, To) 
   AND SCS_Status = 'Decline'
   
   select @NotinMaster=COUNT(Partnumber) from Notinmaster
-  where (Addedon <= @To) and (Addedon >=@From )
+  where (CONVERT(date , AddedOn) <= CONVERT(date , @To)) AND (CONVERT(date , AddedOn) >= CONVERT(date , @From)) AND Status in (0,1)
   AND (@Locationid is null or Locationid = @LocationId)
   
   select @Internal=COUNT(SCS_STATUS) from  createorderrequestpending_td001_${DealerId} 
