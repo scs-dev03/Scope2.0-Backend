@@ -1,6 +1,6 @@
 import sql from 'mssql'
 import { getPool1, getPool2 } from '../db/db.js'
-import { jobcardDate, lastOrderValue, ppniValue, SixMonthLocationwiseSaleValue, snstockValue, stockQty, stockValue } from '../services/MasterApi/MasterApiService.js';
+import { jobcardDate, lastOrderValue, multiAdvisorService, multiDealerService, multiLocationService, ppniValue, SixMonthLocationwiseSaleValue, snstockValue, stockQty, stockValue } from '../services/MasterApi/MasterApiService.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 
@@ -584,14 +584,64 @@ const jobtype = async (req, res) => {
     throw new ApiError(500, 'Unable to Get Jobtype', [error.message])
   }
 }
-const hsncode = async(req,res)=>{
-try {
+
+const hsncode = async (req, res) => {
+  try {
     const pool = await getPool1()
     const query = `use z_scope select tcode , description from hsnmaster`
     const result = await pool.request().query(query)
-    res.status(200).json(new ApiResponse(200,result.recordset, `Data Fetched Successfully`))
-} catch (error) {
-  res.status(500).json(500, 'Unable to Get HSNCode', [error.message])
+    res.status(200).json(new ApiResponse(200, result.recordset, `Data Fetched Successfully`))
+  } catch (error) {
+    res.status(500).json(500, 'Unable to Get HSNCode', [error.message])
+  }
 }
+
+function format(arr) {
+  if (!Array.isArray(arr) || arr.length === 0) return null;
+  const s = arr.map(v => String(v).trim()).filter(Boolean).join(',');
+  return s ? `${s.replace(/'/g, "''")}` : null;
 }
-export { hsncode,jobtype,ordertype, spmhomepage, pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules }
+
+const multiDealer = async (req, res) => {
+  try {
+    const { BrandIds } = req.body
+    if (!BrandIds) {
+      return res.status(400).json(new ApiError(400, `BrandIds are required`))
+    }
+    const formattedBrandIds = format(BrandIds);
+
+    const result = await multiDealerService(formattedBrandIds)
+    res.status(200).json(new ApiResponse(200, result))
+  } catch (error) {
+    res.status(500).json(new ApiError(error.statusCode || 500, error.message))
+  }
+}
+const multiLocation = async (req, res) => {
+  try {
+    const { DealerIds } = req.body
+    if (!DealerIds) {
+      return res.status(400).json(new ApiError(400, `DealerIds are required`))
+    }
+    const formattedDealerIds = format(DealerIds);
+
+    const result = await multiLocationService(formattedDealerIds)
+    res.status(200).json(new ApiResponse(200, result))
+  } catch (error) {
+    res.status(500).json(new ApiError(error.statusCode || 500, error.message))
+  }
+}
+const multiAdvisor = async (req, res) => {
+  try {
+    const { LocationIds } = req.body
+    if (!LocationIds) {
+      return res.status(400).json(new ApiError(400, `LocationIds are required`))
+    }
+    const formattedLocationIds = format(LocationIds);
+
+    const result = await multiAdvisorService(formattedLocationIds)
+    res.status(200).json(new ApiResponse(200, result))
+  } catch (error) {
+    res.status(500).json(new ApiError(error.statusCode || 500, error.message))
+  }
+}
+export { hsncode, jobtype, ordertype, spmhomepage, pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules, multiDealer, multiLocation, multiAdvisor }

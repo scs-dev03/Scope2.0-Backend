@@ -1,6 +1,6 @@
 import Router from 'express'
 const router = Router()
-import { getBrands, getDashboard, getDealers, getLocation, getWorkspace, homePageData, latestDates, model, pagination, partNature, partType, seasonal, userInfo, getUserModules, spmhomepage, ordertype, jobtype, hsncode } from '../controller/MasterApiController.js'
+import { getBrands, getDashboard, getDealers, getLocation, getWorkspace, homePageData, latestDates, model, pagination, partNature, partType, seasonal, userInfo, getUserModules, spmhomepage, ordertype, jobtype, hsncode, multiDealer, multiLocation, multiAdvisor } from '../controller/MasterApiController.js'
 
 
 router.route('/brands').get(getBrands)
@@ -28,4 +28,9 @@ router.route('/user-modules').post(getUserModules)
 //router.route('/user-modules-r').post(getRawUserModules)
 
 router.route('/hsncode').get(hsncode)
+
+router.route('/multi-dealer').post(multiDealer)
+router.route('/multi-location').post(multiLocation)
+router.route('/multi-advisor').post(multiAdvisor)
+
 export default router

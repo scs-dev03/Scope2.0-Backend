@@ -1,5 +1,7 @@
 import sql from 'mssql'
-import { getPool2 } from '../../db/db.js'
+import { getPool1, getPool2 } from '../../db/db.js'
+import { ApiError } from '../../utils/ApiError.js';
+import { login } from '../login/auth.service.js';
 
 const stockQty = async (locationId) => {
     const pool = await getPool2();
@@ -154,4 +156,55 @@ const SixMonthLocationwiseSaleValue = async (dealerid, locationId) => {
     return result.recordset
 }
 
-export { stockQty, stockValue, snstockValue, lastOrderValue, jobcardDate, ppniValue, SixMonthLocationwiseSaleValue }
+const multiDealerService = async (BrandIds) => {
+    try {
+        const pool = await getPool1()
+        const query = `
+        use z_scope
+        select Brand , DealerID , Dealer from LocationInfo where Brandid in (${BrandIds}) 
+        AND DealerStatus = 1
+        Group by Brand , Dealer , DealerID
+        order by Brand , Dealer`
+        const result = await pool.request().query(query)
+        return result.recordset
+    } catch (error) {
+        throw new ApiError(500, error.message)
+    }
+}
+
+const multiLocationService = async (DealerIds) => {
+    try {
+        const pool = await getPool1()
+        const query = `
+        use z_scope
+        select Dealer, LocationID , Location from LocationInfo where DealerId in (${DealerIds}) 
+        AND OgsStatus = 1
+        Group by Dealer, LocationID , Location
+        Order by Dealer ,Location`
+        const result = await pool.request().query(query)
+        return result.recordset
+    } catch (error) {
+        throw new ApiError(500, error.message)
+    }
+}
+
+const multiAdvisorService = async (LocationIds) => {
+    try {
+        const pool = await getPool1()
+        const query = `
+        use z_scope
+        select Id , li.Location , Advisor from AAP_SPMAdvisorMaster ad
+        JOIN LocationInfo li on ad.LocationId = li.LocationID
+        where ad.LocationId in (${LocationIds})
+        AND ad.Status = 1 and li.OgsStatus = 1
+        Order by li.Location`
+
+        // console.log(query);
+        
+        const result = await pool.request().query(query)
+        return result.recordset
+    } catch (error) {
+        throw new ApiError(500, error.message)
+    }
+}
+export { stockQty, stockValue, snstockValue, lastOrderValue, jobcardDate, ppniValue, SixMonthLocationwiseSaleValue, multiDealerService, multiLocationService, multiAdvisorService }
