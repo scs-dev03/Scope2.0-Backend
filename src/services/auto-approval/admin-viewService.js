@@ -2,7 +2,7 @@ import { getPool1 } from "../../db/db.js"
 import { ApiError } from "../../utils/ApiError.js"
 import sql from 'mssql'
 
-const adminDashboardService = async (BrandIds , DealerIds , LocationIds , OrderTypeId , From , To) => {
+const adminDashboardService = async (BrandIds, DealerIds, LocationIds, OrderTypeId, From, To) => {
     try {
         const pool = await getPool1()
         const result = await pool.request()
@@ -21,4 +21,16 @@ const adminDashboardService = async (BrandIds , DealerIds , LocationIds , OrderT
     }
 }
 
-export { adminDashboardService }
+const adminBrandwiseService = async () => {
+    try {
+        const pool = await getPool1()
+        const request = pool.request()
+        const query = `use z_scope EXEC dbo.sp_AAP_BrandWiseAdminDashboard_VB;`
+        const result = await request.query(query)
+        return result.recordset
+    } catch (error) {
+        throw new ApiError(500, error.message);
+    }
+}
+
+export { adminDashboardService, adminBrandwiseService }
