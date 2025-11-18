@@ -116,8 +116,8 @@ const viewNotInMasterService = async (BrandId, DealerId, LocationId, PartNumber,
     AND (@PartTypeId IS NULL OR nim.PartTypeId = @PartTypeId)
     AND (@AddedBy IS NULL OR nim.Addedby = @AddedBy)
     AND (nim.Status = @Status)
-	  AND (@From is NULL OR Addedon >= @From)
-	  AND (@To is NULL OR Addedon <=@To)
+	  AND (@From is NULL OR CONVERT(date ,Addedon) >=  CONVERT(date,@From))
+	  AND (@To is NULL OR CONVERT(date ,Addedon) <= CONVERT(date,@To))
     `
     const result = await pool.request()
       .input('BrandId', sql.Int, BrandId ?? null)
@@ -126,8 +126,8 @@ const viewNotInMasterService = async (BrandId, DealerId, LocationId, PartNumber,
       .input('PartNumber', sql.Int, PartNumber ?? null)
       .input('PartTypeId', sql.Int, PartTypeId ?? null)
       .input('Addedby', sql.Int, Addedby ?? null)
-      .input('From', sql.Int, From ?? null)
-      .input('To', sql.Int, To ?? null)
+      .input('From', sql.Date, From ?? null)
+      .input('To', sql.Date, To ?? null)
       .input('Status', sql.Int, Status)
       .query(query)
 
@@ -461,4 +461,5 @@ const adminActionService = async (Id, Status, Approvedby, Remarks) => {
     throw new ApiError(500,error.message)
  }
 }
+
 export { insertPartNumbers, viewNotInMasterService, addNotinMasterService, uploadNotinMasterService, mappingParttypeHSNCode, adminActionService }

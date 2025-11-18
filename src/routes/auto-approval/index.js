@@ -8,6 +8,7 @@ import operatorroutes from './OperatorRoutes.js'
 import spmviewroutes from './spm-viewRoute.js'
 import nimroutes from './notinmasterRoute.js'
 import adminviewroutes from './admin-viewRoute.js'
+import remarkroutes from './remarkMasterRoute.js'
 
 const router = Router()
 
@@ -27,6 +28,8 @@ router.use('/aa',rulemgmtroutes)
 router.use('/aa/nim',nimroutes)
 
 router.use("/aa/admin",adminviewroutes)
+
+router.use("/aa/remark",remarkroutes)
 
 
 
