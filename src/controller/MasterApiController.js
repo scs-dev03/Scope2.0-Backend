@@ -1,6 +1,6 @@
 import sql from 'mssql'
 import { getPool1, getPool2 } from '../db/db.js'
-import { jobcardDate, lastOrderValue, multiAdvisorService, multiDealerService, multiLocationService, ppniValue, SixMonthLocationwiseSaleValue, snstockValue, stockQty, stockValue } from '../services/MasterApi/MasterApiService.js';
+import { getUserService, jobcardDate, lastOrderValue, multiAdvisorService, multiDealerService, multiLocationService, ppniValue, SixMonthLocationwiseSaleValue, snstockValue, stockQty, stockValue } from '../services/MasterApi/MasterApiService.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 
@@ -644,4 +644,12 @@ const multiAdvisor = async (req, res) => {
     res.status(500).json(new ApiError(error.statusCode || 500, error.message))
   }
 }
-export { hsncode, jobtype, ordertype, spmhomepage, pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules, multiDealer, multiLocation, multiAdvisor }
+const getUser = async (req, res) => {
+  try {
+    const result = await getUserService()
+    res.status(200).json(new ApiResponse(200, result))
+  } catch (error) {
+    res.status(500).json(new ApiError(500, error.message))
+  }
+}
+export { hsncode, jobtype, ordertype, spmhomepage, pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules, multiDealer, multiLocation, multiAdvisor, getUser }

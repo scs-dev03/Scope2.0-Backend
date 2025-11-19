@@ -207,4 +207,15 @@ const multiAdvisorService = async (LocationIds) => {
         throw new ApiError(500, error.message)
     }
 }
-export { stockQty, stockValue, snstockValue, lastOrderValue, jobcardDate, ppniValue, SixMonthLocationwiseSaleValue, multiDealerService, multiLocationService, multiAdvisorService }
+
+const getUserService = async()=>{
+try {
+        const pool = await getPool1()
+        const query = `use z_scope select bintId_Pk ,CONCAT(vcFirstName,' ',vcLastName)Name from AdminMaster_GEN where type = 'A' and btStatus = 1`
+        const result = await pool.request().query(query)
+        return result.recordset
+} catch (error) {
+    throw new ApiError(200,error.message)
+}
+}
+export { stockQty, stockValue, snstockValue, lastOrderValue, jobcardDate, ppniValue, SixMonthLocationwiseSaleValue, multiDealerService, multiLocationService, multiAdvisorService, getUserService }
