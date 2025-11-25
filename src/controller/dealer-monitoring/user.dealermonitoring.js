@@ -5,13 +5,14 @@ import { advisorwisePPNIValueService, groupStock, gainerListingService, jobCardB
 import { performance } from 'node:perf_hooks';
 import { ApiError } from "../../utils/ApiError.js";
 import { ApiResponse } from "../../utils/ApiResponse.js";
+import { ErrorLog } from "../../utils/dealerAppUtilis.js";
 
 // import { transformOrderData } from "../../services/orderDetails/orderDetailsService.js";
 
 const partSale = async (req, res) => {
     try {
-        const { partnumber, brandid, dealerid, locationid } = req.body
-        if (!partnumber || !brandid || !dealerid || !locationid) {
+        const { partnumber, brandid, dealerid, locationid, userId } = req.body
+        if (!partnumber || !brandid || !dealerid || !locationid || !userId) {
             return res.status(400).json({ message: `All fields are required` })
         }
         const check = await partBrandMapping(brandid, partnumber)
@@ -42,6 +43,11 @@ const partSale = async (req, res) => {
             Error: error.message
         })
     }
+    finally {
+        if (req.body.userId) {
+            await vehicleSearchlogsService('Sale Trend', 'Check', req.body, req.body.userId)
+        }
+    }
 }
 
 const partDetails = async (req, res) => {
@@ -65,10 +71,10 @@ const partDetails = async (req, res) => {
 
 const singlePartMaxByLocation = async (req, res) => {
     try {
-        const { brandid, partnumber, locationid, dealerid } = req.body
-        if (!brandid || !partnumber || !dealerid || !locationid) {
+        const { brandid, partnumber, locationid, dealerid, userId } = req.body
+        if (!brandid || !partnumber || !dealerid || !locationid || !userId) {
             return res.status(400).json({
-                Error: `brandid , partnumber , dealerid are required`
+                Error: `brandid , partnumber , dealerid and userId are required`
             })
         }
         const check = await partBrandMapping(brandid, partnumber)
@@ -94,14 +100,18 @@ const singlePartMaxByLocation = async (req, res) => {
         res.status(500).json({
             Error: error.message
         })
+    } finally {
+        if (req.body.userId) {
+            await vehicleSearchlogsService('SCS Norms', 'Check', req.body, req.body.userId)
+        }
     }
 }
 
 const orderDetailsByPartnumber = async (req, res) => {
     try {
-        const { brandid, dealerid, locationid, partnumber, Udate, Ldate } = req.body
-        if (!dealerid || !locationid || !partnumber || !Udate || !Ldate) {
-            return res.status(400).json({ message: `dealerid , locationid , partnumber , Udate , Ldate are required` })
+        const { brandid, dealerid, locationid, partnumber, Udate, Ldate, userId } = req.body
+        if (!dealerid || !locationid || !partnumber || !Udate || !Ldate || !userId) {
+            return res.status(400).json({ message: `dealerid , locationid , partnumber , Udate , Ldate and userId are required` })
         }
         const check = await partBrandMapping(brandid, partnumber)
         if (check == 0) {
@@ -133,14 +143,19 @@ const orderDetailsByPartnumber = async (req, res) => {
             Error: error.message
         })
     }
+    finally {
+        if (req.body.userId) {
+            await vehicleSearchlogsService('Order Details', 'Check', req.body, req.body.userId)
+        }
+    }
 }
 
 const partStock = async (req, res) => {
     try {
-        const { brandid, dealerid, locationid, partnumber } = req.body
-        if (!brandid || !dealerid || !locationid || !partnumber) {
+        const { brandid, dealerid, locationid, partnumber, userId } = req.body
+        if (!brandid || !dealerid || !locationid || !partnumber || !userId) {
             return res.status(400).json({
-                message: `brandid,dealerid,locationid,partnumber are required`
+                message: `brandid,dealerid,locationid,partnumber and userId are required`
             })
         }
         const check = await partBrandMapping(brandid, partnumber)
@@ -195,23 +210,30 @@ const partStock = async (req, res) => {
             Stock: data4.recordsets[1]
         })
 
+
     } catch (error) {
+        await ErrorLog("Part Stock Check",error.message,req.body.userId)
         res.status(500).json({
             Error: error.message
         })
+    }
+    finally {
+        if (req.body.userId) {
+            await vehicleSearchlogsService('Part Stock Check', 'Check', req.body, req.body.userId)
+        }
     }
 }
 
 const vehicleSearch = async (req, res) => {
     try {
         // const pool = await getPool2()
-        const { dealerid, locationid, vehicleno, alltimestk, filter, issued, pageno, pagesize } = req.body
+        const { dealerid, locationid, vehicleno, alltimestk, filter, issued, pageno, pagesize, userId } = req.body
         const converted = filter === null
             ? null
             : (filter === 'Open' ? 'N' : filter);
 
         // console.log(dealerid,vehicleno ,alltimestk, converted , issued);
-        const check = await vehicledealercheck(vehicleno, dealerid , locationid)
+        const check = await vehicledealercheck(vehicleno, dealerid, locationid)
         if (check == 0) {
             return res.status(400).json({
                 message: `Invalid Vehicle Number`
@@ -219,7 +241,7 @@ const vehicleSearch = async (req, res) => {
         }
         const [data1, data2, data3] = await Promise.all([
             vehicleSearchService(dealerid, locationid, vehicleno, alltimestk, converted, issued, pageno, pagesize),
-            vehicleScore(dealerid,locationid, vehicleno),
+            vehicleScore(dealerid, locationid, vehicleno),
             //  vehicleSearchPagination(pageno,pagesize,dealerid,vehicleno,alltimestk,issued,converted)
         ])
 
@@ -248,7 +270,12 @@ const vehicleSearch = async (req, res) => {
             // pageInfo:data3
         })
     } catch (error) {
+        await ErrorLog("Vehicle Search",error.message,req.body.userId)
         res.status(500).json(error)
+    }finally {
+        if (req.body.userId) {
+            await vehicleSearchlogsService('Vehicle Search', 'Check', req.body, req.body.userId)
+        }
     }
 }
 
@@ -264,10 +291,10 @@ const partSearch = async (req, res) => {
 
 const substituteParts = async (req, res) => {
     try {
-        const { brandid, dealerid, locationid, partnumber } = req.body
-        if (!brandid || !partnumber) {
+        const { brandid, dealerid, locationid, partnumber, userId } = req.body
+        if (!brandid || !partnumber || !userId) {
             return res.status(400).json({
-                message: `brandid,partnumber are required`
+                message: `brandid,partnumber and userId are required`
             })
         }
         const check = await partBrandMapping(brandid, partnumber)
@@ -300,10 +327,16 @@ const substituteParts = async (req, res) => {
 
         // })
     } catch (error) {
+        await ErrorLog("Substitution Check",error.message,req.body.userId)
         res.status(500).json({
             Error: error.message
         })
+    } finally {
+        if (req.body.userId) {
+            await vehicleSearchlogsService('Substitution Check', 'Check', req.body, req.body.userId)
+        }
     }
+
 }
 
 const userRole = async (req, res) => {
@@ -329,10 +362,10 @@ const userRole = async (req, res) => {
 
 const locationwisePPNIValue = async (req, res) => {
     try {
-        const { dealerid, nonstockable, jobcardstatus, month } = req.body
-        if (!dealerid || !nonstockable == null || !jobcardstatus == null || !month == null) {
+        const { dealerid, nonstockable, jobcardstatus, month, userId } = req.body
+        if (!dealerid || !nonstockable == null || !jobcardstatus == null || !month == null || !userId) {
             return res.status(400).json({
-                message: `dealerid , nonstockable and partstatus is required`
+                message: `dealerid , nonstockable , userId and partstatus is required`
             })
         }
         const data = await locationwisePPNIValueService(dealerid, jobcardstatus, nonstockable, month)
@@ -341,16 +374,21 @@ const locationwisePPNIValue = async (req, res) => {
             Data: data.recordset
         })
     } catch (error) {
+        await ErrorLog("LocationWise PPNI",error.message,req.body.userId)
         res.status(500).json({
             Error: error.message
         })
+    } finally {
+        if (req.body.userId) {
+            await vehicleSearchlogsService('LocationWise PPNI', 'Check', req.body, req.body.userId)
+        }
     }
 }
 
 const advisorwisePPNIValue = async (req, res) => {
     try {
-        const { dealerid, locationid, nonstockable, jobcardstatus, month } = req.body
-        if (!dealerid || !locationid || !nonstockable == null || !jobcardstatus == null || !month == null) {
+        const { dealerid, locationid, nonstockable, jobcardstatus, month , userId } = req.body
+        if (!dealerid || !locationid || !nonstockable == null || !jobcardstatus == null || !month == null || !userId) {
             return res.status(400).json({
                 message: `dealerid , nonstockable and partstatus is required`
             })
@@ -362,16 +400,21 @@ const advisorwisePPNIValue = async (req, res) => {
             Data: data.recordset
         })
     } catch (error) {
+        await ErrorLog("AdvisorWise PPNI",error.message,req.body.userId)
         res.status(500).json({
             Error: error.message
         })
+    } finally {
+        if (req.body.userId) {
+            await vehicleSearchlogsService('AdvisorWise PPNI', 'Check', req.body, req.body.userId)
+        }
     }
 }
 
 const vehiclewisePPNIValue = async (req, res) => {
     try {
-        const { dealerid, locationid, nonstockable, jobcardstatus, advisor, month, pageno, pagesize } = req.body
-        if (!dealerid || !locationid || !nonstockable == null || !jobcardstatus == null || !month == null) {
+        const { dealerid, locationid, nonstockable, jobcardstatus, advisor, month, pageno, pagesize , userId } = req.body
+        if (!dealerid || !locationid || !nonstockable == null || !jobcardstatus == null || !month == null || !userId) {
             return res.status(400).json({
                 message: `dealerid , nonstockable and partstatus is required`
             })
@@ -461,18 +504,23 @@ const vehiclewisePPNIValue = async (req, res) => {
             // Data:data.recordset
         })
     } catch (error) {
+        await ErrorLog("VehicleWise PPNI",error.message,req.body.userId)
         res.status(500).json({
             Error: error.message
         })
+    } finally {
+        if (req.body.userId) {
+            await vehicleSearchlogsService('VehicleWise PPNI', 'Check', req.body, req.body.userId)
+        }
     }
 }
 
 const partwisePPNIValue = async (req, res) => {
     try {
-        const { dealerid, locationid, nonstockable, jobcardstatus, advisor, vehicleno, month } = req.body
-        if (!dealerid || !locationid || !nonstockable == null || !jobcardstatus == null || !vehicleno || !month == null) {
+        const { dealerid, locationid, nonstockable, jobcardstatus, advisor, vehicleno, month, userId } = req.body
+        if (!dealerid || !locationid || !nonstockable == null || !jobcardstatus == null || !vehicleno || !month == null || !userId) {
             return res.status(400).json({
-                message: `dealerid , locationid  and vehicleno is required`
+                message: `dealerid , locationid , userId and vehicleno is required`
             })
         }
         const data = await partwisePPNIValueService(dealerid, locationid, jobcardstatus, nonstockable, advisor, vehicleno, month)
@@ -480,9 +528,14 @@ const partwisePPNIValue = async (req, res) => {
             Data: data.recordset
         })
     } catch (error) {
+        await ErrorLog("PartWise PPNI",error.message,req.body.userId)
         res.status(500).json({
             Error: error.message
         })
+    } finally {
+        if (req.body.userId) {
+            await vehicleSearchlogsService('PartWise PPNI', 'Check', req.body, req.body.userId)
+        }
     }
 }
 
@@ -500,9 +553,15 @@ const PPNIVALUE12Months = async (req, res) => {
             Data: data.recordset
         })
     } catch (error) {
+        await ErrorLog("PPNIGraph",error.message,req.body.userId)
         res.status(500).json({
             Error: error.message
         })
+    }
+    finally {
+        if (req.body.userId) {
+            await vehicleSearchlogsService('PPNIGraph', 'Check', req.body, req.body.userId)
+        }
     }
 }
 
@@ -516,9 +575,14 @@ const gainerListing = async (req, res) => {
         })
     }
     catch (error) {
+        await ErrorLog("Gainer Listing",error.message,req.body.userId)
         res.status(500).json({
             Error: error.message
         })
+    }finally {
+        if (req.body.userId) {
+            await vehicleSearchlogsService('Gainer Listing', 'Check', req.body, req.body.userId)
+        }
     }
 }
 
@@ -553,21 +617,21 @@ const viewLog = async (req, res) => {
     }
 }
 
-const vehicleSearchConsent = async(req,res)=>{
-try {
-        const {vehiclenumber , dealerid , locationid , userId} = req.body
-        if(!vehiclenumber || !dealerid || !locationid || !userId){
-            return res.status(400).json(new ApiError(400,`vehiclenumber , dealerid , locationid , userId is Required`,[],``))
+const vehicleSearchConsent = async (req, res) => {
+    try {
+        const { vehiclenumber, dealerid, locationid, userId } = req.body
+        if (!vehiclenumber || !dealerid || !locationid || !userId) {
+            return res.status(400).json(new ApiError(400, `vehiclenumber , dealerid , locationid , userId is Required`, [], ``))
         }
-        const result = await vehicleSearchConsentService(vehiclenumber , dealerid , locationid , userId)
-        
-        if(result.rowsAffected[0] > 0){
-            return res.status(200).json(new ApiResponse(204,[],'Consent Recorded Successfully'))
+        const result = await vehicleSearchConsentService(vehiclenumber, dealerid, locationid, userId)
+
+        if (result.rowsAffected[0] > 0) {
+            return res.status(200).json(new ApiResponse(204, [], 'Consent Recorded Successfully'))
         }
-        res.status(500).json(new ApiError(500,'Unable to Record the Consent',[],''))
+        res.status(500).json(new ApiError(500, 'Unable to Record the Consent', [], ''))
     }
- catch (error) {
-    res.status(500).json(new ApiError(500,`Unexpected error while recording consent`,[]))    
+    catch (error) {
+        res.status(500).json(new ApiError(500, `Unexpected error while recording consent`, []))
+    }
 }
-}
-export { vehicleSearchConsent,gainerListing, partSale, partDetails, singlePartMaxByLocation, orderDetailsByPartnumber, partStock, vehicleSearch, partSearch, substituteParts, userRole, locationwisePPNIValue, advisorwisePPNIValue, vehiclewisePPNIValue, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, vehicleSearchLogs, viewLog }
+export { vehicleSearchConsent, gainerListing, partSale, partDetails, singlePartMaxByLocation, orderDetailsByPartnumber, partStock, vehicleSearch, partSearch, substituteParts, userRole, locationwisePPNIValue, advisorwisePPNIValue, vehiclewisePPNIValue, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, vehicleSearchLogs, viewLog }

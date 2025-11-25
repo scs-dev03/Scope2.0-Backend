@@ -1,4 +1,4 @@
-import { getPool2 } from "../../db/db.js";
+import { getPool2 , getPool1 } from "../../db/db.js";
 import sql from 'mssql'
 import { ApiError } from "../../utils/ApiError.js";
 const partInfo = async (brandid, partnumber) => {
@@ -63,7 +63,7 @@ const reservedForVehicle = async (dealerid, locationid, partnumber) => {
 
 const groupStock = async (brandid, dealerid, locationid, partnumber) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool1()
     const query = `
         DECLARE
         @InputPart VARCHAR(40) = '${partnumber}',
@@ -369,7 +369,7 @@ ORDER BY pm.PartNumber1, pm.BrandID;
 const userroleService = async (userid) => {
   try {
     const pool = await getPool2()
-    const query = `select rm.Role,concat(amg.vcFirstName,' ',amg.vcLastName)as Name from adminmaster_gen amg 
+    const query = `select rm.Role,concat(amg.vcFirstName,' ',amg.vcLastName)as Name from z_scope..adminmaster_gen amg 
                         join Role_Master rm on rm.bigid = amg.Designation
                         where bintId_Pk = ${userid}`
     const result = await pool.request().query(query)
@@ -1391,14 +1391,14 @@ const vehicleSearchPagination = async (page, pageSize, dealerId, vehicleNo, allT
 
 const vehicleSearchlogsService = async (moduleName, event, details, userid) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool1()
     const query = `use z_scope Insert into App_Logging(ModuleName,Event,Details,CreatedBy)
                     OUTPUT inserted.ModuleName, inserted.Event, inserted.Details, inserted.CreatedBy
                     values(@ModuleName,@Event,@Details,@CreatedBy)`
     const result = await pool.request()
       .input('ModuleName', sql.VarChar, moduleName)
       .input('Event', sql.VarChar, event)
-      .input('Details', sql.VarChar, details)
+      .input('Details', sql.VarChar,JSON.stringify(details))
       .input('CreatedBy', sql.Int, userid)
       .query(query)
     return result
