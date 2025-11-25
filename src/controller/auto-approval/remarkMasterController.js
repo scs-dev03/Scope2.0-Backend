@@ -5,7 +5,10 @@ import { ApiResponse } from "../../utils/ApiResponse.js"
 const insertRemark = async (req, res) => {
     try {
         const { BrandId, DealerId, LocationId, Remark, Remarktype, userid } = req.body
-        console.log(BrandId, DealerId, LocationId, Remark, Remarktype, userid);
+        // console.log(BrandId, DealerId, LocationId, Remark, Remarktype, userid);
+        if(!Remarktype){
+            return res.status(400).json(new ApiError(400,`Remarktype is Required`))
+        }
 
         const result = await insertRemarkService(BrandId, DealerId, LocationId, Remark, Remarktype, userid)
         res.status(200).json(new ApiResponse(200, result, `Remarks Created`))
