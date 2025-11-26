@@ -9,6 +9,7 @@ import spmviewroutes from './spm-viewRoute.js'
 import nimroutes from './notinmasterRoute.js'
 import adminviewroutes from './admin-viewRoute.js'
 import remarkroutes from './remarkMasterRoute.js'
+import brandwisemappingroutes from './brandwise-UserMappingRoute.js'
 
 const router = Router()
 
@@ -30,6 +31,8 @@ router.use('/aa/nim',nimroutes)
 router.use("/aa/admin",adminviewroutes)
 
 router.use("/aa/remark",remarkroutes)
+
+router.use("/aa/bwum",brandwisemappingroutes)
 
 
 
