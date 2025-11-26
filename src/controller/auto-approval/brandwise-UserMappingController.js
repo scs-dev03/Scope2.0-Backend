@@ -1,4 +1,5 @@
-import { createMappingService, editMappingService, viewMappingService } from "../../services/auto-approval/brandwise-UserMappingService.js"
+import { getPool1 } from "../../db/db.js"
+import { createMappingService, editMappingService, userBrandsService, userDealerService, userLocationService, viewMappingService } from "../../services/auto-approval/brandwise-UserMappingService.js"
 import { ApiError } from "../../utils/ApiError.js"
 import { ApiResponse } from "../../utils/ApiResponse.js"
 
@@ -88,4 +89,44 @@ const editMapping = async (req, res) => {
     }
 }
 
-export { viewMapping, createMapping, editMapping }
+const userBrands = async (req,res) => {
+    try {
+        const { userId } = req.body
+        if (!userId) {
+            return res.status(400).json(new ApiError(400, `userId is required`))
+        }
+        const result = await userBrandsService(userId)
+        res.status(200).json(new ApiResponse(200, result, `Data Fetched`))
+    } catch (error) {
+        res.status(500).json(new ApiError(error.statusCode, error.message))
+    }
+
+}
+const userDealers = async (req,res) => {
+    try {
+        const { userId, BrandId } = req.body
+        if (!userId) {
+            return res.status(400).json(new ApiError(400, `userId is required`))
+        }
+        const result = await userDealerService(userId, BrandId)
+        res.status(200).json(new ApiResponse(200, result, `Data Fetched`))
+    } catch (error) {
+        res.status(500).json(new ApiError(error.statusCode, error.message))
+    }
+
+}
+const userLocation = async (req,res) => {
+    try {
+        const { userId, DealerId } = req.body
+        if (!userId) {
+            return res.status(400).json(new ApiError(400, `userId is required`))
+        }
+        const result = await userLocationService(userId, DealerId)
+        res.status(200).json(new ApiResponse(200, result, `Data Fetched`))
+    } catch (error) {
+        res.status(500).json(new ApiError(error.statusCode, error.message))
+    }
+
+}
+
+export { viewMapping, createMapping, editMapping, userBrands, userDealers, userLocation }

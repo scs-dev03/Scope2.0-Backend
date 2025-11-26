@@ -72,7 +72,7 @@ const createMappingService = async (payload, addedBy) => {
     }
 }
 
-const editMappingService = async (payload,addedBy) => {
+const editMappingService = async (payload, addedBy) => {
     const pool = await getPool1();
     const transaction = new sql.Transaction(pool);
 
@@ -136,4 +136,42 @@ const editMappingService = async (payload,addedBy) => {
     }
 }
 
-export { viewMappingService, createMappingService, editMappingService }
+const userBrandsService = async (userId) => {
+    try {
+        const pool = await getPool1()
+        const query = `select DISTINCT BrandId , bm.vcbrand from AAP_BrandWiseMapping bwm
+                         JOIN Brand_Master bm on bm.bigid =  bwm.BrandId
+                        where bwm.status = 1 and bwm.UserId = ${userId}`
+        const result = await pool.request().query(query)
+        return result.recordset
+    } catch (error) {
+        throw new ApiError(500, error.message)
+    }
+}
+
+const userDealerService = async (userId,BrandId) => {
+    try {
+        const pool = await getPool1()
+        const query = `select DISTINCT DealerId , dm.vcName Dealer from AAP_BrandWiseMapping bwm
+                    JOIN Dealer_Master dm on dm.bigid = bwm.DealerId
+                    where bwm.status = 1 and bwm.UserId = ${userId} and bwm.BrandId = ${BrandId}`
+        const result = await pool.request().query(query)
+        return result.recordset
+    } catch (error) {
+        throw new ApiError(500, error.message)
+    }
+}
+
+const userLocationService = async (userId,DealerId) => {
+    try {
+        const pool = await getPool1()
+        const query = `select DISTINCT bwm.LocationId , li.location Location from AAP_BrandWiseMapping bwm
+                    JOIN LocationInfo li on li.LocationID = bwm.LocationId
+                    where bwm.status = 1 and bwm.UserId = ${userId} and bwm.DealerId = ${DealerId}`
+        const result = await pool.request().query(query)
+        return result.recordset
+    } catch (error) {
+        throw new ApiError(500, error.message)
+    }
+}
+export { viewMappingService, createMappingService, editMappingService, userBrandsService, userDealerService, userLocationService }

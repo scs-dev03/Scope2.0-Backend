@@ -4,7 +4,7 @@ import { ApiResponse } from "../../utils/ApiResponse.js"
 
 const adminDashboard = async (req, res) => {
     try {
-        const {BrandId , DealerId, LocationId, OrderTypeId, From, To } = req.body
+        const { BrandId, DealerId, LocationId, OrderTypeId, From, To } = req.body
         if (!From || !To) {
             return res.status(400).json(new ApiError(400, `From and To are required `))
         }
@@ -17,24 +17,23 @@ const adminDashboard = async (req, res) => {
         const formattedBrandIds = format(BrandId)
         const formattedDealerIds = format(DealerId)
         const formattedLocationIds = format(LocationId)
-        
-        const result = await adminDashboardService(formattedBrandIds,formattedDealerIds,formattedLocationIds, OrderTypeId, From, To)
+
+        const result = await adminDashboardService(formattedBrandIds, formattedDealerIds, formattedLocationIds, OrderTypeId, From, To)
 
         res.status(200).json(new ApiResponse(200, result, `Data Fetched Successfully`))
-    } catch (error) {        
-        res.status(500).json(new ApiError(error.statusCode || 500 ,error.message))
+    } catch (error) {
+        res.status(500).json(new ApiError(error.statusCode || 500, error.message))
     }
 
 }
 
-const adminBrandwise = async(req,res)=>{
-try {
+const adminBrandwise = async (req, res) => {
+    try {
         const result = await adminBrandwiseService()
-        res.status(200).json(new ApiResponse(200,result))
-} catch (error) {
-    res.status(500).json(new ApiError(error.statusCode || 500 , error.message))
-}
+        res.status(200).json(new ApiResponse(200, result))
+    } catch (error) {
+        res.status(500).json(new ApiError(error.statusCode || 500, error.message))
+    }
 }
 
-export {adminDashboard, adminBrandwise}
-
+export { adminDashboard, adminBrandwise }
