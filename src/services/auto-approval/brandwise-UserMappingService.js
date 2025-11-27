@@ -4,6 +4,8 @@ import sql from 'mssql'
 
 const viewMappingService = async (BrandId, DealerId, LocationId, UserId) => {
     try {
+        // console.log(BrandId, DealerId, LocationId, UserId);
+
         const pool = await getPool1()
         const query = `select bm.vcbrand Brand , dm.vcName Dealer , li.Location , CONCAT(amg.vcFirstName,' ',amg.vcLastName)Name , mm.Addedon , CONCAT(amg2.vcFirstName,' ',amg2.vcLastName)AddedBy 
         from AAP_BrandWiseMapping mm
@@ -12,16 +14,16 @@ const viewMappingService = async (BrandId, DealerId, LocationId, UserId) => {
         left Join LocationInfo li on li.locationid = mm.locationid
         left join AdminMaster_GEN amg on amg.bintId_Pk = mm.UserId
         left join AdminMaster_GEN amg2 on amg2.bintId_Pk = mm.AddedBy
-        where (@UserId is NULL OR mm.UserId = @UserId)
-        AND (@BrandId IS NULL or mm.BrandId = @BrandId)
-        AND (@DealerId IS NULL OR mm.DealerId = @DealerId)
-        AND (@LocationId IS NULL OR mm.LocationId = @LocationId)
+        where (@UserId is NULL OR mm.UserId in (${UserId}))
+        AND (@BrandId IS NULL or mm.BrandId in  (${BrandId}))
+        AND (@DealerId IS NULL OR mm.DealerId in (${DealerId}))
+        AND (@LocationId IS NULL OR mm.LocationId in  (${LocationId}))
         and mm.Status = 1`
         const result = await pool.request()
-            .input('BrandId', sql.Int, BrandId ?? null)
-            .input('DealerId', sql.Int, DealerId ?? null)
-            .input('LocationId', sql.Int, LocationId ?? null)
-            .input('UserId', sql.Int, UserId ?? null)
+            .input('BrandId', sql.VarChar, BrandId ?? null)
+            .input('DealerId', sql.VarChar, DealerId ?? null)
+            .input('LocationId', sql.VarChar, LocationId ?? null)
+            .input('UserId', sql.VarChar, UserId ?? null)
             .query(query)
         return result.recordset
     } catch (error) {
@@ -149,7 +151,7 @@ const userBrandsService = async (userId) => {
     }
 }
 
-const userDealerService = async (userId,BrandId) => {
+const userDealerService = async (userId, BrandId) => {
     try {
         const pool = await getPool1()
         const query = `select DISTINCT DealerId , dm.vcName Dealer from AAP_BrandWiseMapping bwm
@@ -162,7 +164,7 @@ const userDealerService = async (userId,BrandId) => {
     }
 }
 
-const userLocationService = async (userId,DealerId) => {
+const userLocationService = async (userId, DealerId) => {
     try {
         const pool = await getPool1()
         const query = `select DISTINCT bwm.LocationId , li.location Location from AAP_BrandWiseMapping bwm

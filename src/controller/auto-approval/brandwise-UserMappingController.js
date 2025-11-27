@@ -1,4 +1,3 @@
-import { getPool1 } from "../../db/db.js"
 import { createMappingService, editMappingService, userBrandsService, userDealerService, userLocationService, viewMappingService } from "../../services/auto-approval/brandwise-UserMappingService.js"
 import { ApiError } from "../../utils/ApiError.js"
 import { ApiResponse } from "../../utils/ApiResponse.js"
@@ -6,7 +5,21 @@ import { ApiResponse } from "../../utils/ApiResponse.js"
 const viewMapping = async (req, res) => {
     try {
         const { BrandId, DealerId, LocationId, UserId } = req.body
-        const result = await viewMappingService(BrandId, DealerId, LocationId, UserId)
+        // console.log(BrandId, DealerId, LocationId, UserId)
+
+        function format(arr) {
+            if (!Array.isArray(arr) || arr.length === 0) return null;
+            const s = arr.map(v => String(v).trim()).filter(Boolean).join(',');
+            return s ? `${s.replace(/'/g, "''")}` : null;
+        }
+        const formattedLocationIds = format(LocationId);
+        const formattedBrandIds = format(BrandId);
+        const formattedDealerIds = format(DealerId);
+        const formattedUserIds = format(UserId);
+
+        // console.log(formattedBrandIds,formattedDealerIds,formattedLocationIds,formattedUserIds);
+        
+        const result = await viewMappingService(formattedBrandIds, formattedDealerIds, formattedLocationIds, formattedUserIds)
         res.status(200).json(new ApiResponse(200, result))
     } catch (error) {
         res.status(500).json(new ApiError(500, error.message))
@@ -89,7 +102,7 @@ const editMapping = async (req, res) => {
     }
 }
 
-const userBrands = async (req,res) => {
+const userBrands = async (req, res) => {
     try {
         const { userId } = req.body
         if (!userId) {
@@ -102,7 +115,7 @@ const userBrands = async (req,res) => {
     }
 
 }
-const userDealers = async (req,res) => {
+const userDealers = async (req, res) => {
     try {
         const { userId, BrandId } = req.body
         if (!userId) {
@@ -115,7 +128,7 @@ const userDealers = async (req,res) => {
     }
 
 }
-const userLocation = async (req,res) => {
+const userLocation = async (req, res) => {
     try {
         const { userId, DealerId } = req.body
         if (!userId) {
