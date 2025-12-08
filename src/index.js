@@ -51,7 +51,7 @@ async function start() {
     // });
 
     // // Run `siRefresh()` every 5 minutes:
-    // cron.schedule('*/30 * * * *', async () => {
+    // cron.schedule('*/20 * * * *', async () => {
     //   await connectDB().catch(err => console.error('connectDB error', err));
     //   console.log('🔄 Running siRefresh at', new Date().toISOString());
     //   siRefresh().catch(err => console.error('siRefresh error', err));

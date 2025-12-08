@@ -1,8 +1,8 @@
 import sql from 'mssql'
 import cron from 'node-cron'
-import {getPool2} from '../db/db.js'
-import {dataValidator,checkisAlreadyScheduled,checkisUserValid, checkisMappingExists,checkGroupSetting} from '../utils/dashboardscheduleHelper.js'
-import {refreshBenchmarking, refreshPPNI, refreshSI, refreshTOPS, refreshCID, refreshSpecialList, refreshGainerMini} from '../utils/refreshDashboard.js'
+import { getPool2 } from '../db/db.js'
+import { dataValidator, checkisAlreadyScheduled, checkisUserValid, checkisMappingExists, checkGroupSetting } from '../utils/dashboardscheduleHelper.js'
+import { refreshBenchmarking, refreshPPNI, refreshSI, refreshTOPS, refreshCID, refreshSpecialList, refreshGainerMini } from '../utils/refreshDashboard.js'
 
 
 // const pool = await getPool2()
@@ -11,66 +11,76 @@ const getBrandByUser = async (req, res) => {
   try {
     const pool = await getPool2();
     const { userid } = req.body;
-    if(!userid){
+    if (!userid) {
       return res.status(400).json({
-        message:`userid is required`
+        message: `userid is required`
       })
     }
     const result = await pool.request()
-      .input('userid', sql.Int, userid) 
+      .input('userid', sql.Int, userid)
       .query(` use [z_scope]
         SELECT DISTINCT Brand, BrandID
         FROM LocationInfo
         WHERE bdmcode = @userid and status = 1 
       `);
-        // console.log(result);
-        
+    // console.log(result);
+
     res.status(200).json({ Data: result.recordset });
   } catch (error) {
     res.status(500).json({ Error: error.message });
   }
 };
 
-const getDealerByUser = async(req,res)=>{
-const pool = await getPool2()
-const {userid,brandid} = req.body
-if(!userid || !brandid){
-  return res.status(400).json({
-    message:`userid and brandid are required`
-  })
-}
-const query = `use [z_scope]
+const getDealerByUser = async (req, res) => {
+  const pool = await getPool2()
+  const { userid, brandid } = req.body
+  if (!userid || !brandid) {
+    return res.status(400).json({
+      message: `userid and brandid are required`
+    })
+  }
+  const query = `use [z_scope]
     select distinct dealer , dealerid from LocationInfo where  brandid = ${brandid} and bdmcode = ${userid} and status = 1`
-// console.log(query);
+  // console.log(query);
 
-const result = await pool.request().query(query)
+  //   const corrected query = `select distinct dealer , dealerid 
+  // from LocationInfo where brandid = 9
+  // and bdmcode = 147765 
+  // and   status = 1
+  // union 
+  // select distinct dealer , dealerid 
+  // from LocationInfo where brandid = 9
+  // and zbdmcode = 147765 
+  // and   status = 1`
+
+  const result = await pool.request().query(query)
   res.status(200).json({
-    Data : result.recordset
+    Data: result.recordset
   })
 }
-const getDashboardbyDealer = async(req,res)=>{
+const getDashboardbyDealer = async (req, res) => {
   const pool = await getPool2();
-  const {dealerid} = req.body
-try {  
+  const { dealerid } = req.body
+  try {
     const query = ` use [z_scope]
                     select dm.tCode , dm.Dashboard  from z_scope.dbo.DB_DashboardURL du
                     join z_scope.dbo.DB_DashboardMaster dm on dm.tcode = du.DashboardCode
                     where du.status = 1 and dm.Status = 1 and  dealerid  = @dealerid`
-    const result = await pool.request().input('dealerid',sql.Int,dealerid).query(query)
-    if(Array.isArray(result.recordset) && result.recordset.length === 0){
-        return res.status(400).json({message:`No Dashboard Exist for Dealerid. You can request a New Dashboard`})
+    const result = await pool.request().input('dealerid', sql.Int, dealerid).query(query)
+    if (Array.isArray(result.recordset) && result.recordset.length === 0) {
+      return res.status(400).json({ message: `No Dashboard Exist for Dealerid. You can request a New Dashboard` })
     }
-    
-    return res.status(200).json({Data:result.recordset})
-} catch (error) {
-if(error.message=== `Invalid object name'DB_DashboardMaster'.`){
-  console.log(`Something Wrong`);
-  
-}
-   console.log(error.message);
-   
-  res.status(500).json({details:error.message})
-}
+
+    return res.status(200).json({ Data: result.recordset })
+  } catch (error) {
+    if (error.message === `Invalid object name'DB_DashboardMaster'.`) {
+      console.log(`Something Wrong`);
+
+    }
+    console.log(error.message);
+
+    res.status(500).json({ details: error.message })
+  }
 }
 // const uploadSchedule = async (req, res) => {
 //     const pool = getPool1();
@@ -98,14 +108,14 @@ if(error.message=== `Invalid object name'DB_DashboardMaster'.`){
 //         } catch (err) {
 //           return res.status(400).json({ error: "Invalid or missing dashboardcodes. It must be a JSON array." });
 //         }
-    
+
 //         // Parse and validate the `scheduledon` field
 //         const scheduledDate = new Date(scheduledon);
 //         if (isNaN(scheduledDate.getTime())) {
 //           return res.status(400).json({ error: "Invalid date format for 'scheduledon'." });
 //         }
 //       // console.log("scheduledDate: ",scheduledDate);
-      
+
 //         // Check if the date is at least 24 hours in the future
 //         // const currentDate = new Date();
 //         // const futureThreshold = new Date(currentDate.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
@@ -116,14 +126,14 @@ if(error.message=== `Invalid object name'DB_DashboardMaster'.`){
 //         // }
 //         const currentDate = new Date();
 //         // console.log("currentDate ",currentDate);
-        
+
 
 //         // Move to the next day at 00:00:00 (midnight)
 //         const nextDayStart = new Date(currentDate);
 //         nextDayStart.setDate(nextDayStart.getDate() + 1);
 //         nextDayStart.setHours(0, 0, 0, 0); // Set time to midnight
 //         // console.log("nextDayStart ",nextDayStart);
-        
+
 //         if (scheduledDate < nextDayStart) {
 //           return res.status(400).json({
 //             Error: "Scheduled date must be on the next day or later.",
@@ -137,7 +147,7 @@ if(error.message=== `Invalid object name'DB_DashboardMaster'.`){
 //           return res.status(400).json(isDataValid);
 //         }
 //       console.log(`hi`);
-      
+
 //         // Insert each dashboardcode into the database
 //         for (const dashboardcode of parsedDashboardCodes) {
 //           console.log(`hi1`);
@@ -149,7 +159,7 @@ if(error.message=== `Invalid object name'DB_DashboardMaster'.`){
 //          if (dashboardcode == 15) {
 //           const isGroupSettingDone = await checkGroupSetting(dealerid) 
 //             // console.log(isGroupSettingDone);
-     
+
 //            if(!isGroupSettingDone){
 //            return res.status(400).json({message:`Group Setting Not done`})
 //          }
@@ -167,7 +177,7 @@ if(error.message=== `Invalid object name'DB_DashboardMaster'.`){
 //             .input("addedby", sql.Int, addedby)
 //             .query(query);
 //         }
-    
+
 //         // console.log("Dashboard successfully uploaded.");
 //         res.status(201).json({ message: "Dashboard Successfully Scheduled" });
 //       }
@@ -180,13 +190,13 @@ if(error.message=== `Invalid object name'DB_DashboardMaster'.`){
 //     }
 // };
 const uploadSchedule = async (req, res) => {
-  const pool =await  getPool2();
+  const pool = await getPool2();
   try {
-    const {dashboardcodes, brandid, brand, dealer, dealerid, scheduledon, addedby } = req.body;    
-     // Validate other required fields
-     if (!brandid || !brand || !dealer || !dealerid || !scheduledon || !dashboardcodes) {
+    const { dashboardcodes, brandid, brand, dealer, dealerid, scheduledon, addedby } = req.body;
+    // Validate other required fields
+    if (!brandid || !brand || !dealer || !dealerid || !scheduledon || !dashboardcodes) {
       return res.status(400).json({ error: "All fields are required." });
-      
+
     }
     // const Block_Dealers = [20305,20538,21432,20670,13,20260,20486,20366,20280,8,
     //   "20305","20538","21432","20670","13","20260","20486","20366","20280","8"
@@ -195,13 +205,13 @@ const uploadSchedule = async (req, res) => {
     //   return res.status(400).json({message:`Blocked from Scheduling Dashboard`})
     // }
 
-    if(!addedby){
+    if (!addedby) {
       // console.log(`Userid is required`);
-      
-     return res.status(400).send(`Userid is Required`)
+
+      return res.status(400).send(`Userid is Required`)
     }
-      // Checking User is Authorised to Perform Actions or not 
-        const isUserValid = await checkisUserValid(addedby)
+    // Checking User is Authorised to Perform Actions or not 
+    const isUserValid = await checkisUserValid(addedby)
 
     // Validate dashboardcodes as an array
     if (isUserValid) {
@@ -214,14 +224,14 @@ const uploadSchedule = async (req, res) => {
       } catch (err) {
         return res.status(400).json({ error: "Invalid or missing dashboardcodes. It must be a JSON array." });
       }
-  
+
       // Parse and validate the `scheduledon` field
       const scheduledDate = new Date(scheduledon);
       if (isNaN(scheduledDate.getTime())) {
         return res.status(400).json({ error: "Invalid date format for 'scheduledon'." });
       }
-    // console.log("scheduledDate: ",scheduledDate);
-    
+      // console.log("scheduledDate: ",scheduledDate);
+
       // Check if the date is at least 24 hours in the future
       // const currentDate = new Date();
       // const futureThreshold = new Date(currentDate.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
@@ -232,14 +242,14 @@ const uploadSchedule = async (req, res) => {
       // }
       const currentDate = new Date();
       // console.log("currentDate ",currentDate);
-      
+
 
       // Move to the next day at 00:00:00 (midnight)
       const nextDayStart = new Date(currentDate);
       nextDayStart.setDate(nextDayStart.getDate() + 1);
       nextDayStart.setHours(0, 0, 0, 0); // Set time to midnight
       // console.log("nextDayStart ",nextDayStart);
-      
+
       if (scheduledDate < nextDayStart) {
         return res.status(400).json({
           Error: "Scheduled date must be on the next day or later.",
@@ -249,27 +259,27 @@ const uploadSchedule = async (req, res) => {
       // Validate dealer data
       const isDataValid = await dataValidator(dealerid);
       // console.log(`isDataUploaded: `,isDataValid);
-      if(typeof(isDataValid)==="object"){
+      if (typeof (isDataValid) === "object") {
         return res.status(400).json(isDataValid);
       }
-  
+
       // Insert each dashboardcode into the database
       for (const dashboardcode of parsedDashboardCodes) {
 
-      const isAlreadyScheduled = await checkisAlreadyScheduled(dashboardcode,brandid,dealerid)
-      //  console.log(`already scheduled: `,isAlreadyScheduled);
-       if(!isAlreadyScheduled){
-        return res.status(400).json({message:`Dashboard Already Scheduled`})
-       }
-       if (dashboardcode == 15) {
-        const isGroupSettingDone = await checkGroupSetting(dealerid) 
+        const isAlreadyScheduled = await checkisAlreadyScheduled(dashboardcode, brandid, dealerid)
+        //  console.log(`already scheduled: `,isAlreadyScheduled);
+        if (!isAlreadyScheduled) {
+          return res.status(400).json({ message: `Dashboard Already Scheduled` })
+        }
+        if (dashboardcode == 15) {
+          const isGroupSettingDone = await checkGroupSetting(dealerid)
           // console.log(isGroupSettingDone);
-   
-         if(!isGroupSettingDone){
-         return res.status(400).json({message:`Group Setting Not done`})
-       }
-  }
-      const query = ` use [UAD_BI]
+
+          if (!isGroupSettingDone) {
+            return res.status(400).json({ message: `Group Setting Not done` })
+          }
+        }
+        const query = ` use [UAD_BI]
           INSERT INTO SBS_DBS_ScheduledDashboard (Dashboardcode, Brandid, Brand, Dealerid, Dealer, Scheduledon, Addedby, Addedon)
           VALUES (@dashboardcode, @brandid, @brand, @dealerid, @dealer, @scheduledon, @addedby, GETDATE());`;
         await pool.request()
@@ -282,43 +292,43 @@ const uploadSchedule = async (req, res) => {
           .input("addedby", sql.Int, addedby)
           .query(query);
       }
-  
+
       // console.log("Dashboard successfully uploaded.");
       res.status(201).json({ message: "Dashboard Successfully Scheduled" });
     }
-    else{
-      res.status(401).json({message:'You are not Authorised to Schedule any Dashboard'})
+    else {
+      res.status(401).json({ message: 'You are not Authorised to Schedule any Dashboard' })
     }
   } catch (error) {
     console.error("Error uploading schedules:", error.message);
     res.status(500).json({ message: error.message });
   }
 };
-const getBDM = async(req,res)=>{
+const getBDM = async (req, res) => {
   const pool = await getPool2()
-try {
+  try {
     // const {bigint_pk} = req.body
     // const query = `use [z_scope] select bintId_Pk, vcFirstName , vcLastName from AdminMaster_GEN where isBDM = 'y' and bintId_Pk = @bigint_pk`
-      const query= `select bintId_Pk, concat(vcFirstName ,' ', vcLastName) Name from z_scope.dbo.AdminMaster_GEN where isBDM = 'y' or Designation = 5 order by bintId_Pk`
+    const query = `select bintId_Pk, concat(vcFirstName ,' ', vcLastName) Name from z_scope.dbo.AdminMaster_GEN where isBDM = 'y' or Designation = 5 order by bintId_Pk`
     const result = await pool.request().query(query)
     res.status(200).json(result.recordset)
-} catch (error) {
-  res.status(500).send(error.message)
-}
+  } catch (error) {
+    res.status(500).send(error.message)
+  }
 }
 const getRequests = async (req, res) => {
-    try {
-      const {userid} = req.body
-      if(!userid){
-        return res.status(400).json({message:`userid is required`})
-      }
-      const requests = await fetchRequests(userid);
-   
-      res.status(200).json({ Request: requests });
-    } catch (error) {
-      res.status(500).json({ details: error.message });
+  try {
+    const { userid } = req.body
+    if (!userid) {
+      return res.status(400).json({ message: `userid is required` })
     }
-};  
+    const requests = await fetchRequests(userid);
+
+    res.status(200).json({ Request: requests });
+  } catch (error) {
+    res.status(500).json({ details: error.message });
+  }
+};
 const editSchedule = async (req, res) => {
   const pool = await getPool2();
   try {
@@ -353,19 +363,19 @@ const editSchedule = async (req, res) => {
       .input('bintid_pk', sql.Int, bintid_pk)
       .query(query);
     // console.log(result.recordsets);
-    
+
     const scheduleData = result.recordsets[0]?.[0];
     const userData = result.recordsets[1]?.[0];
     //  console.log(scheduleData,userData);
-     
+
     if (!scheduleData || !userData) {
       return res.status(404).json({ message: 'Request or user not found.' });
     }
 
     const { addedby, status } = scheduleData;
     const { designation, isBDM } = userData;
-  // console.log(addedby,status,designation,isBDM);
-  
+    // console.log(addedby,status,designation,isBDM);
+
     if (status !== 0) {
       return res.status(500).json({ message: 'Cannot edit schedule. Data uploading is in progress.' });
     }
@@ -390,27 +400,27 @@ const editSchedule = async (req, res) => {
 
     // Fetch updated requests
     const updatedRequests = await fetchRequests();
-     res.status(200).json({ message: 'Schedule updated successfully.', Requests: updatedRequests });
+    res.status(200).json({ message: 'Schedule updated successfully.', Requests: updatedRequests });
   } catch (error) {
     console.error('Error in editSchedule:', error.message);
     res.status(500).json({ details: error.message });
   }
 };
-const deleteReq = async(req,res)=>{
-try {
+const deleteReq = async (req, res) => {
+  try {
     const pool = await getPool2()
-  const {reqid,bintid_pk} = req.body
-  if(!reqid , !bintid_pk){
-    return res.status(401).json({details:'reqid and userid is required in this request'})
+    const { reqid, bintid_pk } = req.body
+    if (!reqid, !bintid_pk) {
+      return res.status(401).json({ details: 'reqid and userid is required in this request' })
+    }
+    // status = 6 (Marked status = 6 when schedule is deleted explicitly only be done when status = 0)
+    const query = `use UAD_BI update SBS_DBS_ScheduledDashboard set status = 6 , Deletedby = @bintid_pk , Deletedon = GETDATE() where reqid = @reqid`
+    await pool.request().input('reqid', sql.Int, reqid).input('bintid_pk', sql.Int, bintid_pk).query(query)
+    const updatedRequests = await fetchRequests(bintid_pk);
+    res.status(200).json({ message: 'Schedule Deleted successfully.', Requests: updatedRequests.recordset });
+  } catch (error) {
+    res.status(500).json({ details: error.message })
   }
-  // status = 6 (Marked status = 6 when schedule is deleted explicitly only be done when status = 0)
-  const query = `use UAD_BI update SBS_DBS_ScheduledDashboard set status = 6 , Deletedby = @bintid_pk , Deletedon = GETDATE() where reqid = @reqid`
-  await pool.request().input('reqid',sql.Int,reqid).input('bintid_pk',sql.Int,bintid_pk).query(query)
-  const updatedRequests = await fetchRequests(bintid_pk);
-     res.status(200).json({ message: 'Schedule Deleted successfully.', Requests: updatedRequests.recordset });
-} catch (error) {
-  res.status(500).json({details:error.message})
-}
 }
 
 // const fetchRequests = async (userid) => {
@@ -422,7 +432,7 @@ try {
 //      const result2 = await pool.request().query(usertypeQuery)
 //      const isBDM = result2.recordset[0].isBDM
 //      const admin = result2.recordset[0].Designation
-     
+
 //     if (isBDM === 'Y') {
 //       usertype = '0';  // BDM or BDM+Admin
 //     } else if (admin == 5) {
@@ -430,7 +440,7 @@ try {
 //     }
 
 //   console.log(usertype);
-  
+
 //     let query
 //    if (usertype == 0){
 //       query = `
@@ -470,7 +480,7 @@ try {
 //      order by reqid desc`;
 //     }
 //     // console.log(query);
-    
+
 //      const result = await pool.request().query(query);
 //     return result.recordset;
 //   } catch (error) {
@@ -494,7 +504,7 @@ const fetchRequests = async (userid) => {
     const result2 = await pool.request().query(usertypeQuery);
     const isBDM = result2.recordset[0].isBDM;
     const admin = result2.recordset[0].Designation;
-    
+
     if (isBDM === 'Y') {
       usertype = '0'; //  BDM or BDM + Admin
     } else if (admin == 5) {
@@ -544,7 +554,7 @@ const fetchRequests = async (userid) => {
 
     //  Step 3: Execute query and return result
     const result = await pool.request().query(query);
-    
+
     return result.recordset;
 
   } catch (error) {
@@ -553,36 +563,36 @@ const fetchRequests = async (userid) => {
   }
 };
 
-const changeLog = async(req,res)=>{
-try {
+const changeLog = async (req, res) => {
+  try {
     const pool = await getPool2()
-    const {dashboardcode , workspaceid , refbrandid , refdealerid ,changeby , requestby , requeston , url , remarks} = req.body
-    if(!dashboardcode || !workspaceid || !refbrandid || !refdealerid || !changeby || !requestby || !requeston || !url || !remarks){
-      return res.status(400).json({message:`All fields are required`})
+    const { dashboardcode, workspaceid, refbrandid, refdealerid, changeby, requestby, requeston, url, remarks } = req.body
+    if (!dashboardcode || !workspaceid || !refbrandid || !refdealerid || !changeby || !requestby || !requeston || !url || !remarks) {
+      return res.status(400).json({ message: `All fields are required` })
     }
     const query = `insert into UAD_BI..SBS_DBS_ChangeLog(dashboardcode,workspaceid,refbrandid, refdealerid,changedby,changedon,requestby,requeston,url,remarks)
                   values(@dashboardcode,@workspaceid,@refbrandid,@refdealerid,@changeby,GETDATE(),@requestby,@requeston,@url,@remarks)`
-    await pool.request().input('dashboardcode',sql.TinyInt,dashboardcode)
-                                      .input('workspaceid',sql.TinyInt,workspaceid)
-                                      .input('refbrandid',sql.SmallInt,refbrandid)
-                                      .input('refdealerid',sql.Int,refdealerid)
-                                      .input('changeby',sql.Int,changeby)
-                                      .input('requestby',sql.Int,requestby)
-                                      .input('requeston',sql.DateTime,requeston)
-                                      .input('url',sql.NVarChar,url)
-                                      .input('remarks',sql.VarChar,remarks)
-                                      .query(query)
-        res.status(201).json({message:"Dashboard Changes are Successfully Tracked"})
-} catch (error) {
-   res.status(500).json({Error:error.message});
-  console.log(error.message);
-  
+    await pool.request().input('dashboardcode', sql.TinyInt, dashboardcode)
+      .input('workspaceid', sql.TinyInt, workspaceid)
+      .input('refbrandid', sql.SmallInt, refbrandid)
+      .input('refdealerid', sql.Int, refdealerid)
+      .input('changeby', sql.Int, changeby)
+      .input('requestby', sql.Int, requestby)
+      .input('requeston', sql.DateTime, requeston)
+      .input('url', sql.NVarChar, url)
+      .input('remarks', sql.VarChar, remarks)
+      .query(query)
+    res.status(201).json({ message: "Dashboard Changes are Successfully Tracked" })
+  } catch (error) {
+    res.status(500).json({ Error: error.message });
+    console.log(error.message);
+
+  }
 }
-}
-const changelogView = async(req,res)=>{
-    try {
-      const pool  = await getPool2()
-      const query = ` use [UAD_BI]
+const changelogView = async (req, res) => {
+  try {
+    const pool = await getPool2()
+    const query = ` use [UAD_BI]
                       SELECT DISTINCT dm.Dashboard,  wm.Workspace,  li.Brand,  li.Dealer,  CONCAT(adm.vcFirstName, ' ', adm.vcLastName) AS ChangedBy,   cl.ChangedOn, am.Name AS RequestedBy,   cl.RequestOn,   cl.Url , cl.remarks 
                       FROM SBS_DBS_ChangeLog cl  
                       LEFT JOIN z_scope.dbo.locationinfo li ON li.dealerid = cl.refdealerid  
@@ -591,14 +601,14 @@ const changelogView = async(req,res)=>{
                       LEFT JOIN SBS_DBS_WorkspaceMaster wm ON wm.WorkspaceID = cl.Workspaceid  
                       LEFT JOIN z_scope.dbo.AdminMaster_GEN adm ON adm.bintId_Pk = cl.Changedby  
                       GROUP BY  dm.Dashboard,  wm.Workspace,  li.Brand,  li.Dealer,  adm.vcFirstName,  adm.vcLastName,  cl.ChangedOn,  am.Name,  cl.RequestOn,  cl.Url , cl.remarks;`
-  
-      const result = await pool.request().query(query)
-      res.status(200).json({Data:result.recordset})
-    } catch (error) {
-       res.status(500).json(error.message)    
-      }
-  
+
+    const result = await pool.request().query(query)
+    res.status(200).json({ Data: result.recordset })
+  } catch (error) {
+    res.status(500).json(error.message)
   }
+
+}
 const newDashboardSchedule = async (req, res) => {
   try {
     const pool = await getPool2();
@@ -617,7 +627,7 @@ const newDashboardSchedule = async (req, res) => {
 
     // Validate `dashboardcodes` as an array
     if (!Array.isArray(dashboardcodes) ||
-     dashboardcodes.length === 0) {
+      dashboardcodes.length === 0) {
       return res.status(400).json({ error: "Invalid or missing dashboardcodes. It must be a non-empty array." });
     }
 
@@ -653,9 +663,9 @@ const newDashboardSchedule = async (req, res) => {
       }
       //Checking Mapping Exists or not
 
-      let isMappingExists = checkisMappingExists(dashboardcode,dealerid)
-      if(!isMappingExists){
-        return res.status(400).json({message:`Mapping Already Exists`})
+      let isMappingExists = checkisMappingExists(dashboardcode, dealerid)
+      if (!isMappingExists) {
+        return res.status(400).json({ message: `Mapping Already Exists` })
       }
 
       // Insert into SBS_DBS_DashboardDealerMapping
@@ -717,37 +727,37 @@ const newDashboardSchedule = async (req, res) => {
     return res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
-const requestNewDashboard = async (req,res)=>{
- try {
-   const pool = await getPool2()
-   const {dealerid} = req.body
-   const query = `select tcode , Dashboard from z_scope.dbo.DB_DashboardMaster where tcode not in (
+const requestNewDashboard = async (req, res) => {
+  try {
+    const pool = await getPool2()
+    const { dealerid } = req.body
+    const query = `select tcode , Dashboard from z_scope.dbo.DB_DashboardMaster where tcode not in (
                    select dm.tCode  from DB_DashboardLocMapping dlm                  
  				          join z_scope.dbo.LocationInfo li on li.LocationID = dlm.LocationID
                   join z_scope.dbo.DB_DashboardMaster dm on dm.tCode = dlm.DashboardCode
                   where dealerid = @dealerid and dlm.Status = 1 and li.OgsStatus = 1 and li.Status = 1 and dm.Status = 1
                   group by dm.tcode , dm.Dashboard
                  ) and status = 1`
-       const result =  await pool.request().input('dealerid',sql.Int,dealerid).query(query)
-         res.status(200).json(result.recordset)
- }  
+    const result = await pool.request().input('dealerid', sql.Int, dealerid).query(query)
+    res.status(200).json(result.recordset)
+  }
   catch (error) {
-   res.status(500).json(error.message)
- }
+    res.status(500).json(error.message)
+  }
 }
-const requestBy = async(req,res)=>{
+const requestBy = async (req, res) => {
   try {
     const pool = await getPool2()
     const query = `select * from UAD_BI..SBS_DBS_AdminMaster`
     const result = await pool.request().query(query)
-    res.status(200).json({Data:result.recordset})
+    res.status(200).json({ Data: result.recordset })
   }
-   catch (error) {
-    res.status(500).json({message:error.message})
+  catch (error) {
+    res.status(500).json({ message: error.message })
   }
 }
-const newDashboardView = async(req,res)=>{
-try {
+const newDashboardView = async (req, res) => {
+  try {
     const pool = await getPool2()
     const query = `use [UAD_BI] select distinct  nrt.id,  li.brand , li.dealer , dm.dashboard ,concat(amg.vcFirstName,' ',amg.vcLastName) as Addedby,nrt.addedon  from UAD_BI..SBS_DBS_newrequesttracker nrt
                     join locationinfo li on li.DealerID = nrt.dealerid and li.BrandID = nrt.brandid
@@ -755,97 +765,97 @@ try {
                     join z_scope.dbo.AdminMaster_GEN amg on amg.bintId_Pk =  nrt.addedby
                     group by nrt.id,  li.brand , li.dealer , dm.dashboard , nrt.addedon ,concat(amg.vcFirstName,' ',amg.vcLastName)`
     const result = await pool.request().query(query)
-    res.status(200).json({Data:result.recordset})
-} catch (error) {
-  res.status(500).json({error:error.message})
-}
+    res.status(200).json({ Data: result.recordset })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
 }
 //  '0,30 0-9 * * *'  for every 30 minutes interval between 12 midnight to 9 am 
 async function scheduleTask() {
   // cron.schedule('*/15 * * * *', async () => { 
-    console.log("Running scheduler every 15 minutes")
-    try {
-      const pool = await getPool2()
-      // Fetch tasks to be executed (status = 0 means pending)
-      const query = `use [UAD_BI]
+  console.log("Running scheduler every 15 minutes")
+  try {
+    const pool = await getPool2()
+    // Fetch tasks to be executed (status = 0 means pending)
+    const query = `use [UAD_BI]
                      SELECT TOP 5  reqid, dashboardcode, brand, brandid, dealer, dealerid, scheduledon
                      FROM SBS_DBS_ScheduledDashboard 
                      WHERE status = 0 and dateadd(hour,-12,ScheduledOn) <= GETDATE() and dashboardcode not in (13) order by ScheduledOn`
-      const result = await pool.request().query(query)
-      const tasks = result.recordset
+    const result = await pool.request().query(query)
+    const tasks = result.recordset
 
-      if (!tasks.length) {
-        console.log(`No requests scheduled in the last 15 minutes.`)
-        return
-      }
+    if (!tasks.length) {
+      console.log(`No requests scheduled in the last 15 minutes.`)
+      return
+    }
 
-      // Process all tasks in parallel
-      const taskPromises = tasks.map(async (task) => {
-        // console.log(`Processing task for dashboardcode: ${task.dashboardcode}, dealer: ${task.dealer}, scheduledon: ${task.scheduledon}`)
+    // Process all tasks in parallel
+    const taskPromises = tasks.map(async (task) => {
+      // console.log(`Processing task for dashboardcode: ${task.dashboardcode}, dealer: ${task.dealer}, scheduledon: ${task.scheduledon}`)
 
-        try {
-          // Mark status as "SP IS RUNNING In-Progress" (1)
-          await pool.request()
-            .input('reqid', sql.Int, task.reqid)
-            .query(`use [UAD_BI] UPDATE SBS_DBS_ScheduledDashboard SET status = 1 WHERE reqid = @reqid`)
+      try {
+        // Mark status as "SP IS RUNNING In-Progress" (1)
+        await pool.request()
+          .input('reqid', sql.Int, task.reqid)
+          .query(`use [UAD_BI] UPDATE SBS_DBS_ScheduledDashboard SET status = 1 WHERE reqid = @reqid`)
 
-          // Call refresh functions asynchronously
-          switch (task.dashboardcode) {
-            case 7: return refreshPPNI(task.brandid, task.dealerid, task.reqid)
-            case 8: return refreshTOPS(task.dealerid, task.reqid)
-            case 9: return refreshSpecialList(task.reqid)
-            case 12: return refreshBenchmarking(task.dealerid, task.reqid)
-            // case 13: return refreshSI(task.dealerid,task.reqid)
-            // case 14: return refreshGSI(task.brand, task.dealer, task.brandid, task.dealerid, task.reqid)
-            case 15: return refreshCID(task.dealerid, task.reqid)
-            case 17: return refreshGainerMini(task.reqid)
-            default:
+        // Call refresh functions asynchronously
+        switch (task.dashboardcode) {
+          case 7: return refreshPPNI(task.brandid, task.dealerid, task.reqid)
+          case 8: return refreshTOPS(task.dealerid, task.reqid)
+          case 9: return refreshSpecialList(task.reqid)
+          case 12: return refreshBenchmarking(task.dealerid, task.reqid)
+          // case 13: return refreshSI(task.dealerid,task.reqid)
+          // case 14: return refreshGSI(task.brand, task.dealer, task.brandid, task.dealerid, task.reqid)
+          case 15: return refreshCID(task.dealerid, task.reqid)
+          case 17: return refreshGainerMini(task.reqid)
+          default:
             console.error(`Invalid dashboardCode: ${task.dashboardcode} for reqid: ${task.reqid}`)
             return null;
-          }
-        } catch (error) {
-          console.error(`Error processing dashboardCode ${task.dashboardcode} for reqid: ${task.reqid}:`, error.message)
         }
-      })
+      } catch (error) {
+        console.error(`Error processing dashboardCode ${task.dashboardcode} for reqid: ${task.reqid}:`, error.message)
+      }
+    })
 
-      // Wait for all tasks to push queries to the DB asynchronously
-      await Promise.allSettled(taskPromises)
+    // Wait for all tasks to push queries to the DB asynchronously
+    await Promise.allSettled(taskPromises)
 
-      console.log("All scheduled tasks processed asynchronously")
-    } catch (error) {
-      console.error("Error processing scheduled tasks:", error.message)
-    }
+    console.log("All scheduled tasks processed asynchronously")
+  } catch (error) {
+    console.error("Error processing scheduled tasks:", error.message)
+  }
   // })
 }
-const countView =  async(req,res)=>{
+const countView = async (req, res) => {
   try {
     const pool = await getPool2()
-    const query =`SELECT 
+    const query = `SELECT 
       COUNT(reqid) AS Total,
       SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) AS InProgress,
       SUM(CASE WHEN status IN (2, 4) THEN 1 ELSE 0 END) AS Failed,
       SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) AS DataRefreshed,
       SUM(CASE WHEN status = 5 THEN 1 ELSE 0 END) AS DashboardRefreshed
       FROM UAD_BI..SBS_DBS_scheduledDashboard;`
-  
-      const result = await pool.request().query(query)
-      res.status(200).json({data:result.recordset})
+
+    const result = await pool.request().query(query)
+    res.status(200).json({ data: result.recordset })
   } catch (error) {
-    res.status(500).json({Error:error.message})
+    res.status(500).json({ Error: error.message })
   }
 }
-const statusTimelime = async(req,res)=>{
+const statusTimelime = async (req, res) => {
   try {
     const pool = await getPool2()
-    const {reqid} = req.body
-    if(!reqid){
+    const { reqid } = req.body
+    if (!reqid) {
       return res.status(400).send(`Reqid is Required`)
     }
     const query = `use [UAD_BI] select newstatus , changedat from statuschangelog where reqid = @reqid`
-    const result = await pool.request().input('reqid',sql.Int,reqid).query(query)
-    res.status(200).json({data:result.recordset})
+    const result = await pool.request().input('reqid', sql.Int, reqid).query(query)
+    res.status(200).json({ data: result.recordset })
   } catch (error) {
-    res.status(500).json({Error:error.message})
+    res.status(500).json({ Error: error.message })
   }
 }
 
@@ -859,10 +869,10 @@ const statusTimelime = async(req,res)=>{
 //       const year = today.getMonth() === 0 ? today.getFullYear() - 1 : today.getFullYear();
 //       const month = today.getMonth() === 0 ? 11 : today.getMonth() - 1;
 //       const firstDayLastMonth = new Date(year, month, 1);
-      
+
 //       // Format date properly in YYYY-MM-DD format
 //       const date = firstDayLastMonth.toLocaleDateString('en-CA'); // en-CA gives YYYY-MM-DD format
-      
+
 //       // console.log(date); // Correctly outputs "2025-01-01"
 //       // Fetch tasks to be executed (status = 0 means pending)
 //       let query = `use UAD_BI_SI;
@@ -872,11 +882,11 @@ const statusTimelime = async(req,res)=>{
 //         query = `use UAD_BI 
 //                 Update SBS_DBS_ScheduledDashboard set Status = 3 where reqid in (select reqid from si_dealer_list where status = 1) and status = 1`
 //       await pool.request().query(query)
-      
+
 //     }
 //     catch(error){
 //       console.log("Error in SI Scheduler",error.message);
-      
+
 //         throw new error
 //     }
 //   })
@@ -899,7 +909,7 @@ const statusTimelime = async(req,res)=>{
 //         return
 //       }
 
-    
+
 //         // console.log(`Processing task for dashboardcode: ${task.dashboardcode}, dealer: ${task.dealer}, scheduledon: ${task.scheduledon}`)
 
 //         try {
@@ -923,8 +933,8 @@ const statusTimelime = async(req,res)=>{
 //   })
 // }
 async function siRefresh() {
-  cron.schedule('*/30 * * * *', async () => { 
-    console.log("Running SI scheduler every 30 minutes");
+  // cron.schedule('*/30 * * * *', async () => {
+    // console.log("Running SI scheduler every 30 minutes");
 
     try {
       const pool = await getPool2();
@@ -936,8 +946,10 @@ async function siRefresh() {
         AND DATEADD(hour, -10, scheduledon) <= GETDATE() 
         AND dashboardcode = 13
         ORDER BY scheduledon`;
-      
+
       const task = (await pool.request().query(query)).recordset[0];
+      // console.log(task);
+      
 
       if (!task) {
         console.log("No SI Dashboard scheduled in the last 30 minutes.");
@@ -951,14 +963,14 @@ async function siRefresh() {
 
       console.log(`Reqid : ${task.reqid} , Dealerid : ${task.dealerid}`);
       // console.log(`Calling refreshSI`);
-      
+
       await refreshSI(task.dealerid, task.reqid);
 
       console.log("✅ SI task processed successfully");
     } catch (error) {
       console.error("❌ Error processing SI scheduled task:", error.message);
     }
-  });
+  // });
 }
 
-export {siRefresh,getBrandByUser,getDealerByUser,getDashboardbyDealer,uploadSchedule,getRequests,getBDM,editSchedule,scheduleTask,deleteReq,changeLog,changelogView,requestNewDashboard,newDashboardSchedule,requestBy,newDashboardView,countView,statusTimelime}
+export { siRefresh, getBrandByUser, getDealerByUser, getDashboardbyDealer, uploadSchedule, getRequests, getBDM, editSchedule, scheduleTask, deleteReq, changeLog, changelogView, requestNewDashboard, newDashboardSchedule, requestBy, newDashboardView, countView, statusTimelime }

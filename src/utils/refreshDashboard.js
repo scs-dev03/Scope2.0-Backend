@@ -56,13 +56,13 @@ const refreshSI = async (dealerid, reqid) => {
     const month = today.getMonth() === 0 ? 11 : today.getMonth() - 1;
     const date = new Date(year, month, 1).toLocaleDateString('en-CA');
 
-    let query = `exec [UAD_BI_SI].[dbo].uad_si_report_3 '${dealerid}','${date}'`;
+    let query = `exec [UAD_BI_SI].[dbo].uad_si_report_GT '${dealerid}','${date}'`;
     const result = await pool.request().query(query);
 
     console.log(`Data Refreshing SI for reqid: ${reqid} at ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`);
 
     const record = result.recordset[0];
-    const Check = isSIDataRefreshed(record);
+    const Check = isDataRefreshed(record);
     console.log("SP Output:", record, "| isDataRefreshed:", Check);
 
     query = `use [UAD_BI] Update SBS_DBS_ScheduledDashboard set status = @status where reqid = @reqid`;
