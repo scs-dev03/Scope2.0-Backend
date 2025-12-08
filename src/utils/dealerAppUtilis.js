@@ -1,9 +1,9 @@
-import { getPool1 } from "../db/db.js"
+import { getPool2 } from "../db/db.js"
 import sql from 'mssql'
 
 const ErrorLog = async (ModuleName, Error, userId) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool2()
         const query = `use z_scope
         Insert INTO App_ErrorLogging(ModuleName , Error , UserId)
         Values (@Module , @Error , @UserId)`

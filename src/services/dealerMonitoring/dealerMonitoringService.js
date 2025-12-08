@@ -63,7 +63,7 @@ const reservedForVehicle = async (dealerid, locationid, partnumber) => {
 
 const groupStock = async (brandid, dealerid, locationid, partnumber) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool2()
     const query = `
         DECLARE
         @InputPart VARCHAR(40) = '${partnumber}',
@@ -1391,7 +1391,7 @@ const vehicleSearchPagination = async (page, pageSize, dealerId, vehicleNo, allT
 
 const vehicleSearchlogsService = async (moduleName, event, details, userid) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool2()
     const query = `use z_scope Insert into App_Logging(ModuleName,Event,Details,CreatedBy)
                     OUTPUT inserted.ModuleName, inserted.Event, inserted.Details, inserted.CreatedBy
                     values(@ModuleName,@Event,@Details,@CreatedBy)`
