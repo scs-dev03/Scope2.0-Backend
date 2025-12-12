@@ -1,4 +1,4 @@
-import { getPool1 , getPool2 } from '../db/db.js'
+import { getPool1, getPool2 } from '../db/db.js'
 import sql from 'mssql'
 
 import fs from 'fs'
@@ -32,16 +32,16 @@ const newRemark = async (req, res) => {
         try {
             const query = `select * from UAD_VON..UAD_VON_RemarksMaster where remark = '${remark}' and usertype = '${usertype}'`
             const result = await pool.request().query(query)
-              // If remark already exists, return error
-             if (result.recordset.length > 0) {
-        return res.status(400).json({ message: "Remark already exists" });
-      }
+            // If remark already exists, return error
+            if (result.recordset.length > 0) {
+                return res.status(400).json({ message: "Remark already exists" });
+            }
         } catch (error) {
             res.status(500).json({
-                Error:error.message
+                Error: error.message
             })
         }
-        
+
         const query = ` use [UAD_VON]
         INSERT INTO UAD_VON_RemarksMaster (remark, brandid, addedby, usertype)
         SELECT 
@@ -100,12 +100,18 @@ const userView = async (req, res) => {
         if (!dealerid && !brandid) {
             return res.status(400).json({ Error: `Dealerid and Brandid is a required Parameter` })
         }
-        if(partnumber){
-        const Check = await maxpartmapping(partnumber,dealerid,locationid)
-        if(Check == false){
-            return res.status(400).json({message:`No Sales in 12 Month for this part`})
+        if (partnumber) {
+            const Check = await maxpartmapping(partnumber, dealerid, locationid)
+            if (Check == false) {
+                return res.status(400).json({ message: `No Sales in 12 Month for this part` })
+            }
+            const flagCheck = await partflagCheck(partnumber, dealerid, locationid, flag)
+            // console.log(flagCheck);
+            if (flagCheck == false) {
+                return res.status(400).json({ message: `Please choose correct filter` })
+            }
+
         }
-    }
         const query = `exec [z_scope].dbo.GetMAXData @brandid, @dealerid , @r1, @r2, @l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@parttype;`
 
         if (!partnumber && !locationid) {
@@ -143,7 +149,7 @@ const userFeedbacklog = async (req, res) => {
         if (!brandid || !dealerid || !locationid || !addedby || !partid || max == null || proposedqty == null || !remarkid) {
             return res.status(400).json({ Error: `All Fields are required` })
         }
-        const partCheck = await partBrandCheck(dealerid, locationid, partid)        
+        const partCheck = await partBrandCheck(dealerid, locationid, partid)
         if (!partCheck) {
             return res.status(400).json({ message: `PartID is Invalid Not in Max` })
         }
@@ -186,6 +192,7 @@ const userFeedbacklog = async (req, res) => {
         } catch (error) {
             return res.status(500).json({ Error: error.message, Error: `Error in Finding Previous Feedback` })
         }
+        // console.log(remarkid);
 
         const query = `
                    Insert into  ${dynamicTable} (brandid , dealerid , locationid , PartID , LatestPartID , MaxValue , UserID , UserFBRemarkID ,Customrem, ProposedQty , FeedbackDate , PreviousFBID)
@@ -304,12 +311,17 @@ const adminView = async (req, res) => {
         if (!brandid || !dealerid || !pageno || !pagesize) {
             return res.status(400).json({ Error: `Brandid and Dealerid are required Parameter` })
         }
-        if(partnumber){
-        const Check = await maxpartmapping(partnumber,dealerid,locationid)
-        if(Check == false){
-            return res.status(400).json({message:`No Sales in 12 Month for this part`})
+        if (partnumber) {
+            const Check = await maxpartmapping(partnumber, dealerid, locationid)
+            if (Check == false) {
+                return res.status(400).json({ message: `No Sales in 12 Month for this part` })
+            }
+            const flagCheck = await partflagCheck(partnumber, dealerid, locationid, flag)
+            // console.log(flagCheck);
+            if (flagCheck == false) {
+                return res.status(400).json({ message: `Please choose correct filter` })
+            }
         }
-    }
         // const query = `exec [z_scope].dbo.GetMAXDataAdmin @brandid,@dealerid , @r1, @r2,@l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@status,@parttype;`
         // console.log(query);
         const query = `use z_scope EXEC sp_MAXAdminView @brandid ,@dealerid ,@locationid ,@seasonalid ,@natureid ,@modelid,@PartNumber,@r1 ,@r2,@l1,@l2 ,@MaxValueFlag,@parttype,@pageno,@pagesize;`
@@ -349,8 +361,8 @@ const adminView = async (req, res) => {
 const adminFeedbackLog = async (req, res) => {
     try {
         const pool = await getPool2()
-        const { brandid, dealerid, locationid, feedbackid, AdminRemark, customRem, ApprovedQty ,addedby} = req.body
-        if ((!brandid || !dealerid || !locationid || !AdminRemark || !addedby || !ApprovedQty) || (feedbackid == null)) {
+        const { brandid, dealerid, locationid, feedbackid, AdminRemark, customRem, ApprovedQty, addedby } = req.body
+        if ((!brandid || !dealerid || !locationid || !AdminRemark || !addedby) || (feedbackid == null) || (ApprovedQty == null)) {
             return res.status(400).json({ message: `All Fields are required and Feedbackid cannot be null` })
         }
 
@@ -373,7 +385,7 @@ const adminFeedbackLog = async (req, res) => {
                 .query(previousAdminFBQuery);
             // console.log(previousAdminFBResult);
 
-            PreviousAdminFBID = previousAdminFBResult.recordset.length > 0 ? previousAdminFBResult.recordset[0].AdminFBID : null;
+            PreviousAdminFBID = previousAdminFBResult.recordset.length > 0 ? previousAdminFBResult.recordset[0].PreviousAdminFBID : null;
             // console.log(PreviousAdminFBID);
 
         } catch (error) {
@@ -427,7 +439,7 @@ const partFamily = async (req, res) => {
         //                 select pm.partnumber1, (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END)as LatestPartNumber , pm.partdesc, pm.category,pm.landedcost from z_scope.dbo.Substitution_Master sm
         //                 join z_scope.dbo.part_master pm on pm.brandid = sm.brandid and sm.partnumber = pm.partnumber
         //                 where sm.subpartnumber = '${partnumber}' and sm.brandid = ${brandid}`
-                  const query =     ` DECLARE 
+        const query = ` DECLARE 
                         @InputPart    VARCHAR(40) = '${partnumber}',   -- ← your input part
                         @InputBrandID INT         = ${brandid};               -- ← your input brand
                     
@@ -508,11 +520,11 @@ const partFamily = async (req, res) => {
                     
                     -- 5) Clean up
                     DROP TABLE #PartFamily;`
-                    
+
         const result = await pool.request()
-        .input('partnumber', sql.VarChar, partnumber)
-        .input('brandid', sql.Int, brandid)
-        .query(query)
+            .input('partnumber', sql.VarChar, partnumber)
+            .input('brandid', sql.Int, brandid)
+            .query(query)
         // console.log(result.recordset);
 
         res.status(200).json({ Data: result.recordset })
@@ -559,7 +571,7 @@ const partFamilySale = async (req, res) => {
         if (!partnumber || !brandid || !dealerid || !locationid) {
             return res.status(400).json({ message: `All fields are required` })
         }
-        const data = await partfamilySaleservice(brandid,dealerid,locationid,partnumber)
+        const data = await partfamilySaleservice(brandid, dealerid, locationid, partnumber)
         res.status(200).json({ Data: data.recordset })
     } catch (error) {
         res.status(500).json({ Error: error.message })
@@ -637,12 +649,14 @@ const adminPendingView = async (req, res) => {
         if (!brandid) {
             return res.status(400).json({ message: `Brandid is required` });
         }
-        if(partnumber){
-        const Check = await maxpartmapping(partnumber,dealerid,locationid)
-        if(Check == false){
-            return res.status(400).json({message:`No Sales in 12 Month for this part`})
+        if (partnumber) {
+            const Check = await maxpartmapping(partnumber, dealerid, locationid)
+            // console.log(Check);
+
+            if (Check == false) {
+                return res.status(400).json({ message: `No Sales in 12 Month for this part` })
+            }
         }
-    }
         const query = `
             USE [UAD_VON]
             EXEC sp_GetAdminView 
@@ -687,7 +701,7 @@ const adminPendingView = async (req, res) => {
 
 const dealerUpload = async (req, res) => {
     let transaction; // Declare transaction outside try block
-    const {addedby} = req.body 
+    const { addedby } = req.body
 
     try {
         const pool = await getPool2();
@@ -698,8 +712,8 @@ const dealerUpload = async (req, res) => {
         }
         // console.log(req.file.path);
 
-        let {headers,data} = await readExcel(req.file.path);
-        // console.log(`data` , data[0]);
+        let { headers, data } = await readExcel(req.file.path);
+        // console.log(`data` , data);
         // console.log(headers)
         fs.unlinkSync(req.file.path); // Delete uploaded file after processing
 
@@ -711,21 +725,21 @@ const dealerUpload = async (req, res) => {
             "partnumber",
             "UserRemark",
             "ProposedQty"
-          ];
-          
+        ];
+
 
         // ✅ Check for required headers
-            // const uploadedHeaders = Object.keys(data[0] || {});
-            // console.log(uploadedHeaders);
-            const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
-            // console.log(missingHeaders);
-            
-            if (missingHeaders.length > 0) {
-              return res.status(400).json({
+        // const uploadedHeaders = Object.keys(data[0] || {});
+        // console.log(uploadedHeaders);
+        const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
+        // console.log(missingHeaders);
+
+        if (missingHeaders.length > 0) {
+            return res.status(400).json({
                 message: "Missing headers or data",
                 missingHeaders
-              });
-            }
+            });
+        }
 
         const cleanedData = data
             .filter(item => item.UserRemark !== null && item.ProposedQty !== null && item.ProposedQty !== null && item.ProposedQty !== undefined)
@@ -738,8 +752,8 @@ const dealerUpload = async (req, res) => {
                 UserRemark,
                 ProposedQty
             }));
-    //  console.log(cleanedData[0]);
-     
+        //  console.log(cleanedData[0]);
+
         // Fetch the brandid and dealerid for a given brand and dealer if needed
         const brand = cleanedData[0].Brand;
         const dealer = cleanedData[0].Dealer;
@@ -751,17 +765,18 @@ const dealerUpload = async (req, res) => {
                     WHERE brand LIKE '${brand}' AND dealer LIKE '${dealer}' AND location LIKE '${location}'`;
 
         const resultIds = await pool.request().query(queryIds);
-        const { brandid, dealerid , locationid } = resultIds.recordset[0];
+        const { brandid, dealerid, locationid } = resultIds.recordset[0];
         // console.log(brandid, dealerid , locationid);
-        
+
         const partidpartnumbermapping = [];
 
-        const query = `select  partid , partnumber from z_scope..Stockable_Nonstockable_TD001_${dealerid} where Locationid = ${locationid} and Stockdate = (select MAX(stockdate) from Stockable_Nonstockable_TD001_${dealerid})`;
-        
+        const query = `select  partid , partnumber from z_scope..Stockable_Nonstockable_TD001_${dealerid} where Locationid = ${locationid} and addedby != 7 and Stockdate = (select MAX(stockdate) from z_scope..Stockable_Nonstockable_TD001_${dealerid} where Locationid = ${locationid} and addedby != 7)`;
+        // console.log(query);
+
         const partidpartnumberresult = await pool.request().query(query);
         // console.log(partidpartnumberresult);
-        
-        
+
+
         if (partidpartnumberresult.recordset.length > 0) {
             partidpartnumbermapping.push(...partidpartnumberresult.recordset);
         }
@@ -841,7 +856,7 @@ const dealerUpload = async (req, res) => {
 
         // Get location IDs for each distinct location
         const locationResults = [];
-        let locResult   
+        let locResult
         for (const loc of distinctLocations) {
             const queryLocation = `
     SELECT locationid 
@@ -850,7 +865,7 @@ const dealerUpload = async (req, res) => {
       AND dealerid = '${dealerid}'
       AND location LIKE '${loc}'
   `;
-             locResult = await pool.request().query(queryLocation);
+            locResult = await pool.request().query(queryLocation);
             if (locResult.recordset.length) {
                 locationResults.push({
                     location: loc,
@@ -865,7 +880,7 @@ const dealerUpload = async (req, res) => {
 
         // console.log(locResult.recordset[0].locationid);
         const latestPartIDs = [];
-        
+
         // const queryLatestPartID = `SELECT partid, subpartid FROM z_scope..Substitution_Master WHERE brandid = ${brandResults[0].brandid}`;
         // const queryLatestPartID = `
         // select partid , partnumber1
@@ -875,22 +890,22 @@ const dealerUpload = async (req, res) => {
         // join LocationInfo li on li.LocationID = sn.Locationid
         // left join Substitution_Master sm on sm.partnumber1 = sn.partnumber1 and li.BrandID = sm.brandid
         // where sn.Stockdate = (select MAX(Stockdate) from Stockable_Nonstockable_TD001_${dealerResults[0].dealerid}) and sn.Locationid = ${locResult.recordset[0].locationid}) and brandid = ${brandResults[0].brandid}`
-        
+
         const queryLatestPartID = `
         WITH LatestParts AS (
   SELECT
     sn.partnumber1,
     COALESCE(sm.subpartnumber, sn.partnumber1) AS LatestPartno,
     li.BrandID
-  FROM Stockable_Nonstockable_TD001_${dealerResults[0].dealerid} AS sn
-  JOIN LocationInfo     AS li
+  FROM z_scope..Stockable_Nonstockable_TD001_${dealerResults[0].dealerid} AS sn
+  JOIN z_scope..LocationInfo     AS li
     ON li.LocationID = sn.LocationID
-  LEFT JOIN Substitution_Master AS sm
+  LEFT JOIN z_scope..Substitution_Master AS sm
     ON sm.partnumber1 = sn.partnumber1
    AND sm.brandid     = li.BrandID
   WHERE sn.Stockdate = (
           SELECT MAX(Stockdate)
-            FROM Stockable_Nonstockable_TD001_${dealerResults[0].dealerid}
+            FROM z_scope..Stockable_Nonstockable_TD001_${dealerResults[0].dealerid}
         )
     AND sn.LocationID = ${locResult.recordset[0].locationid}
 )
@@ -901,11 +916,11 @@ SELECT
   pm2.partid    AS LatestPartID
 FROM LatestParts AS lp
 -- join to get the original PartID
-JOIN Part_Master AS pm1
+JOIN z_scope..Part_Master AS pm1
   ON pm1.brandid      = lp.BrandID
  AND pm1.partnumber1  = lp.partnumber1
 -- join to get the substituted/latest PartID
-LEFT JOIN Part_Master AS pm2
+LEFT JOIN z_scope..Part_Master AS pm2
   ON pm2.brandid      = lp.BrandID
  AND pm2.partnumber1  = lp.LatestPartno;
         `
@@ -921,7 +936,7 @@ LEFT JOIN Part_Master AS pm2
             });
         }
         // console.log(latestPartIDs);
-        
+
         // Inside "Get previousFBIDs" section
         const previousFBIDs = [];
 
@@ -963,13 +978,15 @@ LEFT JOIN Part_Master AS pm2
         const queryMaxValue = `
     SELECT partid, locationid, maxvalue 
     FROM ${maxTable} 
-    WHERE locationid IN (${locationResults.map(l => l.locationid).join(',')})
+    WHERE locationid IN (${locationResults.map(l => l.locationid).join(',')}) and addedby != 7
     AND stockdate = (
         SELECT MAX(stockdate)  
         FROM ${maxTable}  
-        WHERE locationid IN (${locationResults.map(l => l.locationid).join(',')})
+        WHERE locationid IN (${locationResults.map(l => l.locationid).join(',')} ) and  addedby != 7
     )
 `;
+        // console.log(queryMaxValue);
+
 
         const maxResult = await pool.request().query(queryMaxValue);
 
@@ -984,16 +1001,19 @@ LEFT JOIN Part_Master AS pm2
         // console.log(maxValueMapping);
 
         // console.log("PreviousFBIDs:", previousFBIDs);
-        const UserID = addedby; 
+        const UserID = addedby;
         // const UserFBRemarkID = 1; // Static feedback remark ID
-    // Fetch remark mappings
-    const remarkQuery = `SELECT RemarkID, Remark as RemarkName FROM UAD_VON..UAD_VON_RemarksMaster where usertype = 'U' and brandid = ${brandResults[0].brandid}`;
-    const remarkResult = await pool.request().query(remarkQuery);
+        // Fetch remark mappings
+        const remarkQuery = `SELECT RemarkID, Remark as RemarkName FROM UAD_VON..UAD_VON_RemarksMaster where usertype = 'U' and brandid = ${brandResults[0].brandid}`;
+        const remarkResult = await pool.request().query(remarkQuery);
 
-const remarkMappings = remarkResult.recordset.map(row => ({
-    RemarkID: row.RemarkID,
-    RemarkName: row.RemarkName.trim().toLowerCase()
-}));
+        const remarkMappings = remarkResult.recordset.map(row => ({
+            RemarkID: row.RemarkID,
+            RemarkName: row.RemarkName.trim().toLowerCase()
+        }));
+        const UserFBRemarkID = await getFeedbackId(brandResults[0].brandid, 'U')
+        // console.log(UserFBRemarkID);
+
         //   console.log("latestPartIDs:", latestPartIDs);
         // console.log("maxValueMapping:", maxValueMapping);
         // console.log("previousFBIDs:", previousFBIDs);
@@ -1024,10 +1044,14 @@ const remarkMappings = remarkResult.recordset.map(row => ({
                 pfb.LocationID === locationid
             );
 
-                // Find matching remark ID
-            const matchedRemark = remarkMappings.find(r =>
-                r.RemarkName === (item.UserRemark || "").trim().toLowerCase()
-            );
+            // Find matching remark ID
+            // console.log(remarkMappings);
+
+            // const matchedRemark = remarkMappings.find(r =>
+            //     r.RemarkName === (item.UserRemark || "")
+            // );
+
+
             return {
                 brandid: brandMapping?.brandid,
                 dealerid: dealerMapping?.dealerid,
@@ -1036,30 +1060,34 @@ const remarkMappings = remarkResult.recordset.map(row => ({
                 partid: item.Partid,
                 latestpartid: latestpartidMapping?.LatestPartID ?? null,
                 UserID: UserID,
-                // UserFBRemarkID: UserFBRemarkID,
-                UserFBRemarkID: matchedRemark?.RemarkID ?? null, 
+                UserFBRemarkID: UserFBRemarkID,
+                // UserFBRemarkID: matchedRemark?.RemarkID ?? null,
                 CustomRem: item.UserRemark,
                 ProposedQty: item.ProposedQty,
                 PreviousFBID: partidPreviousFBIDMapping?.PreviousFBID ?? null,
-                PartNumber:item.partnumber
+                PartNumber: item.partnumber
             };
         });
-//         const missingRemarks = formattedData.filter(item => !item.UserFBRemarkID);
+        //         const missingRemarks = formattedData.filter(item => !item.UserFBRemarkID);
 
-// if (missingRemarks.length > 0) {
-//     return res.status(400).json({
-//         message: "Some remarks could not be mapped to RemarkID.",
-//         unmappedRemarks: missingRemarks.map(r => ({
-//             PartNumber: r.PartNumber,
-//             Remark: r.CustomRem
-//         }))
-//     });
-// }
+        // if (missingRemarks.length > 0) {
+        //     return res.status(400).json({
+        //         message: "Some remarks could not be mapped to RemarkID.",
+        //         unmappedRemarks: missingRemarks.map(r => ({
+        //             PartNumber: r.PartNumber,
+        //             Remark: r.CustomRem
+        //         }))
+        //     });
+        // }
+        // console.log(1, formattedData[0]);
 
         const invalidRecords = formattedData.filter(item =>
             !item.locationid ||
-            !item.maxvalue
+            item.maxvalue == null
+            // !item.maxvalue == 0
         );
+        // console.log(`invalid`,invalidRecords[0]);
+
 
         if (invalidRecords.length > 0) {
             return res.status(400).json({
@@ -1087,11 +1115,15 @@ const remarkMappings = remarkResult.recordset.map(row => ({
         // console.log(formattedData);
 
         // await transaction.begin(); // Start transaction
+        console.log(formattedData);
+
+
         await insertData(formattedData, tableName)  // Insert Function to insert formatted data into table
         // await transaction.commit(); // Commit transaction
 
 
-        res.status(200).json({ message: "Data inserted successfully"
+        res.status(200).json({
+            message: "Data inserted successfully"
             // , data: formattedData 
         });
 
@@ -1109,34 +1141,34 @@ const remarkMappings = remarkResult.recordset.map(row => ({
 const adminUpload = async (req, res) => {
     // const pool = await getPool1()
     const pool = await getPool2()
-    const {file,addedby} = req.body
-    if(!addedby){
-       return res.status(400).json({ message: "addedby is required" });
+    const { file, addedby } = req.body
+    if (!addedby) {
+        return res.status(400).json({ message: "addedby is required" });
     }
     if (!req.file || req.file.length === 0) {
         return res.status(400).json({ message: "No files received" });
     }
     // console.log(req.file.path);
 
-    const {headers , data} = await readExcel(req.file.path);
+    const { headers, data } = await readExcel(req.file.path);
     //   console.log(`data` , data);
     //   console.log(headers );
-      
+
 
     fs.unlinkSync(req.file.path); // Delete uploaded file after processing
     const REQUIRED_HEADERS = [
         "brand", "dealer", "location", "feedbackid", "AdminRemark", "ApprovedQty"
-      ];
-      
+    ];
+
 
     //  Check for required headers
-        const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
-        if (missingHeaders.length > 0) {
-          return res.status(400).json({
+    const missingHeaders = REQUIRED_HEADERS.filter(header => !headers.includes(header));
+    if (missingHeaders.length > 0) {
+        return res.status(400).json({
             message: "Missing headers or data",
             missingHeaders
-          });
-        }
+        });
+    }
 
 
     const cleanedData = data
@@ -1159,9 +1191,10 @@ const adminUpload = async (req, res) => {
     if (!isArrayEmpty(duplicateEntries)) {
         // console.log(duplicateEntries);
 
-        return res.status(400).json({ 
-            message:`These Locations and feedbackid are duplicate`,
-            Data: duplicateEntries })
+        return res.status(400).json({
+            message: `These Locations and feedbackid are duplicate`,
+            Data: duplicateEntries
+        })
     }
     // Extract distinct values from data
     const distinctLocations = [...new Set(cleanedData.map(item => item.location))];
@@ -1191,7 +1224,7 @@ const adminUpload = async (req, res) => {
         }
     }
     const AdmintableName = `UAD_VON..UAD_VON_AdminFeedback_${brandResults[0].brandid}`
-    const tableName = `UAD_VON_SPMFeedback_${brandResults[0].brandid}`
+    const tableName = `UAD_VON..UAD_VON_SPMFeedback_${brandResults[0].brandid}`
     // console.log(AdmintableName);
 
     const dealerResults = [];
@@ -1216,7 +1249,7 @@ const adminUpload = async (req, res) => {
     for (const loc of distinctLocations) {
         const queryLocation = `
     SELECT locationid 
-    FROM z_scope.dbo.locationinfo 
+    FROM z_scope..locationinfo 
     WHERE brandid = ${resultIds.recordset[0].brandid} 
       AND dealerid = '${dealerResults[0].dealerid}'
       AND location LIKE '${loc}'
@@ -1267,13 +1300,14 @@ const adminUpload = async (req, res) => {
   FROM UAD_VON..UAD_VON_RemarksMaster 
   WHERE usertype = 'A' AND brandid = ${brandResults[0].brandid}
 `;
-const remarkResult = await pool.request().query(remarkQuery);
+    const remarkResult = await pool.request().query(remarkQuery);
 
-const remarkMappings = remarkResult.recordset.map(row => ({
-    RemarkID: row.RemarkID,
-    RemarkName: row.RemarkName.trim().toLowerCase()
-}));
+    const remarkMappings = remarkResult.recordset.map(row => ({
+        RemarkID: row.RemarkID,
+        RemarkName: row.RemarkName.trim().toLowerCase()
+    }));
 
+    const AdminFBRemarkID = await getFeedbackId(brandResults[0].brandid, 'A')
 
     const formattedData = cleanedData.map(item => {
         const brandMapping = brandResults.find(b => b.brand === item.brand);
@@ -1283,10 +1317,10 @@ const remarkMappings = remarkResult.recordset.map(row => ({
         // Convert locationid to NUMBER to match mappings
         const locationid = locationMapping ? Number(locationMapping.locationid) : null;
         const previousMapping = previousFBIDs.find(prev => prev.FeedbackID === item.feedbackid);
-            // Match AdminRemark dynamically
-    const matchedRemark = remarkMappings.find(r =>
-        r.RemarkName === (item.AdminRemark || "").trim().toLowerCase()
-    );
+        // Match AdminRemark dynamically
+        const matchedRemark = remarkMappings.find(r =>
+            r.RemarkName === (item.AdminRemark || "").trim().toLowerCase()
+        );
 
         return {
             brandid: brandMapping?.brandid,
@@ -1294,8 +1328,8 @@ const remarkMappings = remarkResult.recordset.map(row => ({
             locationid: locationid,
             feedbackid: item.feedbackid,
             AdminID: AdminID,
-            // AdminRemark: AdminRemark,
-            AdminRemarkID: matchedRemark?.RemarkID ?? null,
+            AdminRemarkID: AdminFBRemarkID,
+            // AdminRemarkID: matchedRemark?.RemarkID ?? null,
             ApprovedQty: item.ApprovedQty,
             CustomRem: item.AdminRemark,
             PreviousAdminFBID: previousMapping ? previousMapping.PreviousAdminFBID : null // Assign found value or null
@@ -1303,20 +1337,22 @@ const remarkMappings = remarkResult.recordset.map(row => ({
         };
     });
     // console.log(formattedData);
-// const missingRemarks = formattedData.filter(item => !item.AdminRemarkID);
+    // const missingRemarks = formattedData.filter(item => !item.AdminRemarkID);
 
-// if (missingRemarks.length > 0) {
-//     return res.status(400).json({
-//         message: "Some remarks could not be mapped to RemarkID.",
-//         unmappedRemarks: missingRemarks.map(r => ({
-//             FeedbackID: r.feedbackid,
-//             Remark: r.CustomRem
-//         }))
-//     });
-// }
+    // if (missingRemarks.length > 0) {
+    //     return res.status(400).json({
+    //         message: "Some remarks could not be mapped to RemarkID.",
+    //         unmappedRemarks: missingRemarks.map(r => ({
+    //             FeedbackID: r.feedbackid,
+    //             Remark: r.CustomRem
+    //         }))
+    //     });
+    // }
 
-
+    const ids = formattedData.map(item => item.feedbackid).join(",")
     const check = await checkReviewedFeedbackByBrand(brandResults[0].brandid, formattedData);
+    // console.log(check);
+
     if (check.length > 0) {
         return res.status(400).json({
             message: "Some records are already reviewed.",
@@ -1324,31 +1360,54 @@ const remarkMappings = remarkResult.recordset.map(row => ({
         });
     }
     // console.log(formattedData);
-    
-   const {feedbackIds}=  await insertAdminFeedback(formattedData, brandResults[0].brandid)  // Insert Function to insert formatted data into table
-// console.log(feedbackIds);
-// Update the status to 'Reviewed' where FeedbackID is in the feedbackIds string
-try {
-      const statusQuery = `
-        UPDATE UAD_VON..${tableName}
+
+    const { feedbackIds } = await insertAdminFeedback(formattedData, brandResults[0].brandid)  // Insert Function to insert formatted data into table
+    // console.log(feedbackIds);
+    // Update the status to 'Reviewed' where FeedbackID is in the feedbackIds string
+    try {
+        const statusQuery = `
+        UPDATE ${tableName}
         SET Status = 'Reviewed'
-        WHERE FeedbackID IN (${feedbackIds})
+        WHERE FeedbackID IN (${ids})
       `;
+        //   console.log(statusQuery);
+
         await pool.request().query(statusQuery);
-} catch (error) {
-    return res.status(400).json({message:`error in updating status Reviewed in admin , ${error.message}`})
-}
+    } catch (error) {
+        return res.status(400).json({ message: `error in updating status Reviewed in admin , ${error.message}` })
+    }
     res.status(200).json({ message: "Data inserted successfully", data: formattedData });
 
 }
 
-const maxpartmapping = async(partNumber , DealerId , LocationId)=>{
+const maxpartmapping = async (partNumber, DealerId, LocationId) => {
     const pool = await getPool2()
     const result = await pool.request().query(`select * from z_scope..stockable_nonstockable_td001_${DealerId} where locationid = ${LocationId} and partnumber1 = '${partNumber}' and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${DealerId} where locationid = ${LocationId})`)
-    if(result.recordset.length === 0){
+    if (result.recordset.length === 0) {
         return false
     }
     return true;
 }
 
+const partflagCheck = async (partnumber, dealerid, locationid, flag) => {
+    // console.log(partnumber , dealerid , locationid , flag);
+
+    const pool = await getPool2()
+    const result = await pool.request().query(`select * from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and partnumber1 = '${partnumber}' and Addedby != 7 and Maxvalue >= ${flag} and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and Addedby != 7)`)
+    if (result.recordset.length === 0) {
+        return false
+    }
+    return true;
+}
+
+async function getFeedbackId(brandid, usertype) {
+    try {
+        const pool = await getPool2()
+        const query = `select remarkid from UAD_VON..UAD_VON_RemarksMaster where brandid = '${brandid}' and remark = 'Custom' and usertype = '${usertype}'`
+        const result = await pool.request().query(query)
+        return result.recordset[0].remarkid
+    } catch (error) {
+        throw new Error(`Error in getFeedbackId: ${error.message}`)
+    }
+}
 export { remarkMaster, userView, adminView, userFeedbacklog, viewLog, newRemark, viewRemark, adminFeedbackLog, partFamily, countPending, partFamilySale, adminPendingView, dealerUpload, adminUpload }
