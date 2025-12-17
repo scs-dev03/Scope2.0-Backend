@@ -4,6 +4,7 @@ import sql from 'mssql'
 import fs from 'fs'
 import { partBrandCheck, readExcel, insertData, findLocationPartidDuplicates, checkPendingFeedbackAndStatus, findLocationPartidDuplicatesAdmin, insertAdminFeedback, checkReviewedFeedbackByBrand, statusCheck } from '../utils/vonHelper.js'
 import { partfamilySaleservice } from '../services/norms-management/utils.service.js'
+import { query } from 'mssql2'
 
 
 
@@ -656,6 +657,11 @@ const adminPendingView = async (req, res) => {
             if (Check == false) {
                 return res.status(400).json({ message: `No Sales in 12 Month for this part` })
             }
+             const flagCheck = await partflagCheck(partnumber, dealerid, locationid, flag)
+            // console.log(flagCheck);
+            if (flagCheck == false) {
+                return res.status(400).json({ message: `Please choose correct filter` })
+            }
         }
         const query = `
             USE [UAD_VON]
@@ -1115,7 +1121,7 @@ LEFT JOIN z_scope..Part_Master AS pm2
         // console.log(formattedData);
 
         // await transaction.begin(); // Start transaction
-        console.log(formattedData);
+        // console.log(formattedData);
 
 
         await insertData(formattedData, tableName)  // Insert Function to insert formatted data into table
@@ -1393,7 +1399,18 @@ const partflagCheck = async (partnumber, dealerid, locationid, flag) => {
     // console.log(partnumber , dealerid , locationid , flag);
 
     const pool = await getPool2()
-    const result = await pool.request().query(`select * from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and partnumber1 = '${partnumber}' and Addedby != 7 and Maxvalue >= ${flag} and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and Addedby != 7)`)
+    const queryflagzero = `use z_scope select * from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and partnumber1 = '${partnumber}' and Addedby != 7 and Maxvalue = 0 and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and Addedby != 7)`
+    const queryflagone = `use z_scope select * from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and partnumber1 = '${partnumber}' and Addedby != 7 and Maxvalue > 0 and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and Addedby != 7)`
+    let result;
+    if(flag){
+
+         result = await pool.request().query(queryflagone)
+    }
+    else{
+        result = await pool.request().query(queryflagzero)
+    }
+    // console.log(result);
+    
     if (result.recordset.length === 0) {
         return false
     }

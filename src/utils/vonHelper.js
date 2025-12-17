@@ -130,6 +130,7 @@ const insertData = async (formattedData, tableName) => {
     const table = new sql.Table(fullTableName); // Use fully qualified name
     table.create = false;
 
+// console.log(formattedData[0]);
 
     // 2) Define the 11 non-default columns, in exact ordinal order & types:
     table.columns.add('Brandid', sql.TinyInt, { nullable: false });   // tinyint
@@ -161,6 +162,7 @@ const insertData = async (formattedData, tableName) => {
       );
     });
     // console.log(`inside`,formattedData[0]);
+    // console.log(`table`,table);
 
     // 3. PROPER TRANSACTION HANDLING
     // ------------------------------
