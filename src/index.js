@@ -44,14 +44,14 @@ async function start() {
 
     // ────────────────────────────────────────────────
     // Run `scheduleTask()` every minute:
-    // cron.schedule('*/15 * * * *', async () => {
+    // cron.schedule('*/1 * * * *', async () => {
     //   await connectDB().catch(err => console.error('connectDB error', err));
     //   console.log('⚙️  Running scheduleTask at', new Date().toISOString());
     //   scheduleTask().catch(err => console.error('scheduleTask error', err));
     // });
 
-    // // Run `siRefresh()` every 5 minutes:
-    // cron.schedule('*/20 * * * *', async () => {
+    // // // Run `siRefresh()` every 5 minutes:
+    // cron.schedule('*/15 * * * *', async () => {
     //   await connectDB().catch(err => console.error('connectDB error', err));
     //   console.log('🔄 Running siRefresh at', new Date().toISOString());
     //   siRefresh().catch(err => console.error('siRefresh error', err));

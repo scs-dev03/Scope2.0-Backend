@@ -2,7 +2,7 @@ import sql from 'mssql'
 import cron from 'node-cron'
 import { getPool2 } from '../db/db.js'
 import { dataValidator, checkisAlreadyScheduled, checkisUserValid, checkisMappingExists, checkGroupSetting } from '../utils/dashboardscheduleHelper.js'
-import { refreshBenchmarking, refreshPPNI, refreshSI, refreshTOPS, refreshCID, refreshSpecialList, refreshGainerMini } from '../utils/refreshDashboard.js'
+import { refreshBenchmarking, refreshPPNI, refreshSI, refreshTOPS, refreshCID, refreshSpecialList, refreshGainerMini, refreshGSI } from '../utils/refreshDashboard.js'
 
 
 // const pool = await getPool2()
@@ -16,47 +16,84 @@ const getBrandByUser = async (req, res) => {
         message: `userid is required`
       })
     }
-    const result = await pool.request()
-      .input('userid', sql.Int, userid)
-      .query(` use [z_scope]
+    const roleResult = await pool.request().query(`use [z_scope] select roleID from adminmaster_gen where bintid_pk = ${userid}`)
+    const role = roleResult.recordset[0].roleID;
+
+    if (role == 6) {
+      const result = await pool.request()
+        .query(` use [z_scope]
+        SELECT DISTINCT Brand, BrandID
+        FROM LocationInfo
+        WHERE status = 1
+        order by Brand 
+      `);
+      // console.log(result);
+
+      res.status(200).json({ Data: result.recordset });
+    } else {
+
+      const result = await pool.request()
+        .input('userid', sql.Int, userid)
+        .query(` use [z_scope]
         SELECT DISTINCT Brand, BrandID
         FROM LocationInfo
         WHERE bdmcode = @userid and status = 1 
       `);
-    // console.log(result);
+      // console.log(result);
 
-    res.status(200).json({ Data: result.recordset });
+      res.status(200).json({ Data: result.recordset });
+    }
   } catch (error) {
     res.status(500).json({ Error: error.message });
   }
 };
 
 const getDealerByUser = async (req, res) => {
-  const pool = await getPool2()
-  const { userid, brandid } = req.body
-  if (!userid || !brandid) {
-    return res.status(400).json({
-      message: `userid and brandid are required`
-    })
-  }
-  const query = `use [z_scope]
-    select distinct dealer , dealerid from LocationInfo where  brandid = ${brandid} and bdmcode = ${userid} and status = 1`
-  // console.log(query);
-
-  //   const corrected query = `select distinct dealer , dealerid 
-  // from LocationInfo where brandid = 9
-  // and bdmcode = 147765 
-  // and   status = 1
-  // union 
-  // select distinct dealer , dealerid 
-  // from LocationInfo where brandid = 9
-  // and zbdmcode = 147765 
-  // and   status = 1`
-
-  const result = await pool.request().query(query)
-  res.status(200).json({
-    Data: result.recordset
-  })
+ try {
+   const pool = await getPool2()
+   const { userid, brandid } = req.body
+   if (!userid || !brandid) {
+     return res.status(400).json({
+       message: `userid and brandid are required`
+     })
+   }
+   const roleResult = await pool.request().query(`use [z_scope] select roleID from adminmaster_gen where bintid_pk = ${userid}`)
+   const role = roleResult.recordset[0].roleID;
+ 
+   // const oldquery = `use [z_scope]
+   //   select distinct dealer , dealerid from LocationInfo where  brandid = ${brandid} and bdmcode = ${userid} and status = 1`
+   // console.log(query);
+   if (role == 6) {
+     const result = await pool.request()
+       .query(` use [z_scope]
+         SELECT DISTINCT dealer, dealerid
+         FROM LocationInfo
+         WHERE status = 1 and brandid = ${brandid}
+         order by dealer 
+       `);
+     // console.log(result);
+ 
+     res.status(200).json({ Data: result.recordset });
+   }
+   else {
+     const query = `use [z_scope] select distinct dealer , dealerid 
+     from LocationInfo where brandid = ${brandid}
+     and bdmcode = ${userid} 
+     and   status = 1
+     union 
+     select distinct dealer , dealerid 
+     from LocationInfo where brandid = ${brandid}
+     and zbdmcode = ${userid} 
+     and   status = 1`
+     const result = await pool.request().query(query)
+     res.status(200).json({
+       Data: result.recordset
+     })
+   }
+ 
+ } catch (error) {
+  res.status(500).json({ Error: error.message });
+ }
 }
 const getDashboardbyDealer = async (req, res) => {
   const pool = await getPool2();
@@ -806,7 +843,7 @@ async function scheduleTask() {
           case 9: return refreshSpecialList(task.reqid)
           case 12: return refreshBenchmarking(task.dealerid, task.reqid)
           // case 13: return refreshSI(task.dealerid,task.reqid)
-          // case 14: return refreshGSI(task.brand, task.dealer, task.brandid, task.dealerid, task.reqid)
+          case 14: return refreshGSI(task.dealerid, task.reqid)
           case 15: return refreshCID(task.dealerid, task.reqid)
           case 17: return refreshGainerMini(task.reqid)
           default:
@@ -934,42 +971,42 @@ const statusTimelime = async (req, res) => {
 // }
 async function siRefresh() {
   // cron.schedule('*/30 * * * *', async () => {
-    // console.log("Running SI scheduler every 30 minutes");
+  // console.log("Running SI scheduler every 30 minutes");
 
-    try {
-      const pool = await getPool2();
-      const query = `
+  try {
+    const pool = await getPool2();
+    const query = `
         use [UAD_BI]
         SELECT TOP 1 reqid, dashboardcode, brand, brandid, dealer, dealerid, scheduledon
         FROM SBS_DBS_ScheduledDashboard 
         WHERE status = 0 
-        AND DATEADD(hour, -10, scheduledon) <= GETDATE() 
+        AND DATEADD(hour, -12, scheduledon) <= GETDATE() 
         AND dashboardcode = 13
         ORDER BY scheduledon`;
 
-      const task = (await pool.request().query(query)).recordset[0];
-      // console.log(task);
-      
+    const task = (await pool.request().query(query)).recordset[0];
+    // console.log(task);
 
-      if (!task) {
-        console.log("No SI Dashboard scheduled in the last 30 minutes.");
-        return;
-      }
 
-      // Mark status as In-Progress
-      await pool.request()
-        .input('reqid', sql.Int, task.reqid)
-        .query(`use [UAD_BI] UPDATE SBS_DBS_ScheduledDashboard SET status = 1 WHERE reqid = @reqid`);
-
-      console.log(`Reqid : ${task.reqid} , Dealerid : ${task.dealerid}`);
-      // console.log(`Calling refreshSI`);
-
-      await refreshSI(task.dealerid, task.reqid);
-
-      console.log("✅ SI task processed successfully");
-    } catch (error) {
-      console.error("❌ Error processing SI scheduled task:", error.message);
+    if (!task) {
+      console.log("No SI Dashboard scheduled in the last 15 minutes.");
+      return;
     }
+
+    // Mark status as In-Progress
+    await pool.request()
+      .input('reqid', sql.Int, task.reqid)
+      .query(`use [UAD_BI] UPDATE SBS_DBS_ScheduledDashboard SET status = 1 WHERE reqid = @reqid`);
+
+    console.log(`Reqid : ${task.reqid} , Dealerid : ${task.dealerid}`);
+    // console.log(`Calling refreshSI`);
+
+    await refreshSI(task.dealerid, task.reqid);
+
+    console.log("✅ SI task processed successfully");
+  } catch (error) {
+    console.error("❌ Error processing SI scheduled task:", error.message);
+  }
   // });
 }
 
