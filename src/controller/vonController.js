@@ -112,7 +112,7 @@ const userView = async (req, res) => {
             }
 
         }
-        const query = `exec [z_scope].dbo.GetMAXData @brandid, @dealerid , @r1, @r2, @l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@parttype;`
+        const query = `exec [z_scope].dbo.GetMAXData1 @brandid, @dealerid , @r1, @r2, @l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@parttype;`
 
         if (!partnumber && !locationid) {
             return res.status(400).json({ Error: `partnumber or locationid is required` })
@@ -145,46 +145,54 @@ const userView = async (req, res) => {
 const userFeedbacklog = async (req, res) => {
     try {
         const pool = await getPool2()
-        const { brandid, dealerid, locationid, partid, max, remarkid, customrem, proposedqty, addedby } = req.body
-        if (!brandid || !dealerid || !locationid || !addedby || !partid || max == null || proposedqty == null || !remarkid) {
+        const { brandid, dealerid, locationid, partnumber, max, remarkid, customrem, proposedqty, addedby } = req.body
+        if (!brandid || !dealerid || !locationid || !addedby || !partnumber || max == null || proposedqty == null || !remarkid) {
             return res.status(400).json({ Error: `All Fields are required` })
         }
-        const partCheck = await partBrandCheck(dealerid, locationid, partid)
+        const partCheck = await partBrandCheck(dealerid, locationid, partnumber)
         if (!partCheck) {
-            return res.status(400).json({ message: `PartID is Invalid Not in Max` })
+            return res.status(400).json({ message: `PartNumber is Invalid Not in Max` })
         }
 
         const dynamicTable = `[UAD_VON]..UAD_VON_SPMFeedback_${brandid}`
         // console.log(dynamicTable);
-        const previousStatusCheck = await statusCheck(locationid, partid, dynamicTable)
+        const previousStatusCheck = await statusCheck(locationid, partnumber, dynamicTable)
         if (!previousStatusCheck) {
             return res.status(200).json({ message: `Previous feedback has pending state` })
         }
-        let LatestPartID = null;
+        let LatestPart = null;
         try {
-            const LatestPartQuery = `select (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END) AS LatestPartNumber 
-                                from z_scope.dbo.substitution_master sm
-                                 join z_scope.dbo.part_master pm on pm.brandid = sm.brandid and pm.partnumber = sm.partnumber 
-                                where pm.partid = ${partid}`
+            const LatestPartQuery = `
+            Declare @latest varchar(20)
+            Declare @partnumber varchar(20) = '${partnumber}'
+            select @latest = CASE when pm.PartNumber1 = sm.PartNumber1 then sm.subpartnumber1 else pm.partnumber1 end 
+            from z_scope.dbo.substitution_master sm
+            join z_scope.dbo.part_master pm on pm.brandid = sm.brandid and pm.partnumber1 = sm.partnumber1
+            where pm.partnumber1 = @partnumber and pm.brandid = ${brandid}
+            Select ISNULL(@latest,@partnumber)Latest `
+
             const result = await pool.request().query(LatestPartQuery)
-            LatestPartID = result.recordset.length > 0 ? result.recordset[0].LatestPartNumber : null;
-            // console.log(LatestPartID);
+            
+            LatestPart = result.recordset.length > 0 ? result.recordset[0].Latest : null;
 
         } catch (error) {
-            return res.status(500).json({ Error: error.message, Error: `Error in Finding LatestPartID` })
+            return res.status(500).json({ Error: error.message, Error: `Error in Finding LatestPart` })
         }
         let previousFBID = null;
         try {
             const previousFBQuery = `
         SELECT TOP 1 FeedbackID 
         FROM ${dynamicTable}
-        WHERE PartID = @partid 
+        WHERE partnumber = '${partnumber}' 
         ORDER BY FeedbackDate DESC
        `;
+    //    console.log(previousFBQuery);
+       
 
             const previousFBResult = await pool.request()
-                .input('partid', sql.Int, partid)
+                // .input('partnumber', sql.VarChar, partnumber)
                 .query(previousFBQuery);
+// console.log(previousFBResult);
 
             previousFBID = previousFBResult.recordset.length > 0 ? previousFBResult.recordset[0].FeedbackID : null;
             // console.log(previousFBID);
@@ -195,15 +203,15 @@ const userFeedbacklog = async (req, res) => {
         // console.log(remarkid);
 
         const query = `
-                   Insert into  ${dynamicTable} (brandid , dealerid , locationid , PartID , LatestPartID , MaxValue , UserID , UserFBRemarkID ,Customrem, ProposedQty , FeedbackDate , PreviousFBID)
-                   Values (@brandid,@dealerid , @locationid , @partid,@latestid,@max,@userid,@userfbid,@customrem,@proposedqty,GETDATE(),@previousfbid)`
+                   Insert into  ${dynamicTable} (brandid , dealerid , locationid , PartNumber , LatestPartNumber , MaxValue , UserID , UserFBRemarkID ,Customrem, ProposedQty , FeedbackDate , PreviousFBID)
+                   Values (@brandid,@dealerid , @locationid , @partnumber,@latestid,@max,@userid,@userfbid,@customrem,@proposedqty,GETDATE(),@previousfbid)`
         const request = await pool.request()
         request.input('brandid', sql.TinyInt, brandid)
         request.input('dealerid', sql.Int, dealerid)
         request.input('locationid', sql.Int, locationid)
-        request.input('partid', sql.Int, partid)
+        request.input('partnumber', sql.VarChar , partnumber)
         request.input('userid', sql.Int, addedby)
-        request.input('latestid', sql.VarChar, LatestPartID)
+        request.input('latestid', sql.VarChar, LatestPart)
         request.input('max', sql.Int, max)
         request.input('userfbid', sql.Int, remarkid)
         request.input('customrem', sql.VarChar, customrem)
@@ -219,11 +227,11 @@ const userFeedbacklog = async (req, res) => {
 const viewLog = async (req, res) => {
     try {
         const pool = await getPool2()
-        const { brandid, dealerid, locationid, partid } = req.body
+        const { brandid, dealerid, locationid, partnumber } = req.body
         if (!brandid || !dealerid) {
             return res.status(400).json({ message: `Brandid and Dealerid are required Parameter` })
         }
-        if (!locationid && !partid) {
+        if (!locationid && !partnumber) {
             return res.status(400).json({ message: `Locationid or Partid anyone is required` })
         }
         const spmdynamicTable = `UAD_VON..UAD_VON_SPMFeedback_${brandid}`
@@ -272,8 +280,8 @@ const viewLog = async (req, res) => {
         af.AdminFBDate, sf.Status ,
          af.adminid , CONCAT(amg.vcFirstName, ' ',amg.vcLastName)as updatedby
     FROM ${spmdynamicTable} sf
-    JOIN z_scope..part_master pm 
-        ON pm.brandid = sf.Brandid AND pm.partid = sf.partid
+    LEFT JOIN z_scope..part_master pm 
+        ON pm.brandid = sf.Brandid AND pm.partnumber1 = sf.PartNumber
     LEFT JOIN ${admindynamicTable} af 
         ON af.FeedbackID = sf.FeedbackID
     LEFT JOIN UAD_VON..UAD_VON_Remarksmaster rmm 
@@ -286,13 +294,13 @@ const viewLog = async (req, res) => {
 		ON amg.bintId_Pk = af.adminid
     WHERE sf.Dealerid = @dealerid
     AND (@LocationID IS NULL OR sf.locationid = @LocationID)
-    AND (@PartID IS NULL OR pm.partid = @PartID);
+    AND (@PartNumber IS NULL OR sf.PartNumber = @PartNumber);
 `;
 
         const request = await pool.request();
         request.input('dealerid', sql.Int, dealerid);
         request.input('LocationID', sql.Int, locationid);
-        request.input('PartID', sql.Int, partid);
+        request.input('PartNumber', sql.VarChar, partnumber);
 
         const result = await request.query(query);
 
@@ -373,20 +381,19 @@ const adminFeedbackLog = async (req, res) => {
 
         try {
             const previousAdminFBQuery = `
-                SELECT S.FeedbackID, A1.AdminFBID AS PreviousAdminFBID
-             FROM ${dynamicTable} A1
-             JOIN ${userdynamicTable} S ON A1.FeedbackID = S.PreviousFBID
-             WHERE S.FeedbackID =  ${feedbackid};
-           `;
-            //    console.log(previousAdminFBQuery);
+            select AdminFBID from ${dynamicTable} where FeedbackID = (
+            select PreviousFBID from ${userdynamicTable} A
+            join ${dynamicTable} B on A.FeedbackID = B.FeedbackID
+            where A.FeedbackID = ${feedbackid}
+            )`;
+               console.log(previousAdminFBQuery);
 
-            const previousAdminFBResult = await pool.request()
-                .input('feedbackid', sql.Int, feedbackid)
-                .query(previousAdminFBQuery);
-            // console.log(previousAdminFBResult);
+            const previousAdminFBResult = await pool.request().query(previousAdminFBQuery);
+                // .input('feedbackid', sql.Int, feedbackid)
+            console.log(previousAdminFBResult);
 
-            PreviousAdminFBID = previousAdminFBResult.recordset.length > 0 ? previousAdminFBResult.recordset[0].PreviousAdminFBID : null;
-            // console.log(PreviousAdminFBID);
+            PreviousAdminFBID = previousAdminFBResult.recordset.length > 0 ? previousAdminFBResult.recordset[0].AdminFBID : null;
+            console.log(PreviousAdminFBID);
 
         } catch (error) {
             return res.status(500).json({ Error: error.message, Error: `Error in Finding Previous Feedback` })
@@ -656,7 +663,7 @@ const adminPendingView = async (req, res) => {
             if (Check == false) {
                 return res.status(400).json({ message: `No Sales in 12 Month for this part` })
             }
-             const flagCheck = await partflagCheck(partnumber, dealerid, locationid, flag)
+            const flagCheck = await partflagCheck(partnumber, dealerid, locationid, flag)
             // console.log(flagCheck);
             if (flagCheck == false) {
                 return res.status(400).json({ message: `Please choose correct filter` })
@@ -664,7 +671,7 @@ const adminPendingView = async (req, res) => {
         }
         const query = `
             USE [UAD_VON]
-            EXEC sp_GetAdminView 
+            EXEC sp_GetAdminView1 
                 @brandid = @brandid,
                 @dealerid = @dealerid,
                 @locationid = @locationid,
@@ -773,30 +780,30 @@ const dealerUpload = async (req, res) => {
         const { brandid, dealerid, locationid } = resultIds.recordset[0];
         // console.log(brandid, dealerid , locationid);
 
-        const partidpartnumbermapping = [];
+        // const partidpartnumbermapping = [];
 
-        const query = `select  partid , partnumber from z_scope..Stockable_Nonstockable_TD001_${dealerid} where Locationid = ${locationid} and addedby != 7 and Stockdate = (select MAX(stockdate) from z_scope..Stockable_Nonstockable_TD001_${dealerid} where Locationid = ${locationid} and addedby != 7)`;
-        // console.log(query);
+        // const query = `select  partid , partnumber from z_scope..Stockable_Nonstockable_TD001_${dealerid} where Locationid = ${locationid} and addedby != 7 and Stockdate = (select MAX(stockdate) from z_scope..Stockable_Nonstockable_TD001_${dealerid} where Locationid = ${locationid} and addedby != 7)`;
+        // // console.log(query);
 
-        const partidpartnumberresult = await pool.request().query(query);
-        // console.log(partidpartnumberresult);
+        // const partidpartnumberresult = await pool.request().query(query);
+        // // console.log(partidpartnumberresult);
 
 
-        if (partidpartnumberresult.recordset.length > 0) {
-            partidpartnumbermapping.push(...partidpartnumberresult.recordset);
-        }
-        // console.log(partidpartnumbermapping);
+        // if (partidpartnumberresult.recordset.length > 0) {
+        //     partidpartnumbermapping.push(...partidpartnumberresult.recordset);
+        // }
+        // // console.log(partidpartnumbermapping);
 
-        const updatedCleanedData = cleanedData.map(item => {
-            const matched = partidpartnumbermapping.find(
-                mapItem => mapItem.partnumber === item.partnumber
-            );
+        // const updatedCleanedData = cleanedData.map(item => {
+        //     const matched = partidpartnumbermapping.find(
+        //         mapItem => mapItem.partnumber === item.partnumber
+        //     );
 
-            return {
-                ...item,
-                Partid: matched ? matched.partid : null
-            };
-        });
+        //     return {
+        //         ...item,
+        //         Partid: matched ? matched.partid : null
+        //     };
+        // });
 
 
         // console.log("Final Item with Partid:", updatedCleanedData);
@@ -806,7 +813,9 @@ const dealerUpload = async (req, res) => {
         if (isArrayEmpty(cleanedData)) {
             return res.status(400).json({ message: `UserFeedback and ProposedQty cannot be null or undefined` })
         }
-        const duplicateEntries = findLocationPartidDuplicates(updatedCleanedData);
+        // console.log(cleanedData);
+        
+        const duplicateEntries = findLocationPartidDuplicates(cleanedData);
         if (!isArrayEmpty(duplicateEntries)) {
             return res.status(400).json({ Data: duplicateEntries })
         }
@@ -817,7 +826,7 @@ const dealerUpload = async (req, res) => {
         const distinctLocations = [...new Set(cleanedData.map(item => item.Location))];
         const distinctBrands = [...new Set(cleanedData.map(item => item.Brand))];
         const distinctDealers = [...new Set(cleanedData.map(item => item.Dealer))];
-        const distinctPartid = [...new Set(cleanedData.map(item => item.Partid))];
+        // const distinctPartid = [...new Set(cleanedData.map(item => item.Partid))];
 
         // console.log('Distinct Locations:', distinctLocations);
         // console.log('Distinct Brands:', distinctBrands);
@@ -885,7 +894,7 @@ const dealerUpload = async (req, res) => {
 
 
         // console.log(locResult.recordset[0].locationid);
-        const latestPartIDs = [];
+        const latestParts = [];
 
         // const queryLatestPartID = `SELECT partid, subpartid FROM z_scope..Substitution_Master WHERE brandid = ${brandResults[0].brandid}`;
         // const queryLatestPartID = `
@@ -897,51 +906,55 @@ const dealerUpload = async (req, res) => {
         // left join Substitution_Master sm on sm.partnumber1 = sn.partnumber1 and li.BrandID = sm.brandid
         // where sn.Stockdate = (select MAX(Stockdate) from Stockable_Nonstockable_TD001_${dealerResults[0].dealerid}) and sn.Locationid = ${locResult.recordset[0].locationid}) and brandid = ${brandResults[0].brandid}`
 
-        const queryLatestPartID = `
-        WITH LatestParts AS (
-  SELECT
-    sn.partnumber1,
-    COALESCE(sm.subpartnumber, sn.partnumber1) AS LatestPartno,
-    li.BrandID
-  FROM z_scope..Stockable_Nonstockable_TD001_${dealerResults[0].dealerid} AS sn
-  JOIN z_scope..LocationInfo     AS li
-    ON li.LocationID = sn.LocationID
-  LEFT JOIN z_scope..Substitution_Master AS sm
-    ON sm.partnumber1 = sn.partnumber1
-   AND sm.brandid     = li.BrandID
-  WHERE sn.Stockdate = (
-          SELECT MAX(Stockdate)
-            FROM z_scope..Stockable_Nonstockable_TD001_${dealerResults[0].dealerid}
-        )
-    AND sn.LocationID = ${locResult.recordset[0].locationid}
-)
-SELECT
-  lp.partnumber1,
-  pm1.partid    AS PartID,
-  lp.LatestPartno,
-  pm2.partid    AS LatestPartID
-FROM LatestParts AS lp
--- join to get the original PartID
-JOIN z_scope..Part_Master AS pm1
-  ON pm1.brandid      = lp.BrandID
- AND pm1.partnumber1  = lp.partnumber1
--- join to get the substituted/latest PartID
-LEFT JOIN z_scope..Part_Master AS pm2
-  ON pm2.brandid      = lp.BrandID
- AND pm2.partnumber1  = lp.LatestPartno;
-        `
-        const queryResult = await pool.request().query(queryLatestPartID);
+//         const queryLatestPartID = `
+//         WITH LatestParts AS (
+//   SELECT
+//     sn.partnumber1,
+//     COALESCE(sm.subpartnumber, sn.partnumber1) AS LatestPartno,
+//     li.BrandID
+//   FROM z_scope..Stockable_Nonstockable_TD001_${dealerResults[0].dealerid} AS sn
+//   JOIN z_scope..LocationInfo     AS li
+//     ON li.LocationID = sn.LocationID
+//   LEFT JOIN z_scope..Substitution_Master AS sm
+//     ON sm.partnumber1 = sn.partnumber1
+//    AND sm.brandid     = li.BrandID
+//   WHERE sn.Stockdate = (
+//           SELECT MAX(Stockdate)
+//             FROM z_scope..Stockable_Nonstockable_TD001_${dealerResults[0].dealerid}
+//         )
+//     AND sn.LocationID = ${locResult.recordset[0].locationid}
+// )
+// SELECT
+//   lp.partnumber1,
+//   pm1.partid    AS PartID,
+//   lp.LatestPartno,
+//   pm2.partid    AS LatestPartID
+// FROM LatestParts AS lp
+// -- join to get the original PartID
+// JOIN z_scope..Part_Master AS pm1
+//   ON pm1.brandid      = lp.BrandID
+//  AND pm1.partnumber1  = lp.partnumber1
+// -- join to get the substituted/latest PartID
+// LEFT JOIN z_scope..Part_Master AS pm2
+//   ON pm2.brandid      = lp.BrandID
+//  AND pm2.partnumber1  = lp.LatestPartno;
+        // `
+
+        const queryLatestPart = `select sn.partnumber1 , CASE when sn.partnumber1 = sm.partnumber1 then sn.partnumber1 else sn.partnumber1 end as Latest from Stockable_Nonstockable_TD001_${dealerResults[0].dealerid} sn
+                                left JOIN Substitution_Master sm on sn.Brandid = sm.brandid and sm.partnumber1 = sn.partnumber1
+                                where Locationid = ${locResult.recordset[0].locationid} and Stockdate = ( SELECT MAX(Stockdate) FROM z_scope..Stockable_Nonstockable_TD001_${dealerResults[0].dealerid} where LocationID = ${locResult.recordset[0].locationid} and Addedby != 7) and sn.Addedby != 7`
+        const queryResult = await pool.request().query(queryLatestPart);
         // console.log(queryResult);
 
         if (queryResult.recordset.length) {
             queryResult.recordset.forEach(row => {
-                latestPartIDs.push({
-                    Partid: row.PartID,       // Mapping partid correctly
-                    LatestPartID: row.LatestPartID // Mapping subpartid correctly
+                latestParts.push({
+                    PartNumber: row.partnumber1,       // Mapping partid correctly
+                    LatestPart: row.Latest // Mapping subpartid correctly
                 });
             });
         }
-        // console.log(latestPartIDs);
+        // console.log(`latestParts`,latestParts);
 
         // Inside "Get previousFBIDs" section
         const previousFBIDs = [];
@@ -951,13 +964,13 @@ LEFT JOIN z_scope..Part_Master AS pm2
     WITH RankedFeedback AS (
         SELECT 
             FeedbackID, 
-            PartID, 
+            PartNumber, 
             locationid,
-            ROW_NUMBER() OVER (PARTITION BY PartID, locationid ORDER BY FeedbackDate DESC) AS rn
+            ROW_NUMBER() OVER (PARTITION BY PartNumber, locationid ORDER BY FeedbackDate DESC) AS rn
         FROM ${tableName}
         WHERE locationid IN (${locationResults.map(l => l.locationid).join(',')})
     )
-    SELECT FeedbackID, PartID, locationid
+    SELECT FeedbackID, PartNumber, locationid
     FROM RankedFeedback
     WHERE rn = 1;
 `;
@@ -966,7 +979,7 @@ LEFT JOIN z_scope..Part_Master AS pm2
             const previousFBResult = await pool.request().query(queryPreviousFBID);
             if (previousFBResult.recordset.length) {
                 previousFBIDs.push(...previousFBResult.recordset.map(row => ({
-                    Partid: row.PartID,
+                    PartNumber: row.partNumber,
                     LocationID: row.locationid, // Include locationid
                     PreviousFBID: row.FeedbackID
                 })));
@@ -975,14 +988,14 @@ LEFT JOIN z_scope..Part_Master AS pm2
             console.error("Error fetching PreviousFBIDs:", fetchError);
 
         }
-        // console.log(previousFBIDs);
+        // console.log(`previousFBIDs`,previousFBIDs);
 
         // Inside "Get maxValue for each part-location pair" section
         let maxValueMapping = [];
 
         // Query for maxvalue for all relevant locations
         const queryMaxValue = `
-    SELECT partid, locationid, maxvalue 
+    SELECT partnumber, locationid, maxvalue 
     FROM ${maxTable} 
     WHERE locationid IN (${locationResults.map(l => l.locationid).join(',')}) and addedby != 7
     AND stockdate = (
@@ -998,13 +1011,13 @@ LEFT JOIN z_scope..Part_Master AS pm2
 
         if (maxResult.recordset.length) {
             maxValueMapping = maxResult.recordset.map(row => ({
-                Partid: row.partid,
+                PartNumber: row.partnumber,
                 LocationID: row.locationid, // Use actual locationid
                 MaxValue: row.maxvalue
             }));
         }
 
-        // console.log(maxValueMapping);
+        // console.log(`maxValueMapping`,maxValueMapping);
 
         // console.log("PreviousFBIDs:", previousFBIDs);
         const UserID = addedby;
@@ -1025,7 +1038,7 @@ LEFT JOIN z_scope..Part_Master AS pm2
         // console.log("previousFBIDs:", previousFBIDs);
 
         // Transform the data to only include the required fields
-        const formattedData = updatedCleanedData.map(item => {
+        const formattedData = cleanedData.map(item => {
             const brandMapping = brandResults.find(b => b.brand === item.Brand);
             const dealerMapping = dealerResults.find(d => d.dealer === item.Dealer);
             const locationMapping = locationResults.find(l => l.location === item.Location);
@@ -1034,19 +1047,19 @@ LEFT JOIN z_scope..Part_Master AS pm2
             const locationid = locationMapping ? Number(locationMapping.locationid) : null;
 
             // 1. LatestPartID Mapping
-            const latestpartidMapping = latestPartIDs.find(lp =>
-                lp.Partid === item.Partid // Ensure `Partid` exists in latestPartIDs
+            const latestpartidMapping = latestParts.find(lp =>
+                lp.PartNumber === item.partnumber // Ensure `Partid` exists in latestPartIDs
             );
 
             // 2. MaxValue Mapping
             const maxValueMappingItem = maxValueMapping.find(mv =>
-                mv.Partid === item.Partid &&
+                mv.PartNumber === item.partnumber &&
                 mv.LocationID === locationid // Match numeric LocationID
             );
 
             // 3. PreviousFBID Mapping
             const partidPreviousFBIDMapping = previousFBIDs.find(pfb =>
-                pfb.Partid === item.Partid &&
+                pfb.PartNumber === item.partnumber &&
                 pfb.LocationID === locationid
             );
 
@@ -1063,8 +1076,8 @@ LEFT JOIN z_scope..Part_Master AS pm2
                 dealerid: dealerMapping?.dealerid,
                 locationid: locationid,
                 maxvalue: maxValueMappingItem?.MaxValue ?? null, // Default to null if undefined
-                partid: item.Partid,
-                latestpartid: latestpartidMapping?.LatestPartID ?? null,
+                // partnumber: item.partnumber,
+                latestpartnumber: latestpartidMapping?.LatestPart ?? null,
                 UserID: UserID,
                 UserFBRemarkID: UserFBRemarkID,
                 // UserFBRemarkID: matchedRemark?.RemarkID ?? null,
@@ -1121,7 +1134,7 @@ LEFT JOIN z_scope..Part_Master AS pm2
         // console.log(formattedData);
 
         // await transaction.begin(); // Start transaction
-        // console.log(formattedData);
+        // console.log(`formattedData`,formattedData);
 
 
         await insertData(formattedData, tableName)  // Insert Function to insert formatted data into table

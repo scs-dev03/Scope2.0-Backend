@@ -2,7 +2,7 @@ import sql from 'mssql'
 import xlsx from 'xlsx'
 import { getPool1, getPool2 } from '../db/db.js'
 
-const partBrandCheck = async (dealerid, locationid, partid) => {
+const partBrandCheck = async (dealerid, locationid, partnumber) => {
   try {
     const pool = await getPool2()
     const partCheck = `
@@ -13,7 +13,7 @@ const partBrandCheck = async (dealerid, locationid, partid) => {
         SELECT 1 
         FROM Stockable_Nonstockable_TD001_${dealerid} 
         WHERE locationid = ${locationid} 
-        AND partid = ${partid} 
+        AND partnumber = '${partnumber}'
         AND addedby <> 7
         AND stockdate = (SELECT MAX(stockdate) FROM Stockable_Nonstockable_TD001_${dealerid} where locationid = ${locationid} and addedby <> 7)
         ) 
@@ -35,10 +35,10 @@ const partBrandCheck = async (dealerid, locationid, partid) => {
 
   }
 }
-const statusCheck = async (locationid, partid, table) => {
+const statusCheck = async (locationid, partnumber, table) => {
   const pool = await getPool2()
   // console.log(locationid,partid,table);
-  const query = `select top 1 status from ${table} where locationid = ${locationid} and partid = ${partid} order by feedbackid desc`
+  const query = `select top 1 status from ${table} where locationid = ${locationid} and partnumber = '${partnumber}' order by feedbackid desc`
   const result = await pool.request().query(query)
   const resultarray = result.recordset
   const isArrayEmpty = (arr) => !arr || arr.length === 0;
@@ -136,8 +136,8 @@ const insertData = async (formattedData, tableName) => {
     table.columns.add('Brandid', sql.TinyInt, { nullable: false });   // tinyint
     table.columns.add('Dealerid', sql.Int, { nullable: false });  // int
     table.columns.add('Locationid', sql.Int, { nullable: false });  // int
-    table.columns.add('PartID', sql.Int, { nullable: false });  // int
-    table.columns.add('LatestPartID', sql.VarChar(100), { nullable: true });  // varchar(100)
+    table.columns.add('PartNumber', sql.VarChar, { nullable: false });  // int
+    table.columns.add('LatestPartNumber', sql.VarChar(100), { nullable: false });  // varchar(100)
     table.columns.add('MaxValue', sql.Decimal(10, 2), { nullable: false });  // decimal(10,2)
     table.columns.add('UserID', sql.Int, { nullable: false });  // int
     table.columns.add('UserFBRemarkID', sql.Int, { nullable: true });  // int
@@ -151,8 +151,8 @@ const insertData = async (formattedData, tableName) => {
         parseInt(r.brandid, 10),
         parseInt(r.dealerid, 10),
         parseInt(r.locationid, 10),
-        parseInt(r.partid, 10),
-        r.latestpartid != null ? String(r.latestpartid) : null,
+        r.PartNumber,
+        r.latestpartnumber != null ? String(r.latestpartnumber) : null,
         parseFloat(r.maxvalue),
         parseInt(r.UserID, 10),
         r.UserFBRemarkID != null ? parseInt(r.UserFBRemarkID, 10) : null,
@@ -280,13 +280,13 @@ function findLocationPartidDuplicates(data) {
   const duplicates = [];
 
   data.forEach(item => {
-    const key = `${item.Location}-${item.Partid}`;
+    const key = `${item.Location}-${item.partnumber}`;
     // console.log(key);
 
     if (seen.has(key)) {
       // Add duplicate entry if not already tracked
       if (seen.get(key) === 1) { // Only add once per duplicate group
-        duplicates.push({ Location: item.Location, Partid: item.Partid });
+        duplicates.push({ Location: item.Location, partnumber: item.partnumber });
       }
       seen.set(key, seen.get(key) + 1);
     } else {
@@ -325,19 +325,22 @@ const checkPendingFeedbackAndStatus = async (dealerid, tableName, formattedData,
     const pool = await getPool2();
 
     // Fetch pending feedback records for the given dealer
-    const query = `SELECT partid, locationid FROM ${tableName} WHERE dealerid = ${dealerid} and status = 'Pending'`;
+    const query = `SELECT partnumber, locationid FROM ${tableName} WHERE dealerid = ${dealerid} and status = 'Pending'`;
     // console.log(query);
 
     const result = await pool.request().query(query);
     const pendingStatusData = result.recordset;
 
     // Create a Set for quick lookup
-    const pendingSet = new Set(pendingStatusData.map(item => `${item.partid}-${item.locationid}`));
+    const pendingSet = new Set(pendingStatusData.map(item => `${item.partnumber}-${item.locationid}`));
+    // console.log(pendingSet);
+    
 
     // Find the records in formattedData that exist in pendingStatusData
     const pendingRecords = formattedData.filter(item =>
-      pendingSet.has(`${item.partid}-${item.locationid}`)
+      pendingSet.has(`${item.PartNumber}-${item.locationid}`)
     );
+// console.log(pendingRecords);
 
     return pendingRecords.length > 0 ? pendingRecords : [];
 
