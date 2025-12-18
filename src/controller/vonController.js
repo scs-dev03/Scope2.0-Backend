@@ -4,7 +4,6 @@ import sql from 'mssql'
 import fs from 'fs'
 import { partBrandCheck, readExcel, insertData, findLocationPartidDuplicates, checkPendingFeedbackAndStatus, findLocationPartidDuplicatesAdmin, insertAdminFeedback, checkReviewedFeedbackByBrand, statusCheck } from '../utils/vonHelper.js'
 import { partfamilySaleservice } from '../services/norms-management/utils.service.js'
-import { query } from 'mssql2'
 
 
 
@@ -799,7 +798,8 @@ const dealerUpload = async (req, res) => {
             };
         });
 
-        // console.log("Final Item with Partid:", updatedCleanedData[0]);
+
+        // console.log("Final Item with Partid:", updatedCleanedData);
 
         // Get duplicates
         const isArrayEmpty = (arr) => !arr || arr.length === 0;
@@ -1085,7 +1085,7 @@ LEFT JOIN z_scope..Part_Master AS pm2
         //         }))
         //     });
         // }
-        // console.log(1, formattedData[0]);
+        // console.log(formattedData);
 
         const invalidRecords = formattedData.filter(item =>
             !item.locationid ||
@@ -1402,15 +1402,15 @@ const partflagCheck = async (partnumber, dealerid, locationid, flag) => {
     const queryflagzero = `use z_scope select * from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and partnumber1 = '${partnumber}' and Addedby != 7 and Maxvalue = 0 and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and Addedby != 7)`
     const queryflagone = `use z_scope select * from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and partnumber1 = '${partnumber}' and Addedby != 7 and Maxvalue > 0 and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and Addedby != 7)`
     let result;
-    if(flag){
+    if (flag) {
 
-         result = await pool.request().query(queryflagone)
+        result = await pool.request().query(queryflagone)
     }
-    else{
+    else {
         result = await pool.request().query(queryflagzero)
     }
     // console.log(result);
-    
+
     if (result.recordset.length === 0) {
         return false
     }
