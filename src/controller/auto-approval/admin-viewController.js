@@ -5,9 +5,9 @@ import { ApiResponse } from "../../utils/ApiResponse.js"
 const adminDashboard = async (req, res) => {
     try {
         const { BrandId, DealerId, LocationId, OrderTypeId, From, To } = req.body
-        if (!From || !To) {
-            return res.status(400).json(new ApiError(400, `From and To are required `))
-        }
+        // if (!From || !To) {
+        //     return res.status(400).json(new ApiError(400, `From and To are required `))
+        // }
         function format(arr) {
             if (!Array.isArray(arr) || arr.length === 0) return null;
             const s = arr.map(v => String(v).trim()).filter(Boolean).join(',');

@@ -158,13 +158,13 @@ const SixMonthLocationwiseSaleValue = async (dealerid, locationId) => {
 
 const multiDealerService = async (BrandIds) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool2()
         const query = `
         use z_scope
-        select Brand , DealerID , Dealer from LocationInfo where Brandid in (${BrandIds}) 
+        select BrandId , DealerID , Dealer from LocationInfo where Brandid in (${BrandIds}) 
         AND DealerStatus = 1
-        Group by Brand , Dealer , DealerID
-        order by Brand , Dealer`
+        Group by BrandId , Dealer , DealerID
+        order by BrandId , Dealer`
         const result = await pool.request().query(query)
         return result.recordset
     } catch (error) {
@@ -174,13 +174,13 @@ const multiDealerService = async (BrandIds) => {
 
 const multiLocationService = async (DealerIds) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool2()
         const query = `
         use z_scope
-        select Dealer, LocationID , Location from LocationInfo where DealerId in (${DealerIds}) 
+        select BrandId , DealerId , LocationID , Location from LocationInfo where DealerId in (${DealerIds}) 
         AND OgsStatus = 1
-        Group by Dealer, LocationID , Location
-        Order by Dealer ,Location`
+        Group by DealerId, LocationID , Location , BrandId
+        Order by DealerId ,Location`
         const result = await pool.request().query(query)
         return result.recordset
     } catch (error) {

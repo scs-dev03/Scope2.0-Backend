@@ -5,7 +5,8 @@ import {
     modifyTemplate,
     getTemplate,
     getAllRules,
-    getRuleOutput
+    getRuleOutput,
+    viewRules
 } from "../../controller/auto-approval/rule-managementController.js"
 
 const router = Router();
@@ -13,15 +14,22 @@ const router = Router();
 router.post("/add-template",addTemplate);
 router.put("/modify-template",modifyTemplate);
 router.post("/template",getTemplate);
+
 router.post("/add-rule", addRule);
+router.post("/view-rule", viewRules);
+
+
 router.put("/modify-rule", modifyRule);
 router.get("/view-rules",getAllRules)
+
+router.post("/rule-mappings", getRuleMappings);
 router.post("/add-ruleMapping", addRuleMapping);
 router.put("/modify-ruleMapping", modifyRuleMapping)
+
 router.post("/add-priority-mapping", addPriorityMapping);
-router.put("/modify-priority-mapping", modifyPriorityMapping);
-router.post("/rule-mappings", getRuleMappings);
+router.put("/modify-priority", modifyPriorityMapping);
 router.post("/priority-mappings", getPriorityMappings);
+
 router.get("/view-ruleoutput",getRuleOutput);
 
 export default router;

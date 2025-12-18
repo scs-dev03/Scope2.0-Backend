@@ -1,7 +1,7 @@
-import { stat } from "fs";
 import { getPool1 } from "../../db/db.js";
 import { ApiError } from "../../utils/ApiError.js";
-import { trace } from "console";
+import sql from 'mssql'
+
 
 export const insertTemplate = async (name, TempDesc, Template, createdBy, trueOutput, falseOutput, trueRemark, falseRemark) => {
     const pool = await getPool1();
@@ -25,10 +25,10 @@ export const insertTemplate = async (name, TempDesc, Template, createdBy, trueOu
             .input("tempDesc", TempDesc)
             .input("Template", Template)
             .input("createdBy", createdBy)
-            .input("trueOutput",trueOutput)
-            .input("falseOutput",falseOutput)
-            .input("trueRemark",trueRemark)
-            .input("falseRemark",falseRemark)
+            .input("trueOutput", trueOutput)
+            .input("falseOutput", falseOutput)
+            .input("trueRemark", trueRemark)
+            .input("falseRemark", falseRemark)
             .query(`
         INSERT INTO z_scope..aap_ruletemplate ([Name],[TempDesc],[Template],[CreatedBy],[trueOutput],[falseOutput],[trueRemark],[falseRemark])
 VALUES (@name, @tempDesc, @Template, @createdBy, @trueOutput, @falseOutput, @trueRemark, @falseRemark)
@@ -44,7 +44,7 @@ VALUES (@name, @tempDesc, @Template, @createdBy, @trueOutput, @falseOutput, @tru
     }
 };
 
-export const updateTemplate = async (templateId, name, tempDesc, template, createdBy, status,trueOutput,falseOutput,trueRemark,falseRemark) => {
+export const updateTemplate = async (templateId, name, tempDesc, template, createdBy, status, trueOutput, falseOutput, trueRemark, falseRemark) => {
     try {
         const pool = await getPool1();
         const duplicateCheck = await pool.request()
@@ -94,10 +94,10 @@ WHERE Id = @templateId
             .input("template", template)
             .input("createdBy", createdBy)
             .input("status", status)
-            .input("trueOutput",trueOutput)
-            .input("falseOutput",falseOutput)
-            .input("trueRemark",trueRemark)
-            .input("falseRemark",falseRemark)
+            .input("trueOutput", trueOutput)
+            .input("falseOutput", falseOutput)
+            .input("trueRemark", trueRemark)
+            .input("falseRemark", falseRemark)
             .query(query);
         if (result.rowsAffected[0] === 0) {
             throw new ApiError(404, "No tempalte exists for this template id");
@@ -108,6 +108,7 @@ WHERE Id = @templateId
         throw new ApiError(err.statusCode || 500, err.message || "server error");
     }
 };
+
 export const fetchTemplate = async (createdBy, startDate, endDate) => {
     const pool = await getPool1();
     try {
@@ -129,11 +130,14 @@ WHERE (@createdBy IS NULL OR CreatedBy =@createdby)
         throw new ApiError(500, err.message);
     }
 }
-export const insertRule = async (LocationId, name, description, expression, trueOutput, falseOutput, createdBy, trueRemark, falseRemark) => {
-    const pool = await getPool1();
-    const transaction = pool.transaction();
+
+export const insertRule = async (transaction, name, description, expression, trueOutput, falseOutput, createdBy, trueRemark, falseRemark, ruleFor, RuleType) => {
+    // const pool = await getPool1();
+    // const transaction = pool.transaction();
     try {
-        await transaction.begin();
+        // await transaction.begin();
+        // console.log(`transaction inside`,transaction);
+
         const duplicateCheck = await transaction.request()
             .input("name", name)
             .input("expression", expression)
@@ -142,9 +146,10 @@ export const insertRule = async (LocationId, name, description, expression, true
                 FROM z_scope..aap_rulemaster
                 WHERE [Name] = @name OR [Rule] = @expression
             `);
+        // console.log(duplicateCheck.recordsets);
 
         if (duplicateCheck.recordset.length > 0) {
-            throw new ApiError(400, "Rule with same name or expression already exists");
+            throw new ApiError(409, "Rule with same name or expression already exists");
         }
         const result = await transaction.request()
             .input("name", name)
@@ -154,35 +159,28 @@ export const insertRule = async (LocationId, name, description, expression, true
             .input("falseOutput", falseOutput)
             .input("trueRemark", trueRemark)
             .input("falseRemark", falseRemark)
+            .input("ruleFor", ruleFor)
+            .input("RuleType", RuleType)
+            .input("AddedBy", createdBy)
             .query(`
-        INSERT INTO z_scope..aap_rulemaster ([Name],[RuleDesc],[Rule],[TrueOutput],[FalseOutput],TrueRemarks,FalseRemarks)
+        INSERT INTO z_scope..aap_rulemaster ([Name],[RuleDesc],[Rule],[TrueOutput],[FalseOutput],TrueRemarks,FalseRemarks,RuleFor, RuleType , AddedBy)
         OUTPUT INSERTED.id
-VALUES (@name, @description, @expression, @trueOutput,@falseOutput, @trueRemark, @falseRemark)
+        VALUES (@name, @description, @expression, @trueOutput,@falseOutput, @trueRemark, @falseRemark , @ruleFor , @RuleType, @AddedBy)
       `);
         const ruleId = result.recordset[0].id;
         if (result.rowsAffected[0] === 0) {
             throw new ApiError(404, "No rule exists for this rule id");
         }
-        if (LocationId) {
-            const locationMapping = await transaction.request()
-                .input("ruleId", ruleId)
-                .input("LocationId", LocationId)
-                .input("createdBy", createdBy)
-                .query(
-                    `INSERT INTO z_scope..AAP_RuleMapping (LocationId, RuleId, CreatedBy)
-                OUTPUT INSERTED.Id
-                VALUES (@LocationId, @RuleId, @CreatedBy)`
-                )
-        }
-        await transaction.commit();
-        return result.recordset;
+        // console.log(ruleId);
+        // await transaction.commit();
+        return ruleId;
     } catch (err) {
-        await transaction.rollback();
+        // await transaction.rollback();
         throw new ApiError(err.statusCode || 500, err.message || "server error");
     }
 };
 
-export const updateRule = async (ruleId, name, description, expression, trueOutput, falseOutput, trueRemark, falseRemark) => {
+export const updateRule = async (ruleId, name, description, expression, trueOutput, falseOutput, trueRemark, falseRemark, ruleFor) => {
     try {
         const pool = await getPool1();
         const duplicateCheck = await pool.request()
@@ -221,6 +219,8 @@ export const updateRule = async (ruleId, name, description, expression, trueOutp
         request.input("falseOutput", falseOutput);
         request.input("trueRemark", trueRemark);
         request.input("falseRemark", falseRemark);
+        request.input("RuleFor", ruleFor);
+        // request.input("RuleType", RuleType);
 
         const query = `
     UPDATE z_scope..aap_rulemaster
@@ -231,7 +231,9 @@ export const updateRule = async (ruleId, name, description, expression, trueOutp
         [TrueOutput] = COALESCE(@trueOutput, [TrueOutput]),
         [FalseOutput]= COALESCE(@falseOutput, [FalseOutput]),
         TrueRemarks=COALESCE(@trueRemark,TrueRemarks),
-        FalseRemarks=COALESCE(@falseRemark,FalseRemarks)
+        FalseRemarks=COALESCE(@falseRemark,FalseRemarks),
+        RuleFor=COALESCE(@RuleFor,RuleFor)
+        --RuleType=COALESCE(@RuleType,RuleType),
     WHERE Id = @RuleId
 `;
         const result = await request.query(query);
@@ -246,82 +248,117 @@ export const updateRule = async (ruleId, name, description, expression, trueOutp
     }
 };
 
-export const insertRuleMapping = async (BrandId, RuleId, CreatedBy, DealerId, LocationId) => {
+// export const insertRuleMapping = async (BrandId, RuleId, CreatedBy, DealerId, LocationId) => {
 
-    const pool = await getPool1();
-    const transaction = pool.transaction();
+//     const pool = await getPool1();
+//     const transaction = pool.transaction();
+//     try {
+//         await transaction.begin();
+//         let brandCheck = await transaction.request()
+//             .input("RuleId", RuleId)
+//             .input("BrandId", BrandId)
+//             .query(`
+//                 SELECT TOP 1 Id FROM z_scope..AAP_RuleMapping 
+//                 WHERE RuleId = @RuleId AND BrandId = @BrandId 
+//                   AND DealerId IS NULL AND LocationId IS NULL
+//             `);
+
+//         if (brandCheck.recordset.length > 0) {
+//             throw new ApiError(400, `Rule already mapped at Brand level`, {
+//                 mappingId: brandCheck.recordset[0].Id
+//             });
+//         }
+
+
+//         if (DealerId) {
+//             let dealerCheck = await transaction.request()
+//                 .input("RuleId", RuleId)
+//                 .input("BrandId", BrandId)
+//                 .input("DealerId", DealerId)
+//                 .query(`
+//                     SELECT TOP 1 Id FROM z_scope..AAP_RuleMapping 
+//                     WHERE RuleId = @RuleId AND BrandId = @BrandId 
+//                       AND DealerId = @DealerId AND LocationId IS NULL
+//                 `);
+
+//             if (dealerCheck.recordset.length > 0) {
+//                 throw new ApiError(400, `Rule already mapped at Dealer level`, {
+//                     mappingId: dealerCheck.recordset[0].Id
+//                 });
+//             }
+//         }
+
+//         if (DealerId && LocationId) {
+//             let locationCheck = await transaction.request()
+//                 .input("RuleId", RuleId)
+//                 .input("BrandId", BrandId)
+//                 .input("DealerId", DealerId)
+//                 .input("LocationId", LocationId)
+//                 .query(`
+//                     SELECT TOP 1 Id FROM z_scope..AAP_RuleMapping 
+//                     WHERE RuleId = @RuleId AND BrandId = @BrandId 
+//                       AND DealerId = @DealerId AND LocationId = @LocationId
+//                 `);
+
+//             if (locationCheck.recordset.length > 0) {
+//                 throw new ApiError(400, `Rule already mapped at Location level`, {
+//                     mappingId: locationCheck.recordset[0].Id
+//                 });
+//             }
+//         }
+
+//         const result = await transaction.request()
+//             .input("BrandId", BrandId)
+//             .input("DealerId", DealerId)
+//             .input("LocationId", LocationId)
+//             .input("RuleId", RuleId)
+//             .input("CreatedBy", CreatedBy)
+//             .query(`
+//                 INSERT INTO z_scope..AAP_RuleMapping (BrandId, DealerId, LocationId, RuleId, CreatedBy)
+//                 OUTPUT INSERTED.Id
+//                 VALUES (@BrandId, @DealerId, @LocationId, @RuleId, @CreatedBy)
+//             `);
+//         await transaction.commit();
+//         return { mappingId: result.recordset[0].Id };
+
+//     } catch (err) {
+//         await transaction.rollback();
+//         throw new ApiError(err.statusCode || 500, err.message);
+//     }
+// };
+
+export const insertRuleMapping = async (transaction, mappings) => {
+    if (!Array.isArray(mappings) || mappings.length === 0) return;
+
     try {
-        await transaction.begin();
-        let brandCheck = await transaction.request()
-            .input("RuleId", RuleId)
-            .input("BrandId", BrandId)
-            .query(`
-                SELECT TOP 1 Id FROM z_scope..AAP_RuleMapping 
-                WHERE RuleId = @RuleId AND BrandId = @BrandId 
-                  AND DealerId IS NULL AND LocationId IS NULL
-            `);
+        // const pool = await getPool1();
 
-        if (brandCheck.recordset.length > 0) {
-            throw new ApiError(400, `Rule already mapped at Brand level`, {
-                mappingId: brandCheck.recordset[0].Id
-            });
+        // 👇 Table definition must match your real table columns
+        const table = new sql.Table("AAP_RuleMapping"); // if needed: "dbo.AAP_RuleMapping"
+        table.create = false; // table already exists
+
+        table.columns.add("RuleId", sql.Int, { nullable: true });
+        table.columns.add("BrandId", sql.Int, { nullable: true });
+        table.columns.add("DealerId", sql.Int, { nullable: true });
+        table.columns.add("LocationId", sql.Int, { nullable: true });
+        table.columns.add("CreatedBy", sql.Int, { nullable: true });
+
+        for (const row of mappings) {
+            table.rows.add(
+                row.RuleId,
+                row.BrandId ?? null,
+                row.DealerId ?? null,
+                row.LocationId ?? null,
+                row.createdBy
+            );
         }
 
-
-        if (DealerId) {
-            let dealerCheck = await transaction.request()
-                .input("RuleId", RuleId)
-                .input("BrandId", BrandId)
-                .input("DealerId", DealerId)
-                .query(`
-                    SELECT TOP 1 Id FROM z_scope..AAP_RuleMapping 
-                    WHERE RuleId = @RuleId AND BrandId = @BrandId 
-                      AND DealerId = @DealerId AND LocationId IS NULL
-                `);
-
-            if (dealerCheck.recordset.length > 0) {
-                throw new ApiError(400, `Rule already mapped at Dealer level`, {
-                    mappingId: dealerCheck.recordset[0].Id
-                });
-            }
-        }
-
-        if (DealerId && LocationId) {
-            let locationCheck = await transaction.request()
-                .input("RuleId", RuleId)
-                .input("BrandId", BrandId)
-                .input("DealerId", DealerId)
-                .input("LocationId", LocationId)
-                .query(`
-                    SELECT TOP 1 Id FROM z_scope..AAP_RuleMapping 
-                    WHERE RuleId = @RuleId AND BrandId = @BrandId 
-                      AND DealerId = @DealerId AND LocationId = @LocationId
-                `);
-
-            if (locationCheck.recordset.length > 0) {
-                throw new ApiError(400, `Rule already mapped at Location level`, {
-                    mappingId: locationCheck.recordset[0].Id
-                });
-            }
-        }
-
-        const result = await transaction.request()
-            .input("BrandId", BrandId)
-            .input("DealerId", DealerId)
-            .input("LocationId", LocationId)
-            .input("RuleId", RuleId)
-            .input("CreatedBy", CreatedBy)
-            .query(`
-                INSERT INTO z_scope..AAP_RuleMapping (BrandId, DealerId, LocationId, RuleId, CreatedBy)
-                OUTPUT INSERTED.Id
-                VALUES (@BrandId, @DealerId, @LocationId, @RuleId, @CreatedBy)
-            `);
-        await transaction.commit();
-        return { mappingId: result.recordset[0].Id };
-
+        await transaction.request().bulk(table);
     } catch (err) {
-        await transaction.rollback();
-        throw new ApiError(err.statusCode || 500, err.message);
+        throw new ApiError(
+            err.statusCode || 500,
+            err.message || "Error inserting rule mappings"
+        );
     }
 };
 
@@ -458,12 +495,12 @@ export const insertPriorityMapping = async (LocationId, RuleId, Priority, Create
             WHERE LocationId = @LocationId AND Priority = @Priority
         `);
 
-        if (presult.recordset.length > 0) {
-            await transaction.request()
-                  .input("LocationId",LocationId)
-                  .input("Priority",Priority)
-                  .query(
-                    `update z_scope..AAP_LocationPriority
+            if (presult.recordset.length > 0) {
+                await transaction.request()
+                    .input("LocationId", LocationId)
+                    .input("Priority", Priority)
+                    .query(
+                        `update z_scope..AAP_LocationPriority
                      set Priority=Priority+1
                      where LocationId=@LocationId  and Priority>=@Priority`
                     )
@@ -580,7 +617,7 @@ export const fetchRuleMappings = async (BrandId, LocationId, DealerId) => {
         Left join z_scope..AAP_RuleMaster r on mp.RuleID=r.id
         left join LocationInfo li on mp.LocationId=li.LocationID 
         WHERE li.BrandId = @BrandId`;
-        
+
         const request = pool.request().input("BrandId", BrandId);
 
         if (LocationId) {
@@ -646,4 +683,51 @@ export const fetchRuleOutput = async () => {
     }
 };
 
+export const insertLocationWisePriority = async (transaction , ruleId, userId) => {
+    // const pool = await getPool1()
+ try {
+       const checkQuery = `select 1 from AAP_RuleMaster where Id = @Id `
+       const result = await transaction.request().input('Id',sql.Int,ruleId).query(checkQuery)
+       // console.log(result);
+       if(result.rowsAffected == 1){
+           await transaction.request()
+           .input('RuleId',ruleId)
+           .input('AddedBy',userId)
+           .execute(`dbo.AAP_SetLocationPriority`)
+       }
+       else{
+           throw new ApiError(500,`RuleId doesn't exists -> ${ruleId}`)
+       }
+ } catch (error) {
+    throw new ApiError(500,error.message)
+ }
+    
+}
 
+export const viewRulesService = async(BrandId,DealerId,LocationId,RuleId)=>{
+try {
+        const pool = await getPool1()
+        const query = `select vcbrand Brand ,  vcName Dealer, li.Location ,rm.Name, rm.[Rule] , lp.priority   , lp.Status , rm.id , lp.LocationId
+                        from AAP_RuleMaster rm
+                        JOIN AAP_RuleMapping rmp on rm.id = rmp.ruleid
+                        JOIN AAP_LocationPriority lp on lp.ruleid = rm.Id
+                        JOIN Brand_Master bm on bm.bigid = rmp.BrandId
+                        JOIN Dealer_Master dm on dm.bigid = rmp.DealerId
+                        JOIN LocationInfo li on li.locationid = rmp.locationid 
+                        where (@BrandId IS NULL OR rmp.BrandId = @BrandId)
+                        AND (@DealerId IS NULL OR rmp.DealerId = @DealerID)
+                        AND (@LocationId IS NULL OR rmp.LocationId = @LocationId)
+                        AND (@RuleID IS NULL OR rmp.RuleID = @RuleID)
+                        order by lp.locationid , lp.priority`
+        const result = await pool.request()
+        .input('BrandId',sql.Int,BrandId)
+        .input('DealerId',sql.Int,DealerId)
+        .input('LocationId',sql.Int,LocationId)
+        .input('RuleId',sql.Int,RuleId)
+        .query(query)
+        return result.recordset
+} catch (error) {
+    throw new ApiError(500,error.message);
+    
+}
+}

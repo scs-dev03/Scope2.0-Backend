@@ -7,7 +7,7 @@ const viewMappingService = async (BrandId, DealerId, LocationId, UserId) => {
         // console.log(BrandId, DealerId, LocationId, UserId);
 
         const pool = await getPool1()
-        const query = `select bm.vcbrand Brand , dm.vcName Dealer , li.Location , CONCAT(amg.vcFirstName,' ',amg.vcLastName)Name , mm.Addedon , CONCAT(amg2.vcFirstName,' ',amg2.vcLastName)AddedBy 
+        const query = `[use z_scope] select bm.vcbrand Brand ,bm.bigid BrandId, dm.vcName Dealer, dm.bigid DealerId , li.Location ,li.LocationID LocationId, CONCAT(amg.vcFirstName,' ',amg.vcLastName)Name , mm.Addedon , CONCAT(amg2.vcFirstName,' ',amg2.vcLastName)AddedBy , amg2.bintId_Pk AddedbyId
         from AAP_BrandWiseMapping mm
         left JOIN Brand_Master bm on bm.bigid = mm.BrandId
         left JOIN dealer_master dm on dm.bigid = mm.DealerId
