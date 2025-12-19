@@ -7,7 +7,7 @@ const viewMappingService = async (BrandId, DealerId, LocationId, UserId) => {
         // console.log(BrandId, DealerId, LocationId, UserId);
 
         const pool = await getPool1()
-        const query = `[use z_scope] select bm.vcbrand Brand ,bm.bigid BrandId, dm.vcName Dealer, dm.bigid DealerId , li.Location ,li.LocationID LocationId, CONCAT(amg.vcFirstName,' ',amg.vcLastName)Name , mm.Addedon , CONCAT(amg2.vcFirstName,' ',amg2.vcLastName)AddedBy , amg2.bintId_Pk AddedbyId
+        const query = `use z_scope select bm.vcbrand Brand ,bm.bigid BrandId, dm.vcName Dealer, dm.bigid DealerId , li.Location ,li.LocationID LocationId, CONCAT(amg.vcFirstName,' ',amg.vcLastName)Name , mm.Addedon , CONCAT(amg2.vcFirstName,' ',amg2.vcLastName)AddedBy , amg2.bintId_Pk AddedbyId
         from AAP_BrandWiseMapping mm
         left JOIN Brand_Master bm on bm.bigid = mm.BrandId
         left JOIN dealer_master dm on dm.bigid = mm.DealerId
@@ -19,6 +19,8 @@ const viewMappingService = async (BrandId, DealerId, LocationId, UserId) => {
         AND (@DealerId IS NULL OR mm.DealerId in (${DealerId}))
         AND (@LocationId IS NULL OR mm.LocationId in  (${LocationId}))
         and mm.Status = 1`
+        // console.log(query);
+        
         const result = await pool.request()
             .input('BrandId', sql.VarChar, BrandId ?? null)
             .input('DealerId', sql.VarChar, DealerId ?? null)

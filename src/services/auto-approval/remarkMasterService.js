@@ -39,9 +39,12 @@ const remarktypeMasterService = async (Type) => {
 const remarkViewService = async (BrandId, DealerId, LocationId, RemarkFor, RemarkTypeId) => {
     try {
         const pool = await getPool1()
-        const query = `select rm.Id ,li.Brand , li.Dealer , li.Location , rm.Remark, rtm.RemarkFor , rtm.Remark Type , rm.Addedby  , rm.AddedOn  from AAP_RemarkMaster rm
+        const query = `use z_scope select rm.Id ,bm.vcbrand Brand , dm.vcName Dealer , li.Location , bm.bigid BrandId , dm.bigid DealerId , li.locationid , rm.Remark, rtm.RemarkFor , rtm.Remark Type , rm.Addedby AddedbyId ,CONCAT(vcFirstName,' ',vcLastName)Addedby , rm.AddedOn  from AAP_RemarkMaster rm
             JOIN AAP_RemarkTypeMaster rtm on rm.Remarktype = rtm.Id
             LEFT JOIN LocationInfo li on li.locationid = rm.locationid
+			left join Brand_Master bm on bm.bigid = rm.BrandId
+			left join Dealer_Master dm on dm.bigid = rm.DealerId
+			join AdminMaster_GEN amg on amg.bintId_Pk = rm.AddedBy
             where (@BrandId IS NULL OR rm.Brandid = @BrandId)
             AND (@DealerId IS NULL OR rm.DealerId = @DealerID)
             AND (@LocationId IS NULL OR rm.LocationId = @LocationID)
