@@ -4,12 +4,13 @@ import {app}  from "./app.js"
 import cron from 'node-cron'
 import { scheduleTask, siRefresh } from './controller/dashboardSchedulerController.js'
 const PORT = process.env.PORT || 3000
+
 // connectDB()
-// // .then(()=>{
-// //     app.listen(PORT,()=>{
-// //         console.log(`Server is runnning at PORT: ${PORT}`)
-// //     })
-// // })
+// .then(()=>{
+//     app.listen(PORT,()=>{
+//         console.log(`Server is runnning at PORT: ${PORT}`)
+//     })
+// })
 // .catch((err)=>{
 //     console.log(" connection failed",err);
 // })
