@@ -78,3 +78,51 @@ export const getLrnsByLspService = async (lspName) => {
 
   return result.recordset;
 };
+
+export const getLrnsByDispatchOrderService = async (dispatchOrderNo) => {
+  const pool = await getPool1();
+  const request = pool.request();
+
+  request.input("DispatchOrderNo", dispatchOrderNo);
+
+  const result = await request.query(`
+    SELECT *
+    FROM dbo.lsp_lrn
+    WHERE DispatchOrderNo = @DispatchOrderNo
+    ORDER BY CreatedAt DESC
+  `);
+
+  return result.recordset;
+};
+
+export const getLrnByNumberService = async (lrNumber) => {
+  const pool = await getPool1();
+  const request = pool.request();
+
+  request.input("LRNumber", lrNumber);
+
+  const result = await request.query(`
+    SELECT *
+    FROM dbo.lsp_lrn
+    WHERE LRNumber = @LRNumber
+    ORDER BY CreatedAt DESC
+  `);
+
+  return result.recordset;
+};
+
+export const getLrnsByStatusService = async (status) => {
+  const pool = await getPool1();
+  const request = pool.request();
+
+  request.input("Status", status);
+
+  const result = await request.query(`
+    SELECT *
+    FROM dbo.lsp_lrn
+    WHERE Status = @Status
+    ORDER BY CreatedAt DESC
+  `);
+
+  return result.recordset;
+};
