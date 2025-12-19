@@ -182,6 +182,7 @@ const insertData = async (formattedData, tableName) => {
 const insertAdminFeedback = async (formattedData, brandid) => {
   const pool = await getPool2();
   const transaction = pool.transaction();
+// console.log(`1`,formattedData[0]);
 
   try {
     await transaction.begin();
@@ -223,6 +224,7 @@ const insertAdminFeedback = async (formattedData, brandid) => {
         CustomRem: item.CustomRem ? String(item.CustomRem) : null
       };
 
+      // console.log(`2`,formattedData[0]);
       // Validate required fields
       // if (isNaN(convertedRow.Brandid) || convertedRow.Brandid < 0 || convertedRow.Brandid > 255) {
       //   throw new Error(`Invalid Brandid: ${item.brandid}`);

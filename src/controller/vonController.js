@@ -172,7 +172,7 @@ const userFeedbacklog = async (req, res) => {
             Select ISNULL(@latest,@partnumber)Latest `
 
             const result = await pool.request().query(LatestPartQuery)
-            
+
             LatestPart = result.recordset.length > 0 ? result.recordset[0].Latest : null;
 
         } catch (error) {
@@ -186,13 +186,13 @@ const userFeedbacklog = async (req, res) => {
         WHERE partnumber = '${partnumber}' 
         ORDER BY FeedbackDate DESC
        `;
-    //    console.log(previousFBQuery);
-       
+            //    console.log(previousFBQuery);
+
 
             const previousFBResult = await pool.request()
                 // .input('partnumber', sql.VarChar, partnumber)
                 .query(previousFBQuery);
-// console.log(previousFBResult);
+            // console.log(previousFBResult);
 
             previousFBID = previousFBResult.recordset.length > 0 ? previousFBResult.recordset[0].FeedbackID : null;
             // console.log(previousFBID);
@@ -209,7 +209,7 @@ const userFeedbacklog = async (req, res) => {
         request.input('brandid', sql.TinyInt, brandid)
         request.input('dealerid', sql.Int, dealerid)
         request.input('locationid', sql.Int, locationid)
-        request.input('partnumber', sql.VarChar , partnumber)
+        request.input('partnumber', sql.VarChar, partnumber)
         request.input('userid', sql.Int, addedby)
         request.input('latestid', sql.VarChar, LatestPart)
         request.input('max', sql.Int, max)
@@ -386,10 +386,10 @@ const adminFeedbackLog = async (req, res) => {
             join ${dynamicTable} B on A.FeedbackID = B.FeedbackID
             where A.FeedbackID = ${feedbackid}
             )`;
-               console.log(previousAdminFBQuery);
+            console.log(previousAdminFBQuery);
 
             const previousAdminFBResult = await pool.request().query(previousAdminFBQuery);
-                // .input('feedbackid', sql.Int, feedbackid)
+            // .input('feedbackid', sql.Int, feedbackid)
             console.log(previousAdminFBResult);
 
             PreviousAdminFBID = previousAdminFBResult.recordset.length > 0 ? previousAdminFBResult.recordset[0].AdminFBID : null;
@@ -438,99 +438,36 @@ const partFamily = async (req, res) => {
         }
         // console.log(partnumber);
 
-        // const query = ` use [z_scope] 
-        //                 select pm.partnumber1, (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END)as LatestPartNumber , pm.partdesc, pm.category,pm.landedcost from [10.10.152.16].[z_scope].dbo.substitution_master sm 
-        //                 join [10.10.152.16].[z_scope].dbo.part_master pm on pm.brandid = sm.brandid and pm.partnumber1 = sm.partnumber1
-        //                 where sm.subpartnumber = (select distinct subpartnumber1 from [10.10.152.16].[z_scope].dbo.substitution_master where partnumber1 = @partnumber)`
-        // `use z_scope
-        //                 select pm.partnumber1, (CASE WHEN pm.BrandID = sm.BrandID AND pm.PartNumber = sm.PartNumber THEN sm.SubPartNumber ELSE pm.PartNumber END)as LatestPartNumber , pm.partdesc, pm.category,pm.landedcost from z_scope.dbo.Substitution_Master sm
-        //                 join z_scope.dbo.part_master pm on pm.brandid = sm.brandid and sm.partnumber = pm.partnumber
-        //                 where sm.subpartnumber = '${partnumber}' and sm.brandid = ${brandid}`
-        const query = ` DECLARE 
-                        @InputPart    VARCHAR(40) = '${partnumber}',   -- ← your input part
-                        @InputBrandID INT         = ${brandid};               -- ← your input brand
-                    
-                    DECLARE @RowsInserted INT;
-                    
-                    -- 0) Drop any old temp‐table
-                    IF OBJECT_ID('tempdb..#PartFamily','U') IS NOT NULL
-                        DROP TABLE #PartFamily;
-                    
-                    -- 1) Create a holding table: one row per (Part, BrandID)
-                    CREATE TABLE #PartFamily (
-                        Part    VARCHAR(40),
-                        BrandID INT,
-                        CONSTRAINT PK_PartFamily PRIMARY KEY (Part, BrandID)
-                    );
-                    
-                    -- 2) Seed it with exactly your input (part, brand)
-                    INSERT INTO #PartFamily(Part, BrandID)
-                    VALUES (@InputPart, @InputBrandID);
-                    
-                    -- 3) Iteratively grow the family within that brand
-                    SET @RowsInserted = 1;
-                    WHILE @RowsInserted > 0
-                    BEGIN
-                        INSERT INTO #PartFamily(Part, BrandID)
-                        SELECT DISTINCT
-                            sm.SubPartNumber1,
-                            sm.BrandID
-                        FROM z_scope..Substitution_Master AS sm
-                        JOIN #PartFamily AS f
-                          ON sm.PartNumber1 = f.Part
-                         AND sm.BrandID    = f.BrandID
-                        WHERE NOT EXISTS (
-                           SELECT 1
-                           FROM #PartFamily x
-                           WHERE x.Part    = sm.SubPartNumber1
-                             AND x.BrandID = sm.BrandID
-                        )
-                    
-                        UNION
-                    
-                        SELECT DISTINCT
-                            sm.PartNumber1,
-                            sm.BrandID
-                        FROM z_scope..Substitution_Master AS sm
-                        JOIN #PartFamily AS f
-                          ON sm.SubPartNumber1 = f.Part
-                         AND sm.BrandID        = f.BrandID
-                        WHERE NOT EXISTS (
-                           SELECT 1
-                           FROM #PartFamily x
-                           WHERE x.Part    = sm.PartNumber1
-                             AND x.BrandID = sm.BrandID
-                        );
-                    
-                        SET @RowsInserted = @@ROWCOUNT;
-                    END
-                    
-                    -- 4) Pull full details for every (Part, BrandID) found
-                     SELECT  
-                        pm.PartNumber1,
-						CASE when pf.part = sm.partnumber then sm.subpartnumber else pf.part end as LatestPartNumber,
-                        pm.PartDesc,
-                        pm.LandedCost,
-                        pm.MRP,
-                        pm.PartID,
-                        pm.Category,
-                        pm.MOQ,
-                        pm.BrandID
-                    FROM z_scope..Part_Master pm
-                    JOIN #PartFamily pf
-                      ON pm.PartNumber1 = pf.Part
-                     AND pm.BrandID     = pf.BrandID
-					 JOIN z_scope..Substitution_Master sm 
-					 on pf.BrandID = sm.brandid
-					 and pf.part = sm.partnumber1
-                    ORDER BY pm.PartNumber1, pm.BrandID;
-                    
-                    -- 5) Clean up
-                    DROP TABLE #PartFamily;`
+        const query = `use z_scope
+    DECLARE @Part TABLE (partnumber varchar(30),BrandId int)
+	
+        declare @latestpart varchar(20) 
+        select @latestpart = subpartnumber1 from Substitution_Master (nolock)
+        where brandid = @InputBrandID and (partnumber1 = @InputPart or subpartnumber1 = @InputPart)
+
+		insert into @Part(partnumber,BrandId)
+        select partnumber1 , @InputBrandID  from substitution_master (nolock) where brandid = @InputBrandID and subpartnumber1= @latestpart
+        union 
+        select ISNULL(@latestpart,@InputPart) ,@InputBrandID
+
+	SELECT  
+    pm.PartNumber1,
+	CASE when pf.partnumber = sm.partnumber then sm.subpartnumber else pf.partnumber end as LatestPartNumber,
+    pm.PartDesc,
+    pm.LandedCost,
+    pm.MRP,
+    pm.PartID,
+    pm.Category,
+    pm.MOQ,
+    pm.BrandID
+    FROM z_scope..Part_Master pm
+    JOIN @Part pf ON pm.PartNumber1 = pf.partnumber AND pm.BrandID = pf.BrandID
+	left  JOIN z_scope..Substitution_Master sm on pf.BrandID = sm.brandid and pf.partnumber = sm.partnumber1
+    ORDER BY pm.PartNumber1, pm.BrandID;`
 
         const result = await pool.request()
-            .input('partnumber', sql.VarChar, partnumber)
-            .input('brandid', sql.Int, brandid)
+            .input('InputPart', sql.VarChar, partnumber)
+            .input('InputBrandID', sql.Int, brandid)
             .query(query)
         // console.log(result.recordset);
 
@@ -766,6 +703,10 @@ const dealerUpload = async (req, res) => {
             }));
         //  console.log(cleanedData[0]);
 
+        const isArrayEmpty = (arr) => !arr || arr.length === 0;
+        if (isArrayEmpty(cleanedData)) {
+            return res.status(400).json({ message: `UserFeedback and ProposedQty cannot be null or undefined` })
+        }
         // Fetch the brandid and dealerid for a given brand and dealer if needed
         const brand = cleanedData[0].Brand;
         const dealer = cleanedData[0].Dealer;
@@ -809,12 +750,9 @@ const dealerUpload = async (req, res) => {
         // console.log("Final Item with Partid:", updatedCleanedData);
 
         // Get duplicates
-        const isArrayEmpty = (arr) => !arr || arr.length === 0;
-        if (isArrayEmpty(cleanedData)) {
-            return res.status(400).json({ message: `UserFeedback and ProposedQty cannot be null or undefined` })
-        }
+
         // console.log(cleanedData);
-        
+
         const duplicateEntries = findLocationPartidDuplicates(cleanedData);
         if (!isArrayEmpty(duplicateEntries)) {
             return res.status(400).json({ Data: duplicateEntries })
@@ -906,38 +844,38 @@ const dealerUpload = async (req, res) => {
         // left join Substitution_Master sm on sm.partnumber1 = sn.partnumber1 and li.BrandID = sm.brandid
         // where sn.Stockdate = (select MAX(Stockdate) from Stockable_Nonstockable_TD001_${dealerResults[0].dealerid}) and sn.Locationid = ${locResult.recordset[0].locationid}) and brandid = ${brandResults[0].brandid}`
 
-//         const queryLatestPartID = `
-//         WITH LatestParts AS (
-//   SELECT
-//     sn.partnumber1,
-//     COALESCE(sm.subpartnumber, sn.partnumber1) AS LatestPartno,
-//     li.BrandID
-//   FROM z_scope..Stockable_Nonstockable_TD001_${dealerResults[0].dealerid} AS sn
-//   JOIN z_scope..LocationInfo     AS li
-//     ON li.LocationID = sn.LocationID
-//   LEFT JOIN z_scope..Substitution_Master AS sm
-//     ON sm.partnumber1 = sn.partnumber1
-//    AND sm.brandid     = li.BrandID
-//   WHERE sn.Stockdate = (
-//           SELECT MAX(Stockdate)
-//             FROM z_scope..Stockable_Nonstockable_TD001_${dealerResults[0].dealerid}
-//         )
-//     AND sn.LocationID = ${locResult.recordset[0].locationid}
-// )
-// SELECT
-//   lp.partnumber1,
-//   pm1.partid    AS PartID,
-//   lp.LatestPartno,
-//   pm2.partid    AS LatestPartID
-// FROM LatestParts AS lp
-// -- join to get the original PartID
-// JOIN z_scope..Part_Master AS pm1
-//   ON pm1.brandid      = lp.BrandID
-//  AND pm1.partnumber1  = lp.partnumber1
-// -- join to get the substituted/latest PartID
-// LEFT JOIN z_scope..Part_Master AS pm2
-//   ON pm2.brandid      = lp.BrandID
-//  AND pm2.partnumber1  = lp.LatestPartno;
+        //         const queryLatestPartID = `
+        //         WITH LatestParts AS (
+        //   SELECT
+        //     sn.partnumber1,
+        //     COALESCE(sm.subpartnumber, sn.partnumber1) AS LatestPartno,
+        //     li.BrandID
+        //   FROM z_scope..Stockable_Nonstockable_TD001_${dealerResults[0].dealerid} AS sn
+        //   JOIN z_scope..LocationInfo     AS li
+        //     ON li.LocationID = sn.LocationID
+        //   LEFT JOIN z_scope..Substitution_Master AS sm
+        //     ON sm.partnumber1 = sn.partnumber1
+        //    AND sm.brandid     = li.BrandID
+        //   WHERE sn.Stockdate = (
+        //           SELECT MAX(Stockdate)
+        //             FROM z_scope..Stockable_Nonstockable_TD001_${dealerResults[0].dealerid}
+        //         )
+        //     AND sn.LocationID = ${locResult.recordset[0].locationid}
+        // )
+        // SELECT
+        //   lp.partnumber1,
+        //   pm1.partid    AS PartID,
+        //   lp.LatestPartno,
+        //   pm2.partid    AS LatestPartID
+        // FROM LatestParts AS lp
+        // -- join to get the original PartID
+        // JOIN z_scope..Part_Master AS pm1
+        //   ON pm1.brandid      = lp.BrandID
+        //  AND pm1.partnumber1  = lp.partnumber1
+        // -- join to get the substituted/latest PartID
+        // LEFT JOIN z_scope..Part_Master AS pm2
+        //   ON pm2.brandid      = lp.BrandID
+        //  AND pm2.partnumber1  = lp.LatestPartno;
         // `
 
         const queryLatestPart = `select sn.partnumber1 , CASE when sn.partnumber1 = sm.partnumber1 then sn.partnumber1 else sn.partnumber1 end as Latest from Stockable_Nonstockable_TD001_${dealerResults[0].dealerid} sn
@@ -1258,6 +1196,9 @@ const adminUpload = async (req, res) => {
         }
     }
     // console.log('Dealers with IDs:', dealerResults);
+    if (dealerResults.length > 1) {
+        return res.status(400).json({ message: `Multiple Dealers Found! Only Single Dealer is Allowed`, Dealers: dealerResults })
+    }
     const maxTable = `z_scope..stockable_nonstockable_td001_${dealerResults[0].dealerid}`
     // console.log(maxTable);
 
@@ -1314,17 +1255,17 @@ const adminUpload = async (req, res) => {
     const AdminID = addedby; // Static User ID
     // const AdminRemark = 1; // Static feedback remark ID
 
-    const remarkQuery = `
-  SELECT RemarkID, Remark AS RemarkName 
-  FROM UAD_VON..UAD_VON_RemarksMaster 
-  WHERE usertype = 'A' AND brandid = ${brandResults[0].brandid}
-`;
-    const remarkResult = await pool.request().query(remarkQuery);
+    //     const remarkQuery = `
+    //   SELECT RemarkID, Remark AS RemarkName 
+    //   FROM UAD_VON..UAD_VON_RemarksMaster 
+    //   WHERE usertype = 'A' AND brandid = ${brandResults[0].brandid}
+    // `;
+    //     const remarkResult = await pool.request().query(remarkQuery);
 
-    const remarkMappings = remarkResult.recordset.map(row => ({
-        RemarkID: row.RemarkID,
-        RemarkName: row.RemarkName.trim().toLowerCase()
-    }));
+    //     const remarkMappings = remarkResult.recordset.map(row => ({
+    //         RemarkID: row.RemarkID,
+    //         RemarkName: row.RemarkName.trim().toLowerCase()
+    //     }));
 
     const AdminFBRemarkID = await getFeedbackId(brandResults[0].brandid, 'A')
 
@@ -1337,9 +1278,9 @@ const adminUpload = async (req, res) => {
         const locationid = locationMapping ? Number(locationMapping.locationid) : null;
         const previousMapping = previousFBIDs.find(prev => prev.FeedbackID === item.feedbackid);
         // Match AdminRemark dynamically
-        const matchedRemark = remarkMappings.find(r =>
-            r.RemarkName === (item.AdminRemark || "").trim().toLowerCase()
-        );
+        // const matchedRemark = remarkMappings.find(r =>
+        //     r.RemarkName === (item.AdminRemark || "").trim().toLowerCase()
+        // );
 
         return {
             brandid: brandMapping?.brandid,
@@ -1369,6 +1310,8 @@ const adminUpload = async (req, res) => {
     // }
 
     const ids = formattedData.map(item => item.feedbackid).join(",")
+    // console.log(ids);
+
     const check = await checkReviewedFeedbackByBrand(brandResults[0].brandid, formattedData);
     // console.log(check);
 
@@ -1378,10 +1321,8 @@ const adminUpload = async (req, res) => {
             pendingRecords: check
         });
     }
-    // console.log(formattedData);
 
     const { feedbackIds } = await insertAdminFeedback(formattedData, brandResults[0].brandid)  // Insert Function to insert formatted data into table
-    // console.log(feedbackIds);
     // Update the status to 'Reviewed' where FeedbackID is in the feedbackIds string
     try {
         const statusQuery = `
