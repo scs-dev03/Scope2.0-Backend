@@ -691,7 +691,7 @@ const dealerUpload = async (req, res) => {
         }
 
         const cleanedData = data
-            .filter(item => item.UserRemark !== null && item.ProposedQty !== null && item.ProposedQty !== null && item.ProposedQty !== undefined)
+            .filter(item => item.UserRemark !== null && item.UserRemark !== undefined && item.ProposedQty !== null && item.ProposedQty !== undefined &&  String(item.UserRemark).trim() !== "" &&  String(item.ProposedQty).trim() !== "")
             .map(({ Brand, Dealer, Location, Maxvalue, partnumber, UserRemark, ProposedQty }) => ({
                 Brand,
                 Dealer,
@@ -1075,7 +1075,12 @@ const dealerUpload = async (req, res) => {
         // console.log(`formattedData`,formattedData);
 
 
-        await insertData(formattedData, tableName)  // Insert Function to insert formatted data into table
+       try {
+         await insertData(formattedData, tableName) 
+       } catch (error) {
+        // console.log(error);
+        return res.status(500).json({Error:error.message})
+       } // Insert Function to insert formatted data into table
         // await transaction.commit(); // Commit transaction
 
 
@@ -1127,9 +1132,10 @@ const adminUpload = async (req, res) => {
         });
     }
 
+// console.log(data[0],data[3]);
 
     const cleanedData = data
-        .filter(item => item.LatestAdminRemark !== null && item.ApprovedQty !== null && item.ApprovedQty !== null && item.ApprovedQty !== undefined)
+        .filter(item => item.AdminRemark !== null && item.AdminRemark !== undefined && item.ApprovedQty !== null && item.ApprovedQty !== undefined &&  String(item.AdminRemark).trim() !== "" &&  String(item.ApprovedQty).trim() !== "")
         .map(({ brand, dealer, location, feedbackid, AdminRemark, ApprovedQty }) => ({
             brand,
             dealer,
@@ -1322,7 +1328,13 @@ const adminUpload = async (req, res) => {
         });
     }
 
-    const { feedbackIds } = await insertAdminFeedback(formattedData, brandResults[0].brandid)  // Insert Function to insert formatted data into table
+    try {
+        const { feedbackIds } = await insertAdminFeedback(formattedData, brandResults[0].brandid)
+    } catch (error) {
+        // console.log(error);
+        return res.status(500).json({Error:error.message})
+
+    }  // Insert Function to insert formatted data into table
     // Update the status to 'Reviewed' where FeedbackID is in the feedbackIds string
     try {
         const statusQuery = `

@@ -1,6 +1,7 @@
 import sql from 'mssql'
 import xlsx from 'xlsx'
 import { getPool1, getPool2 } from '../db/db.js'
+import { ApiError } from './ApiError.js'
 
 const partBrandCheck = async (dealerid, locationid, partnumber) => {
   try {
@@ -173,9 +174,9 @@ const insertData = async (formattedData, tableName) => {
     return
 
   } catch (err) {
-    console.error('Error during bulk insert Dealer Feedback VON:', err, tableName);
+    // console.error('Error during bulk insert Dealer Feedback VON:', err, tableName);
     await transaction.rollback();
-    throw err; // Re-throw for upstream handling
+    throw new ApiError(500,err.message); // Re-throw for upstream handling
   }
 };
 
@@ -273,7 +274,7 @@ const insertAdminFeedback = async (formattedData, brandid) => {
   } catch (err) {
     console.error('Error during admin feedback insert:', err);
     await transaction.rollback();
-    throw err;
+    throw new ApiError(500,err.message);
   }
 };
 
