@@ -38,7 +38,6 @@ const getCommonFieldsController = async (req, res) => {
 const getFieldMappingController = async (req, res) => {
   try {
     const { lspId } = req.params; // lspId = column name
-
     const data = await getFieldMappingService(lspId);
 
     res.json({

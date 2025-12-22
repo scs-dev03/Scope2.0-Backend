@@ -22,7 +22,7 @@ router.get("/common-fields", getCommonFieldsController);
  * Mapping APIs
  */
 
-router.get("/field-mapping/:lspName", getFieldMappingController);
+router.get("/field-mapping/:lspId", getFieldMappingController);
 router.post("/dispatch-lrn", addOrSwitchLRNController);
 
 router.post("/lrn-details", upsertLRNDetailsController);
