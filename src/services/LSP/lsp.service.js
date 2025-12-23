@@ -55,7 +55,6 @@ const getFieldMappingService = async (lspCode) => {
   }
 
   const lspName = lspResult.recordset[0].LSPName;
-  console.log(lspName);
   // Whitelist (double safety)
   const allowedLSPs = [
     "DelhiverySurface",

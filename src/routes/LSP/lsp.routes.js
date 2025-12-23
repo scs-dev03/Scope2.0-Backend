@@ -23,15 +23,20 @@ router.get("/common-fields", getCommonFieldsController);
  */
 
 router.get("/field-mapping/:lspId", getFieldMappingController);
-router.post("/dispatch-lrn", addOrSwitchLRNController);
 
+/**
+ * Updating LRN or inserting new LRN
+ * Mapping in mappingTable
+ */
+router.post("/dispatch-lrn", addOrSwitchLRNController);
 router.post("/lrn-details", upsertLRNDetailsController);
 
+// get by DON or LRN Number
 router.get("/dispatch/:dispatchOrderNo/lrns", getLRNsByDispatchController);
 router.get("/lrn/:lrNumber", getLRNDetailsController);
 
+// get by status
 router.get("/lrns/status/:statusId", getLRNsByStatusController);
-
 
 
 export default router;
