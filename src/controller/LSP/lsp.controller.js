@@ -6,7 +6,8 @@ import {
   upsertLRNDetailsService,
   getLRNDetailsService,
   getLRNsByDispatchService,
-  getLRNsByStatusService
+  getLRNsByStatusService,
+  ingestLSPPayloadService
 } from "../../services/LSP/lsp.service.js";
 
 const getAllLSPsController = async (req, res) => {
@@ -37,8 +38,8 @@ const getCommonFieldsController = async (req, res) => {
 
 const getFieldMappingController = async (req, res) => {
   try {
-    const { lspId } = req.params; // lspId = column name
-    const data = await getFieldMappingService(lspId);
+    const { lspCode } = req.params; // lspCode = column name
+    const data = await getFieldMappingService(lspCode);
 
     res.json({
       success: true,
@@ -122,6 +123,29 @@ const getLRNsByStatusController = async (req, res) => {
   }
 };
 
+const ingestLSPPayloadController = async (req, res) => {
+  try {
+    const { lspCode, lspName, dispatchOrderNo, data } = req.body;
+
+    const result = await ingestLSPPayloadService({
+      lspCode,
+      lspName,
+      dispatchOrderNo,
+      data
+    });
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    res.status(400).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
+
 export {
   getAllLSPsController,
   getCommonFieldsController,
@@ -130,5 +154,6 @@ export {
   upsertLRNDetailsController,
   getLRNsByDispatchController,
   getLRNDetailsController,
-  getLRNsByStatusController
+  getLRNsByStatusController,
+  ingestLSPPayloadController
 };
