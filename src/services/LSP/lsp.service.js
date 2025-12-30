@@ -3,12 +3,12 @@ import sql from "mssql";
 const database = "UAD_LSPMonitoringSystemDB";
 
 
-// HELPER FUNTIONS
+// HELPER FUNCTIONS
 const getLRNColumnsFromDB = async () => {
   const pool = getPool1();
   const result = await pool.request().query(`
     SELECT FieldName
-    FROM dbo.CommanFieldMaster
+    FROM ${database}.dbo.CommanFieldMaster
     WHERE ISNULL(Status, 1) = 1
       AND FieldName NOT IN ('Status', 'LSPCode')
   `);
@@ -20,7 +20,7 @@ const getActiveLSPNames = async () => {
   const pool = getPool1();
   const result = await pool.request().query(`
     SELECT LSPName
-    FROM dbo.LSPMaster
+    FROM ${database}.dbo.LSPMaster
     WHERE ISNULL(Status, 1) = 1
   `);
   return result.recordset.map(r => r.LSPName);
@@ -38,7 +38,7 @@ const getLSPFieldMappings = async (lspName) => {
     SELECT 
       CommanField,
       ${lspName} AS LSPField
-    FROM dbo.FieldMappingMastertbl
+    FROM ${database}.dbo.FieldMappingMastertbl
     WHERE ${lspName} IS NOT NULL
       AND ${lspName} <> 'NA'
   `;
@@ -68,7 +68,7 @@ const transformToCommonFields = (payload, fieldMap) => {
 };
 
 const resolveStatusId = async (statusText) => {
-  if (!statusText) return 1; // default to CREATED (or first status)
+  if (!statusText) return 1; // default to pending pickup
 
   const pool = getPool1();
 
@@ -79,7 +79,7 @@ const resolveStatusId = async (statusText) => {
     .input("NormalizedKey", normalizedInput)
     .query(`
       SELECT StatusID
-      FROM dbo.Status1Master
+      FROM ${database}.dbo.Status1Master
       WHERE NormalizedKey = @NormalizedKey
     `);
 
@@ -95,7 +95,7 @@ const getAllLSPsService = async () => {
     SELECT 
       ID,
       LSPName
-    FROM dbo.LSPMaster
+    FROM ${database}.dbo.LSPMaster
     WHERE ISNULL(Status, 1) = 1
     ORDER BY LSPName
   `;
@@ -109,7 +109,7 @@ const getCommonFieldsService = async () => {
   const pool = getPool1();
   const query = `
     SELECT FieldName
-    FROM dbo.CommanFieldMaster
+    FROM ${database}.dbo.CommanFieldMaster
     WHERE ISNULL(Status, 1) = 1
     ORDER BY ID
   `;
@@ -125,7 +125,7 @@ const getFieldMappingService = async (lspCode) => {
     .input("LSPCode", lspCode)
     .query(`
       SELECT LSPName
-      FROM dbo.LSPMaster
+      FROM ${database}.dbo.LSPMaster
       WHERE ID = @LSPCode
     `);
 
@@ -147,7 +147,7 @@ const getFieldMappingService = async (lspCode) => {
     SELECT
       CommanField AS CommonFieldName,
       ${safeColumn} AS LSPFieldName
-    FROM dbo.FieldMappingMastertbl
+    FROM ${database}.dbo.FieldMappingMastertbl
     WHERE ${safeColumn} IS NOT NULL
       AND ${safeColumn} <> 'NA'
     ORDER BY ID
@@ -221,7 +221,7 @@ const addOrSwitchLRNService = async (dispatchOrderNo, lrNumber, LSPCode) => {
 
     // Deactivate existing active LRN
     await request.query(`
-      UPDATE dbo.DispatchLRNTracking
+      UPDATE ${database}.dbo.DispatchLRNTracking
       SET Status = 0
       WHERE DispatchOrderNo = @DispatchOrderNo AND Status = 1
     `);
@@ -229,7 +229,7 @@ const addOrSwitchLRNService = async (dispatchOrderNo, lrNumber, LSPCode) => {
     // Get next version number
     const versionResult = await request.query(`
       SELECT MAX(Version) AS MaxVersion
-      FROM dbo.DispatchLRNTracking
+      FROM ${database}.dbo.DispatchLRNTracking
       WHERE DispatchOrderNo = @DispatchOrderNo
     `);
 
@@ -237,7 +237,7 @@ const addOrSwitchLRNService = async (dispatchOrderNo, lrNumber, LSPCode) => {
 
     // Insert new LRN
     const insertResult = await request.query(`
-      INSERT INTO dbo.DispatchLRNTracking
+      INSERT INTO ${database}.dbo.DispatchLRNTracking
         (DispatchOrderNo, LRNumber, Version, LSPCode, Status, InsertedOn)
       VALUES
         (@DispatchOrderNo, @LRNumber, ${nextVersion}, @LSPCode, 1, GETDATE());
@@ -246,7 +246,7 @@ const addOrSwitchLRNService = async (dispatchOrderNo, lrNumber, LSPCode) => {
     await transaction.commit();
 
     return {
-      message: `LRN ${lrNumber} added as version ${nextVersion} and set active`,
+      message: `LRN ${lrNumber} added as version ${nextVersion} and set active, results ${insertResult}`,
     };
   } catch (err) {
     await transaction.rollback();
@@ -280,9 +280,9 @@ const upsertLRNDetailsService = async (data) => {
 
     // 3️⃣ Correct SQL (Status, NOT StatusID)
     const query = `
-      IF EXISTS (SELECT 1 FROM dbo.LRNDetails WHERE LRNumber = @LRNumber)
+      IF EXISTS (SELECT 1 FROM ${database}.dbo.LRNDetails WHERE LRNumber = @LRNumber)
       BEGIN
-        UPDATE dbo.LRNDetails
+        UPDATE ${database}.dbo.LRNDetails
         SET
           LSPCode = @LSPCode,
           LRDate = @LRDate,
@@ -307,7 +307,7 @@ const upsertLRNDetailsService = async (data) => {
       END
       ELSE
       BEGIN
-        INSERT INTO dbo.LRNDetails
+        INSERT INTO ${database}.dbo.LRNDetails
         (LRNumber, LSPCode, LRDate, PickupTimeStamp, OrderNo,
          PromisedDate, EstimatedDate, ChargedWt, PackageAmount,
          BoxCount, NoOfDelAttempts, LastDelAttemptDate,
@@ -342,7 +342,7 @@ const getLRNsByDispatchService = async (dispatchOrderNo) => {
 
   const query = `
     SELECT *
-    FROM dbo.DispatchLRNTracking
+    FROM ${database}.dbo.DispatchLRNTracking
     WHERE DispatchOrderNo = @DispatchOrderNo
     ORDER BY Version DESC
   `;
@@ -362,9 +362,9 @@ const getLRNDetailsService = async (lrNumber) => {
       ld.*, 
       lsp.LSPName, 
       st.StatusName
-    FROM dbo.LRNDetails ld
-    JOIN dbo.LSPMaster lsp ON ld.LSPCode = lsp.ID
-    JOIN dbo.Status1Master st ON ld.Status = st.StatusID
+    FROM ${database}.dbo.LRNDetails ld
+    JOIN ${database}.dbo.LSPMaster lsp ON ld.LSPCode = lsp.ID
+    JOIN ${database}.dbo.Status1Master st ON ld.Status = st.StatusID
     WHERE ld.LRNumber = @LRNumber
   `;
   const result = await request.query(query);
@@ -382,9 +382,9 @@ const getLRNsByStatusService = async (statusId) => {
       ld.*, 
       lsp.LSPName,
       st.StatusName
-    FROM dbo.LRNDetails ld
-    JOIN dbo.LSPMaster lsp ON ld.LSPCode = lsp.ID
-    JOIN dbo.Status1Master st ON ld.Status = st.StatusID
+    FROM ${database}.dbo.LRNDetails ld
+    JOIN ${database}.dbo.LSPMaster lsp ON ld.LSPCode = lsp.ID
+    JOIN ${database}.dbo.Status1Master st ON ld.Status = st.StatusID
     WHERE ld.Status = @Status
     ORDER BY ld.InsertedOn DESC
   `;

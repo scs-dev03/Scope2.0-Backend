@@ -22,7 +22,6 @@ router.get("/common-fields", getCommonFieldsController);
 /**
  * Mapping APIs
  */
-
 router.get("/field-mapping/:lspCode", getFieldMappingController);
 
 /**
