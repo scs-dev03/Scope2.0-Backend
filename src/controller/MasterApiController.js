@@ -1,6 +1,6 @@
 import sql from 'mssql'
 import { getPool1, getPool2 } from '../db/db.js'
-import { getUserService, jobcardDate, lastOrderValue, multiAdvisorService, multiDealerService, multiLocationService, ppniValue, SixMonthLocationwiseSaleValue, snstockValue, stockQty, stockValue } from '../services/MasterApi/MasterApiService.js';
+import { clusterByBrandService, dealerByClusterService, getUserService, jobcardDate, lastOrderValue, multiAdvisorService, multiDealerService, multiLocationService, partQualityService, ppniValue, SixMonthLocationwiseSaleValue, snstockValue, stockQty, stockValue, tranferTypeService } from '../services/MasterApi/MasterApiService.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 
@@ -19,13 +19,14 @@ const getDealers = async (req, res) => {
   try {
     const pool = getPool2();
     const { brandid } = req.body;
-    const result = await pool.request().input('brandid', sql.Int, brandid).query(`select distinct(dealerid),dealer from locationinfo where brandid = @brandid and dealerStatus = 1 `)
+    const result = await pool.request().input('brandid', sql.Int, brandid).query(`use z_scope select distinct(dealerid),dealer from locationinfo where brandid = @brandid and dealerStatus = 1 `)
     res.status(200).json(result.recordset)
   } catch (error) {
     res.status(500).json(error)
     console.log(error);
   }
 }
+
 const getLocation = async (req, res) => {
   try {
     const pool = getPool2();
@@ -37,6 +38,7 @@ const getLocation = async (req, res) => {
     console.log(error);
   }
 }
+
 const getWorkspace = async (req, res) => {
   try {
     const pool = getPool2();
@@ -62,7 +64,7 @@ const getDashboard = async (req, res) => {
 const partNature = async (req, res) => {
   try {
     const pool = await getPool2()
-    const query = `select  tCode , Description  from PartNatureMaster`
+    const query = `select  tCode , Description  from z_scope..PartNatureMaster`
     const result = await pool.request().query(query)
     res.status(200).json({ Data: result.recordset })
   } catch (error) {
@@ -652,4 +654,42 @@ const getUser = async (req, res) => {
     res.status(500).json(new ApiError(500, error.message))
   }
 }
-export { hsncode, jobtype, ordertype, spmhomepage, pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules, multiDealer, multiLocation, multiAdvisor, getUser }
+
+const partQuality = async (req, res) => {
+  try {
+    const result = await partQualityService()
+    res.status(200).json(new ApiResponse(200, result))
+  } catch (error) {
+    res.status(500).json(new ApiError(500, error.message))
+  }
+}
+
+const tranferType = async (req, res) => {
+  try {
+    const result = await tranferTypeService()
+    res.status(200).json(new ApiResponse(200, result))
+  } catch (error) {
+    res.status(500).json(new ApiError(500, error.message))
+  }
+}
+
+const clusterByBrand = async (req, res) => {
+  try {
+    const { BrandId } = req.body
+    const result = await clusterByBrandService(BrandId)
+    res.status(200).json(new ApiResponse(200, result))
+  } catch (error) {
+    res.status(500).json(new ApiError(500, error.message))
+  }
+}
+
+const dealerByCluster = async (req, res) => {
+  try {
+    const { ClusterCode } = req.body
+    const result = await dealerByClusterService(ClusterCode)
+    res.status(200).json(new ApiResponse(200, result))
+  } catch (error) {
+    res.status(500).json(new ApiError(500, error.message))
+  }
+}
+export { hsncode, jobtype, ordertype, spmhomepage, pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules, multiDealer, multiLocation, multiAdvisor, getUser, partQuality, tranferType ,clusterByBrand , dealerByCluster}

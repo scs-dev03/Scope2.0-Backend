@@ -1,7 +1,6 @@
 import sql from 'mssql'
 import { getPool1, getPool2 } from '../../db/db.js'
 import { ApiError } from '../../utils/ApiError.js';
-import { login } from '../login/auth.service.js';
 
 const stockQty = async (locationId) => {
     const pool = await getPool2();
@@ -200,7 +199,7 @@ const multiAdvisorService = async (LocationIds) => {
         Order by li.Location`
 
         // console.log(query);
-        
+
         const result = await pool.request().query(query)
         return result.recordset
     } catch (error) {
@@ -208,14 +207,65 @@ const multiAdvisorService = async (LocationIds) => {
     }
 }
 
-const getUserService = async()=>{
-try {
+const getUserService = async () => {
+    try {
         const pool = await getPool1()
         const query = `use z_scope select bintId_Pk ,CONCAT(vcFirstName,' ',vcLastName)Name from AdminMaster_GEN where type = 'A' and btStatus = 1`
         const result = await pool.request().query(query)
         return result.recordset
-} catch (error) {
-    throw new ApiError(200,error.message)
+    } catch (error) {
+        throw new ApiError(200, error.message)
+    }
 }
+const partQualityService = async () => {
+    try {
+        const pool = await getPool1()
+        const query = `use z_scope select Id , Quality from partqualitymaster where status = 1`
+        const result = await pool.request().query(query)
+        return result.recordset
+    } catch (error) {
+        throw new ApiError(200, error.message)
+    }
 }
-export { stockQty, stockValue, snstockValue, lastOrderValue, jobcardDate, ppniValue, SixMonthLocationwiseSaleValue, multiDealerService, multiLocationService, multiAdvisorService, getUserService }
+const tranferTypeService = async () => {
+    try {
+        const pool = await getPool1()
+        const query = `use z_scope select Id , Name from AAP_TransferQtyMaster where Status = 1`
+        const result = await pool.request().query(query)
+        return result.recordset
+    } catch (error) {
+        throw new ApiError(200, error.message)
+    }
+}
+
+const clusterByBrandService = async (BrandId) => {
+    try {
+        const pool = await getPool1()
+        const query = `use z_scope
+                        select ClusterCode , Cluster from (
+                        select ClusterCode from Clust_ClusterLocMapping where LocationID in 
+    		            ( select locationid from locationinfo where brandid = @BrandId and status = 1 ) and status = 1 group by ClusterCode ) A
+                    JOIN Clust_ClusterMaster cm on cm.tCode = A.ClusterCode`
+
+        const result = await pool.request().input('BrandId', sql.Int, BrandId).query(query)
+        return result.recordset
+    } catch (error) {
+        throw new ApiError(500, error)
+    }
+}
+
+const dealerByClusterService = async (ClusterCode) => {
+    try {
+        const pool = await getPool1()
+        const query = `use z_scope 
+                        select Dealer , DealerID from locationinfo where locationid in 
+                        (select LocationID from Clust_ClusterLocMapping where ClusterCode  = @ClusterCode and Status = 1)
+                        group by dealer , DealerID`
+
+        const result = await pool.request().input('ClusterCode', sql.Int, ClusterCode).query(query)
+        return result.recordset
+    } catch (error) {
+        throw new ApiError(500, error)
+    }
+}
+export { stockQty, stockValue, snstockValue, lastOrderValue, jobcardDate, ppniValue, SixMonthLocationwiseSaleValue, multiDealerService, multiLocationService, multiAdvisorService, getUserService, partQualityService, tranferTypeService , clusterByBrandService , dealerByClusterService}

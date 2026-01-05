@@ -10,6 +10,7 @@ import nimroutes from './notinmasterRoute.js'
 import adminviewroutes from './admin-viewRoute.js'
 import remarkroutes from './remarkMasterRoute.js'
 import brandwisemappingroutes from './brandwise-UserMappingRoute.js'
+import internalrules from './internalandclustercreationRoute.js'
 
 const router = Router()
 
@@ -33,6 +34,8 @@ router.use("/aa/admin",adminviewroutes)
 router.use("/aa/remark",remarkroutes)
 
 router.use("/aa/bwum",brandwisemappingroutes)
+
+router.use("/aa/internal",internalrules)
 
 
 
