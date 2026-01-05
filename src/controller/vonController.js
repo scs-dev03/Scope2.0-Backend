@@ -594,6 +594,9 @@ const adminPendingView = async (req, res) => {
             return res.status(400).json({ message: `Brandid is required` });
         }
         if (partnumber) {
+            if(!dealerid || !locationid){
+                return res.status(400).json({message : `dealerid and locationid are required when searching a part`})
+            }
             const Check = await maxpartmapping(partnumber, dealerid, locationid)
             // console.log(Check);
 
@@ -603,7 +606,7 @@ const adminPendingView = async (req, res) => {
             const flagCheck = await partflagCheck(partnumber, dealerid, locationid, flag)
             // console.log(flagCheck);
             if (flagCheck == false) {
-                return res.status(400).json({ message: `Please choose correct filter` })
+                return res.status(400).json({ message: `Please choose correct MAX filter` })
             }
         }
         const query = `
@@ -1354,7 +1357,18 @@ const adminUpload = async (req, res) => {
 
 const maxpartmapping = async (partNumber, DealerId, LocationId) => {
     const pool = await getPool2()
-    const result = await pool.request().query(`select * from z_scope..stockable_nonstockable_td001_${DealerId} where locationid = ${LocationId} and partnumber1 = '${partNumber}' and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${DealerId} where locationid = ${LocationId})`)
+    // const query = `select * from z_scope..stockable_nonstockable_td001_${DealerId} where locationid = ${LocationId} and partnumber1 = '${partNumber}' and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${DealerId} where locationid = ${LocationId})`
+    const query = `with data as (
+                    select locationid , MAX(Stockdate)Stockdate from z_scope..stockable_nonstockable_td001_${DealerId} where Addedby !=7
+                    group by Locationid
+                    )
+                    select * from z_scope..stockable_nonstockable_td001_${DealerId} sn
+                    join data d on d.Locationid = sn.Locationid and d.Stockdate = sn.Stockdate
+                    where partnumber1 = '${partNumber}'`
+
+    const result = await pool.request().query(query)
+    // console.log(query);
+    
     if (result.recordset.length === 0) {
         return false
     }
