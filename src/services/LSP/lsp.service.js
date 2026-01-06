@@ -1,16 +1,18 @@
 import { getPool1 } from "../../db/db.js";
 import sql from "mssql";
+
 const database = "UAD_LSPMonitoringSystemDB";
 
+/* =========================
+   HELPER FUNCTIONS
+========================= */
 
-// HELPER FUNCTIONS
 const getLRNColumnsFromDB = async () => {
   const pool = getPool1();
   const result = await pool.request().query(`
     SELECT FieldName
     FROM ${database}.dbo.CommanFieldMaster
     WHERE ISNULL(Status, 1) = 1
-      AND FieldName NOT IN ('Status', 'LSPCode')
   `);
 
   return result.recordset.map(r => r.FieldName);
@@ -28,24 +30,20 @@ const getActiveLSPNames = async () => {
 
 const getLSPFieldMappings = async (lspName) => {
   const pool = getPool1();
-
   const activeLSPs = await getActiveLSPNames();
+
   if (!activeLSPs.includes(lspName)) {
     throw new Error("Invalid or inactive LSP");
   }
 
   const query = `
-    SELECT 
-      CommanField,
-      ${lspName} AS LSPField
+    SELECT CommanField, ${lspName} AS LSPField
     FROM ${database}.dbo.FieldMappingMastertbl
-    WHERE ${lspName} IS NOT NULL
-      AND ${lspName} <> 'NA'
+    WHERE ${lspName} IS NOT NULL AND ${lspName} <> 'NA'
   `;
 
   const result = await pool.request().query(query);
 
-  // Convert to lookup map
   const mapping = {};
   result.recordset.forEach(r => {
     mapping[r.LSPField.trim()] = r.CommanField.trim();
@@ -57,10 +55,14 @@ const getLSPFieldMappings = async (lspName) => {
 const transformToCommonFields = (payload, fieldMap) => {
   const normalized = {};
 
+  // Map LSP fields to common fields
   Object.keys(payload).forEach(lspField => {
     const commonField = fieldMap[lspField];
     if (commonField) {
       normalized[commonField] = payload[lspField];
+    } else {
+      // Keep unmapped fields for special handling (RTO, LastStatusRemarks, etc.)
+      normalized[lspField] = payload[lspField];
     }
   });
 
@@ -68,12 +70,10 @@ const transformToCommonFields = (payload, fieldMap) => {
 };
 
 const resolveStatusId = async (statusText) => {
-  if (!statusText) return 1; // default to pending pickup
+  if (!statusText) return 1;
 
   const pool = getPool1();
-
-  // Normalize input: lowercase + remove spaces
-  const normalizedInput = statusText.trim().toLowerCase().replace(/\s+/g, '');
+  const normalizedInput = statusText.trim().toLowerCase().replace(/\s+/g, "");
 
   const result = await pool.request()
     .input("NormalizedKey", normalizedInput)
@@ -83,180 +83,71 @@ const resolveStatusId = async (statusText) => {
       WHERE NormalizedKey = @NormalizedKey
     `);
 
-  // Return the found StatusID or default
   return result.recordset[0]?.StatusID ?? 1;
 };
 
-//Get all active LSPs
-const getAllLSPsService = async () => {
-  const pool = getPool1();
-
-  const query = `
-    SELECT 
-      ID,
-      LSPName
-    FROM ${database}.dbo.LSPMaster
-    WHERE ISNULL(Status, 1) = 1
-    ORDER BY LSPName
-  `;
-
-  const result = await pool.request().query(query);
-  return result.recordset;
+// 1 = Normal, 2 = Exception, 3 = RTO
+const resolveFlowType = (value) => {
+  if (!value) return 1;
+  const v = String(value).toLowerCase();
+  if (v.includes("rto")) return 3;
+  if (v.includes("exception")) return 2;
+  return 1;
 };
 
-//Get common fields (master list)
-const getCommonFieldsService = async () => {
-  const pool = getPool1();
-  const query = `
-    SELECT FieldName
-    FROM ${database}.dbo.CommanFieldMaster
-    WHERE ISNULL(Status, 1) = 1
-    ORDER BY ID
-  `;
-  const result = await pool.request().query(query);
-  return result.recordset.map((r) => r.FieldName);
-};
+/* =========================
+   CORE INGESTION
+========================= */
 
-// Get field mappings for an LSP
-const getFieldMappingService = async (lspCode) => {
-  const pool = getPool1();
-  // Get LSP column name from master
-  const lspResult = await pool.request()
-    .input("LSPCode", lspCode)
-    .query(`
-      SELECT LSPName
-      FROM ${database}.dbo.LSPMaster
-      WHERE ID = @LSPCode
-    `);
-
-  if (lspResult.recordset.length === 0) {
-    throw new Error("Invalid LSP ID");
-  }
-
-  const lspName = lspResult.recordset[0].LSPName;
-  // Whitelist (double safety)
-  const activeLSPs = await getActiveLSPNames();
-  if (!activeLSPs.includes(lspName)) {
-    throw new Error("Invalid or inactive LSP");
-  }
-
-  const safeColumn = `[${lspName}]`;
-
-  // Query mapping
-  const query = `
-    SELECT
-      CommanField AS CommonFieldName,
-      ${safeColumn} AS LSPFieldName
-    FROM ${database}.dbo.FieldMappingMastertbl
-    WHERE ${safeColumn} IS NOT NULL
-      AND ${safeColumn} <> 'NA'
-    ORDER BY ID
-  `;
-
-  const result = await pool.request().query(query);
-  return result.recordset;
-};
-
-// map to common fileds according to lspCode and add to DB and Mapping table
-const ingestLSPPayloadService = async ({
-  lspCode,
-  lspName,
-  dispatchOrderNo,
-  data
-}) => {
-  // 1. Mapping
+const ingestLSPPayloadService = async ({ lspCode, lspName, dispatchOrderNo, data }) => {
   const fieldMap = await getLSPFieldMappings(lspName);
-
-  // 2. Transform LSP → global fields
   const normalizedData = transformToCommonFields(data, fieldMap);
 
-  // 3. Mandatory validation
   if (!normalizedData.LRNumber) {
     throw new Error("LRNumber is mandatory");
   }
 
-  let statusValue = normalizedData.Status;
-
-  // Case 1: numeric StatusID provided → use it directly
+  // Resolve status
+  const statusValue = normalizedData.Status || normalizedData.StatusID;
   if (typeof statusValue === "number" && statusValue > 0) {
     normalizedData.Status = statusValue;
   } else {
-    // Case 2: text provided → resolve via NormalizedKey
     normalizedData.Status = await resolveStatusId(statusValue);
   }
 
-  // 4. System-controlled enrichment
   normalizedData.LSPCode = lspCode;
 
-  // 5. Persist
-  await upsertLRNDetailsService(normalizedData);
+  // Flow + Critical
+  normalizedData.NormalExceptionRTO = resolveFlowType(
+    normalizedData.RTO || normalizedData.LastStatusRemarks || ""
+  );
 
-  // 6. Dispatch ↔ LRN mapping
+  normalizedData.IsCritical = normalizedData.NormalExceptionRTO !== 1 ? 1 : 0;
+
+  // Ensure mandatory NOT NULL fields
+  normalizedData.Status = normalizedData.Status ?? 1;
+  normalizedData.NormalExceptionRTO = normalizedData.NormalExceptionRTO ?? 1;
+  normalizedData.IsCritical = normalizedData.IsCritical ?? 0;
+
+  // Insert versioned LRN
+  await insertLRNDetailsVersionService(normalizedData);
+
+  // Dispatch ↔ LRN mapping
   if (dispatchOrderNo) {
-    await addOrSwitchLRNService(
-      dispatchOrderNo,
-      normalizedData.LRNumber,
-      lspCode
-    );
+    await addOrSwitchLRNService(dispatchOrderNo, normalizedData.LRNumber, lspCode);
   }
 
   return {
-    message: "LSP data ingested successfully",
+    message: "LSP payload ingested successfully",
     normalizedData
   };
 };
 
-// map the DispatchOrderNumber to that LRN in table LRNTracking 
-const addOrSwitchLRNService = async (dispatchOrderNo, lrNumber, LSPCode) => {
-  const pool = getPool1();
-  const transaction = await pool.transaction();
+/* =========================
+   VERSIONED LRN INSERT
+========================= */
 
-  try {
-    await transaction.begin();
-
-    const request = transaction.request();
-    request.input("DispatchOrderNo", dispatchOrderNo);
-    request.input("LRNumber", lrNumber);
-    request.input("LSPCode", LSPCode);
-
-    // Deactivate existing active LRN
-    await request.query(`
-      UPDATE ${database}.dbo.DispatchLRNTracking
-      SET Status = 0
-      WHERE DispatchOrderNo = @DispatchOrderNo AND Status = 1
-    `);
-
-    // Get next version number
-    const versionResult = await request.query(`
-      SELECT MAX(Version) AS MaxVersion
-      FROM ${database}.dbo.DispatchLRNTracking
-      WHERE DispatchOrderNo = @DispatchOrderNo
-    `);
-
-    const nextVersion = (versionResult.recordset[0].MaxVersion || 0) + 1;
-
-    // Insert new LRN
-    const insertResult = await request.query(`
-      INSERT INTO ${database}.dbo.DispatchLRNTracking
-        (DispatchOrderNo, LRNumber, Version, LSPCode, Status, InsertedOn)
-      VALUES
-        (@DispatchOrderNo, @LRNumber, ${nextVersion}, @LSPCode, 1, GETDATE());
-    `);
-
-    await transaction.commit();
-
-    return {
-      message: `LRN ${lrNumber} added as version ${nextVersion} and set active, results ${insertResult}`,
-    };
-  } catch (err) {
-    await transaction.rollback();
-    console.error("Transaction failed:", err);
-    throw new Error("Failed to add/switch LRN");
-  }
-};
-
-// Add Data in LRN Details
-const upsertLRNDetailsService = async (data) => {
+const insertLRNDetailsVersionService = async (data) => {
   const pool = getPool1();
   const transaction = await pool.transaction();
 
@@ -264,128 +155,200 @@ const upsertLRNDetailsService = async (data) => {
     await transaction.begin();
     const request = transaction.request();
 
-    // 1️⃣ Explicit system fields
+    // Mandatory inputs
     request.input("LRNumber", data.LRNumber);
     request.input("LSPCode", data.LSPCode);
-    request.input("Status", data.Status ?? 1);
+    request.input("Status", data.Status);
+    request.input("NormalExceptionRTO", data.NormalExceptionRTO);
+    request.input("IsCritical", data.IsCritical);
 
-    // 2️⃣ Bind all fields defined by CommanFieldMaster
+    // Get next version
+    const versionResult = await request.query(`
+      SELECT ISNULL(MAX(Version), 0) + 1 AS NextVersion
+      FROM ${database}.dbo.LRNDetails
+      WHERE LRNumber = @LRNumber
+    `);
+
+    const nextVersion = versionResult.recordset[0].NextVersion;
+    request.input("Version", nextVersion);
+
+    // Dynamic fields
+    const skipCols = ["LRNumber", "Version", "Status", "LSPCode", "NormalExceptionRTO", "IsCritical"];
     const lrnColumns = await getLRNColumnsFromDB();
 
     lrnColumns.forEach(col => {
-      if (col === "LRNumber") return;
-      if (["LRNumber", "Status"].includes(col)) return;
+      if (skipCols.includes(col)) return;
       request.input(col, data[col] ?? null);
     });
 
-    // 3️⃣ Correct SQL (Status, NOT StatusID)
+    // Final insert
     const query = `
-      IF EXISTS (SELECT 1 FROM ${database}.dbo.LRNDetails WHERE LRNumber = @LRNumber)
-      BEGIN
-        UPDATE ${database}.dbo.LRNDetails
-        SET
-          LSPCode = @LSPCode,
-          LRDate = @LRDate,
-          PickupTimeStamp = @PickupTimeStamp,
-          OrderNo = @OrderNo,
-          PromisedDate = @PromisedDate,
-          EstimatedDate = @EstimatedDate,
-          ChargedWt = @ChargedWt,
-          PackageAmount = @PackageAmount,
-          BoxCount = @BoxCount,
-          NoOfDelAttempts = @NoOfDelAttempts,
-          LastDelAttemptDate = @LastDelAttemptDate,
-          LastDelAttemptRemarks = @LastDelAttemptRemarks,
-          DeliveryDate = @DeliveryDate,
-          LastStatusTimeStamp = @LastStatusTimeStamp,
-          LastStatusLocation = @LastStatusLocation,
-          LastStatusRemarks = @LastStatusRemarks,
-          RTO = @RTO,
-          CourierName = @CourierName,
-          Status = @Status
-        WHERE LRNumber = @LRNumber
-      END
-      ELSE
-      BEGIN
-        INSERT INTO ${database}.dbo.LRNDetails
-        (LRNumber, LSPCode, LRDate, PickupTimeStamp, OrderNo,
-         PromisedDate, EstimatedDate, ChargedWt, PackageAmount,
-         BoxCount, NoOfDelAttempts, LastDelAttemptDate,
-         LastDelAttemptRemarks, DeliveryDate, LastStatusTimeStamp,
-         LastStatusLocation, LastStatusRemarks, RTO,
-         CourierName, Status)
-        VALUES
-        (@LRNumber, @LSPCode, @LRDate, @PickupTimeStamp, @OrderNo,
-         @PromisedDate, @EstimatedDate, @ChargedWt, @PackageAmount,
-         @BoxCount, @NoOfDelAttempts, @LastDelAttemptDate,
-         @LastDelAttemptRemarks, @DeliveryDate, @LastStatusTimeStamp,
-         @LastStatusLocation, @LastStatusRemarks, @RTO,
-         @CourierName, @Status)
-      END
+      INSERT INTO ${database}.dbo.LRNDetails
+      (LRNumber, Version, LSPCode, Status,
+       NormalExceptionRTO, IsCritical,
+       LRDate, PickupTimeStamp, OrderNo,
+       PromisedDate, EstimatedDate, ChargedWt,
+       PackageAmount, BoxCount, NoOfDelAttempts,
+       LastDelAttemptDate, LastDelAttemptRemarks,
+       DeliveryDate, LastStatusTimeStamp,
+       LastStatusLocation, LastStatusRemarks,
+       RTO, CourierName, InsertedOn)
+      VALUES
+      (@LRNumber, @Version, @LSPCode, @Status,
+       @NormalExceptionRTO, @IsCritical,
+       @LRDate, @PickupTimeStamp, @OrderNo,
+       @PromisedDate, @EstimatedDate, @ChargedWt,
+       @PackageAmount, @BoxCount, @NoOfDelAttempts,
+       @LastDelAttemptDate, @LastDelAttemptRemarks,
+       @DeliveryDate, @LastStatusTimeStamp,
+       @LastStatusLocation, @LastStatusRemarks,
+       @RTO, @CourierName, GETDATE())
     `;
 
     await request.query(query);
     await transaction.commit();
 
-    return { message: `LRN ${data.LRNumber} upserted successfully` };
+    return { message: "LRN version inserted", version: nextVersion };
   } catch (err) {
     await transaction.rollback();
     throw err;
   }
 };
 
-// get LRNs according to dispatch order number
+/* =========================
+   DISPATCH ↔ LRN
+========================= */
+
+const addOrSwitchLRNService = async (dispatchOrderNo, lrNumber, LSPCode) => {
+  const pool = getPool1();
+  const transaction = await pool.transaction();
+
+  try {
+    await transaction.begin();
+    const request = transaction.request();
+
+    request.input("DispatchOrderNo", dispatchOrderNo);
+    request.input("LRNumber", lrNumber);
+    request.input("LSPCode", LSPCode);
+
+    // Disable old mapping
+    await request.query(`
+      UPDATE ${database}.dbo.DispatchLRNTracking
+      SET Status = 0
+      WHERE DispatchOrderNo = @DispatchOrderNo AND Status = 1
+    `);
+
+    const versionResult = await request.query(`
+      SELECT ISNULL(MAX(Version), 0) + 1 AS NextVersion
+      FROM ${database}.dbo.DispatchLRNTracking
+      WHERE DispatchOrderNo = @DispatchOrderNo
+    `);
+
+    const nextVersion = versionResult.recordset[0].NextVersion;
+
+    await request.query(`
+      INSERT INTO ${database}.dbo.DispatchLRNTracking
+      (DispatchOrderNo, LRNumber, Version, LSPCode, Status, InsertedOn)
+      VALUES
+      (@DispatchOrderNo, @LRNumber, ${nextVersion}, @LSPCode, 1, GETDATE())
+    `);
+
+    await transaction.commit();
+  } catch (err) {
+    await transaction.rollback();
+    throw err;
+  }
+};
+
+/* =========================
+   READ APIS
+========================= */
+
+const getAllLSPsService = async () => {
+  const pool = getPool1();
+  const result = await pool.request().query(`
+    SELECT ID, LSPName
+    FROM ${database}.dbo.LSPMaster
+    WHERE ISNULL(Status,1)=1
+    ORDER BY LSPName
+  `);
+  return result.recordset;
+};
+
+const getCommonFieldsService = async () => {
+  const pool = getPool1();
+  const result = await pool.request().query(`
+    SELECT FieldName
+    FROM ${database}.dbo.CommanFieldMaster
+    WHERE ISNULL(Status,1)=1
+    ORDER BY ID
+  `);
+  return result.recordset.map(r => r.FieldName);
+};
+
+const getFieldMappingService = async (lspCode) => {
+  const pool = getPool1();
+  const lspResult = await pool.request()
+    .input("ID", lspCode)
+    .query(`SELECT LSPName FROM ${database}.dbo.LSPMaster WHERE ID = @ID`);
+
+  if (!lspResult.recordset.length) throw new Error("Invalid LSP");
+
+  return getLSPFieldMappings(lspResult.recordset[0].LSPName);
+};
+
 const getLRNsByDispatchService = async (dispatchOrderNo) => {
   const pool = getPool1();
   const request = pool.request();
   request.input("DispatchOrderNo", dispatchOrderNo);
 
-  const query = `
+  const result = await request.query(`
     SELECT *
     FROM ${database}.dbo.DispatchLRNTracking
     WHERE DispatchOrderNo = @DispatchOrderNo
     ORDER BY Version DESC
-  `;
+  `);
 
-  const result = await request.query(query);
   return result.recordset;
 };
 
-// get LRN according to LRNumber
 const getLRNDetailsService = async (lrNumber) => {
   const pool = getPool1();
   const request = pool.request();
   request.input("LRNumber", lrNumber);
 
   const query = `
-    SELECT 
-      ld.*, 
-      lsp.LSPName, 
-      st.StatusName
+    SELECT ld.*, lsp.LSPName, st.StatusName
     FROM ${database}.dbo.LRNDetails ld
     JOIN ${database}.dbo.LSPMaster lsp ON ld.LSPCode = lsp.ID
     JOIN ${database}.dbo.Status1Master st ON ld.Status = st.StatusID
     WHERE ld.LRNumber = @LRNumber
+      AND ld.Version = (
+        SELECT MAX(Version)
+        FROM ${database}.dbo.LRNDetails
+        WHERE LRNumber = @LRNumber
+      )
   `;
+
   const result = await request.query(query);
   return result.recordset[0] || null;
 };
 
-// Filter LRNS according to there status
 const getLRNsByStatusService = async (statusId) => {
   const pool = getPool1();
   const request = pool.request();
   request.input("Status", statusId);
 
   const query = `
-    SELECT 
-      ld.*, 
-      lsp.LSPName,
-      st.StatusName
-    FROM ${database}.dbo.LRNDetails ld
+    WITH Latest AS (
+      SELECT *, ROW_NUMBER() OVER (PARTITION BY LRNumber ORDER BY Version DESC) rn
+      FROM ${database}.dbo.LRNDetails
+    )
+    SELECT ld.*, lsp.LSPName, st.StatusName
+    FROM Latest ld
     JOIN ${database}.dbo.LSPMaster lsp ON ld.LSPCode = lsp.ID
     JOIN ${database}.dbo.Status1Master st ON ld.Status = st.StatusID
-    WHERE ld.Status = @Status
+    WHERE ld.rn = 1 AND ld.Status = @Status
     ORDER BY ld.InsertedOn DESC
   `;
 
@@ -393,14 +356,130 @@ const getLRNsByStatusService = async (statusId) => {
   return result.recordset;
 };
 
+const getLRNHistoryService = async (lrNumber) => {
+  const pool = getPool1();
+  const request = pool.request();
+  request.input("LRNumber", lrNumber);
+
+  const query = `
+    SELECT ld.*, lsp.LSPName, st.StatusName
+    FROM ${database}.dbo.LRNDetails ld
+    JOIN ${database}.dbo.LSPMaster lsp ON ld.LSPCode = lsp.ID
+    JOIN ${database}.dbo.Status1Master st ON ld.Status = st.StatusID
+    WHERE ld.LRNumber = @LRNumber
+    ORDER BY ld.Version DESC
+  `;
+
+  const result = await request.query(query);
+  return result.recordset;
+};
+
+/* =========================
+   Actions
+========================= */
+
+const addActionService = async ({
+  LRNumber,
+  Version,
+  Message,
+  Photos,
+  UserID
+}
+) => {
+  
+  const pool = getPool1();
+  const transaction = await pool.transaction();
+  
+  try {
+    await transaction.begin();
+    const request = transaction.request();
+
+    const insertResult = await request
+      .input("LRNumber", LRNumber)
+      .input("Version", Version)
+      .input("Message", Message)
+      .input("Photos", Photos || null)
+      .input("UserID", UserID)
+      .query(`
+        INSERT INTO ${database}.dbo.Actions
+        (LRNumber, Version, Message, Photos, UserID)
+        OUTPUT INSERTED.ActionID
+        VALUES
+        (@LRNumber, @Version, @Message, @Photos, @UserID)
+      `);
+
+    const actionId = insertResult.recordset[0].ActionID;
+
+    // 2️⃣ Append ActionID to LRNDetails
+    await request
+      .input("ActionID", actionId.toString())
+      .query(`
+        UPDATE ${database}.dbo.LRNDetails
+        SET ActionIDs =
+          CASE
+            WHEN ActionIDs IS NULL OR ActionIDs = ''
+            THEN @ActionID
+            ELSE ActionIDs + ',' + @ActionID
+          END
+        WHERE LRNumber = @LRNumber
+          AND Version = @Version
+      `);
+
+    await transaction.commit();
+
+    return { message: "Action added", actionId };
+  } catch (err) {
+    await transaction.rollback();
+    throw err;
+  }
+};
+
+const getLRNActionsService = async (lrNumber, version) => {
+  const pool = getPool1();
+
+  // 1️⃣ Get ActionIDs
+  const lrnResult = await pool.request()
+    .input("LRNumber", lrNumber)
+    .input("Version", version)
+    .query(`
+      SELECT ActionIDs
+      FROM ${database}.dbo.LRNDetails
+      WHERE LRNumber = @LRNumber
+        AND Version = @Version
+    `);
+
+  const actionIdsStr = lrnResult.recordset[0]?.ActionIDs;
+  if (!actionIdsStr) return [];
+
+  const actionIds = actionIdsStr.split(",").map(Number);
+
+  // 2️⃣ Fetch actions
+  const actionsResult = await pool.request().query(`
+    SELECT *
+    FROM ${database}.dbo.Actions
+    WHERE ActionID IN (${actionIds.join(",")})
+    ORDER BY ActionTime DESC
+  `);
+
+  return actionsResult.recordset;
+};
+
+
+/* =========================
+   EXPORTS
+========================= */
+
 export {
+  ingestLSPPayloadService,
+  insertLRNDetailsVersionService,
+  addOrSwitchLRNService,
+  getLRNDetailsService,
+  getLRNsByStatusService,
   getAllLSPsService,
   getCommonFieldsService,
   getFieldMappingService,
-  addOrSwitchLRNService,
-  upsertLRNDetailsService,
   getLRNsByDispatchService,
-  getLRNDetailsService,
-  getLRNsByStatusService,
-  ingestLSPPayloadService
+  getLRNHistoryService,
+  addActionService,
+  getLRNActionsService
 };

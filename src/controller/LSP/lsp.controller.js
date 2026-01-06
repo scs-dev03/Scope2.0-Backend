@@ -3,26 +3,28 @@ import {
   getCommonFieldsService,
   getFieldMappingService,
   addOrSwitchLRNService,
-  upsertLRNDetailsService,
+  insertLRNDetailsVersionService,
   getLRNDetailsService,
   getLRNsByDispatchService,
   getLRNsByStatusService,
-  ingestLSPPayloadService
+  ingestLSPPayloadService,
+  getLRNHistoryService,
+  addActionService,
+  getLRNActionsService
 } from "../../services/LSP/lsp.service.js";
 
+/**
+ * =========================
+ * MASTER CONTROLLERS
+ * =========================
+ */
 const getAllLSPsController = async (req, res) => {
   try {
     const data = await getAllLSPsService();
-    return res.status(200).json({
-      success: true,
-      data
-    });
+    return res.status(200).json({ success: true, data });
   } catch (err) {
     console.error("Error fetching LSPs:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch LSPs"
-    });
+    return res.status(500).json({ success: false, message: "Failed to fetch LSPs" });
   }
 };
 
@@ -36,60 +38,85 @@ const getCommonFieldsController = async (req, res) => {
   }
 };
 
+/**
+ * =========================
+ * FIELD MAPPING
+ * =========================
+ */
 const getFieldMappingController = async (req, res) => {
   try {
-    const { lspCode } = req.params; // lspCode = column name
+    const { lspCode } = req.params;
     const data = await getFieldMappingService(lspCode);
 
-    res.json({
-      success: true,
-      data
-    });
+    return res.status(200).json({ success: true, data });
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: err.message
-    });
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
+/**
+ * =========================
+ * DISPATCH ↔ LRN
+ * =========================
+ */
 const addOrSwitchLRNController = async (req, res) => {
   try {
     const { dispatchOrderNo, lrNumber, LSPCode } = req.body;
 
     if (!dispatchOrderNo || !lrNumber || !LSPCode) {
-      return res.status(400).json({ success: false, message: "dispatchOrderNo, lrNumber, and LSPCode are required" });
+      return res.status(400).json({
+        success: false,
+        message: "dispatchOrderNo, lrNumber, and LSPCode are required"
+      });
     }
 
     const data = await addOrSwitchLRNService(dispatchOrderNo, lrNumber, LSPCode);
-
     return res.status(200).json({ success: true, data });
   } catch (err) {
     console.error("Error adding/switching LRN:", err);
-    return res.status(500).json({ success: false, message: err.message || "Failed to add/switch LRN" });
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
-const upsertLRNDetailsController = async (req, res) => {
+/**
+ * =========================
+ * VERSIONED LRN INSERT
+ * =========================
+ */
+const insertLRNDetailsVersionController = async (req, res) => {
   try {
-    const data = req.body;
+    const payload = req.body;
 
-    if (!data.LRNumber || !data.LSPCode || !data.StatusID) {
+    if (!payload.LRNumber || !payload.LSPCode || !payload.Status) {
       return res.status(400).json({
         success: false,
         message: "LRNumber, LSPCode, and StatusID are required"
       });
     }
 
-    const result = await upsertLRNDetailsService(data);
-    return res.status(200).json({ success: true, data: result });
+    payload.NormalExceptionRTO = payload.NormalExceptionRTO ?? 1;
+    payload.IsCritical = payload.IsCritical ?? 0;
 
+    const data = await insertLRNDetailsVersionService(payload);
+
+    return res.status(201).json({
+      success: true,
+      data
+    });
   } catch (err) {
-    console.error("Error upserting LRNDetails:", err);
-    return res.status(500).json({ success: false, message: err.message || "Failed to upsert LRNDetails" });
+    console.error("Error inserting LRN version:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to insert LRN version"
+    });
   }
 };
 
+/**
+ * =========================
+ * READ APIs
+ * =========================
+ */
 const getLRNsByDispatchController = async (req, res) => {
   try {
     const { dispatchOrderNo } = req.params;
@@ -123,6 +150,11 @@ const getLRNsByStatusController = async (req, res) => {
   }
 };
 
+/**
+ * =========================
+ * MAIN INGESTION
+ * =========================
+ */
 const ingestLSPPayloadController = async (req, res) => {
   try {
     const { lspCode, lspName, dispatchOrderNo, data } = req.body;
@@ -134,14 +166,94 @@ const ingestLSPPayloadController = async (req, res) => {
       data
     });
 
-    res.json({
+    return res.status(200).json({
       success: true,
       ...result
     });
   } catch (err) {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
       message: err.message
+    });
+  }
+};
+
+const getLRNHistoryController = async (req, res) => {
+  try {
+    const { lrNumber } = req.params;
+
+    if (!lrNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "LRNumber is required"
+      });
+    }
+
+    const data = await getLRNHistoryService(lrNumber);
+
+    return res.status(200).json({
+      success: true,
+      count: data.length,
+      data
+    });
+  } catch (err) {
+    console.error("Error fetching LRN history:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
+
+// actions
+
+const addActionController = async (req, res) => {
+  try {
+    const { LRNumber, Version, Message, Photos, UserID } = req.body;
+    
+    if (!LRNumber || !Version || !Message || !UserID) {
+      return res.status(400).json({
+        success: false,
+        message: "LRNumber, Version, Message and UserID are required"
+      });
+    }
+    
+    const result = await addActionService({
+      LRNumber,
+      Version,
+      Message,
+      Photos,
+      UserID
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: result
+    });
+  } catch (err) {
+    console.error("Add Action Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to add action"
+    });
+  }
+};
+
+const getActionsByLRNController = async (req, res) => {
+  try {
+    const { lrNumber, version } = req.params;
+
+    const actions = await getLRNActionsService(lrNumber, Number(version));
+
+    return res.status(200).json({
+      success: true,
+      data: actions
+    });
+  } catch (err) {
+    console.error("Get Actions Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to fetch actions"
     });
   }
 };
@@ -151,9 +263,12 @@ export {
   getCommonFieldsController,
   getFieldMappingController,
   addOrSwitchLRNController,
-  upsertLRNDetailsController,
+  insertLRNDetailsVersionController,
   getLRNsByDispatchController,
   getLRNDetailsController,
   getLRNsByStatusController,
-  ingestLSPPayloadController
+  ingestLSPPayloadController,
+  getLRNHistoryController,
+  addActionController,
+  getActionsByLRNController
 };

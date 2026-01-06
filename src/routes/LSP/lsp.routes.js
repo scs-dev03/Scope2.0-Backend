@@ -4,41 +4,82 @@ import {
   getCommonFieldsController,
   getFieldMappingController,
   addOrSwitchLRNController,
-  upsertLRNDetailsController,
   getLRNsByDispatchController,
   getLRNDetailsController,
   getLRNsByStatusController,
-  ingestLSPPayloadController
+  ingestLSPPayloadController,
+  insertLRNDetailsVersionController,
+  getLRNHistoryController,
+  addActionController,
+  getActionsByLRNController
 } from "../../controller/LSP/lsp.controller.js";
 
 const router = express.Router();
 
 /**
- * Master APIs
+ * =========================
+ * MASTER APIs
+ * =========================
  */
 router.get("/lsps", getAllLSPsController);
 router.get("/common-fields", getCommonFieldsController);
 
 /**
- * Mapping APIs
+ * =========================
+ * FIELD MAPPING APIs
+ * =========================
  */
 router.get("/field-mapping/:lspCode", getFieldMappingController);
 
 /**
- * Updating LRN or inserting new LRN
- * Mapping in mappingTable
+ * =========================
+ * CORE INGESTION
+ * =========================
  */
-router.post("/dispatch-lrn", addOrSwitchLRNController);
-router.post("/lrn-details", upsertLRNDetailsController);
-
-// map the data according to lsp code
 router.post("/ingest", ingestLSPPayloadController);
 
-// get by DON or LRN Number
-router.get("/dispatch/:dispatchOrderNo/lrns", getLRNsByDispatchController);
-router.get("/lrn/:lrNumber", getLRNDetailsController);
+/**
+ * =========================
+ * ADMIN / INTERNAL APIs
+ * (Versioned LRN Insert)
+ * =========================
+ */
+router.post(
+  "/lrn/version",
+  insertLRNDetailsVersionController
+);
 
-// get by status
-router.get("/lrns/status/:statusId", getLRNsByStatusController);
+/**
+ * =========================
+ * DISPATCH ↔ LRN
+ * =========================
+ */
+router.post("/dispatch-lrn", addOrSwitchLRNController);
+
+/**
+ * =========================
+ * READ APIs
+ * =========================
+ */
+router.get(
+  "/dispatch/:dispatchOrderNo/lrns",
+  getLRNsByDispatchController
+);
+
+router.get(
+  "/lrn/:lrNumber",
+  getLRNDetailsController
+);
+
+router.get(
+  "/lrns/status/:statusId",
+  getLRNsByStatusController
+);
+
+router.get("/lrn/:lrNumber/history", getLRNHistoryController);
+
+// actions
+router.post("/actions", addActionController);
+router.get("/actions/:lrNumber/:version", getActionsByLRNController);
 
 export default router;
