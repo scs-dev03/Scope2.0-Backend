@@ -265,8 +265,8 @@ const viewLog = async (req, res) => {
         const query = `
     USE [UAD_VON];
     SELECT 
-        li.Brand, li.Dealer, li.Location, 
-        pm.PartNumber, pm.PartDesc, pm.Category, pm.MRP, 
+        li.Brand, li.Dealer, li.Location, sf.PartNumber,
+         pm.PartDesc, pm.Category, pm.MRP, 
         sf.MaxValue, 
         CASE 
             WHEN rm.Remark = 'Custom' THEN sf.Customrem 
@@ -290,7 +290,7 @@ const viewLog = async (req, res) => {
         ON li.LocationID = sf.Locationid
     JOIN UAD_VON..UAD_VON_Remarksmaster rm 
         ON rm.Remarkid = sf.UserFBRemarkID 
-    join z_scope..AdminMaster_GEN amg
+    LEFT join z_scope..AdminMaster_GEN amg
 		ON amg.bintId_Pk = af.adminid
     WHERE sf.Dealerid = @dealerid
     AND (@LocationID IS NULL OR sf.locationid = @LocationID)
@@ -320,6 +320,9 @@ const adminView = async (req, res) => {
             return res.status(400).json({ Error: `Brandid and Dealerid are required Parameter` })
         }
         if (partnumber) {
+             if(!dealerid || !locationid){
+                return res.status(400).json({message : `dealerid and locationid are required when searching a part`})
+            }
             const Check = await maxpartmapping(partnumber, dealerid, locationid)
             if (Check == false) {
                 return res.status(400).json({ message: `No Sales in 12 Month for this part` })
@@ -595,7 +598,7 @@ const adminPendingView = async (req, res) => {
         }
         if (partnumber) {
             if(!dealerid || !locationid){
-                return res.status(400).json({message : `dealerid and locationid are required when searching a part`})
+                return res.status(400).json({message : `Dealer and Location are required when searching a part`})
             }
             const Check = await maxpartmapping(partnumber, dealerid, locationid)
             // console.log(Check);
@@ -1376,8 +1379,9 @@ const maxpartmapping = async (partNumber, DealerId, LocationId) => {
 }
 
 const partflagCheck = async (partnumber, dealerid, locationid, flag) => {
-    // console.log(partnumber , dealerid , locationid , flag);
-
+    if(flag == null){
+        return true
+    }
     const pool = await getPool2()
     const queryflagzero = `use z_scope select * from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and partnumber1 = '${partnumber}' and Addedby != 7 and Maxvalue = 0 and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and Addedby != 7)`
     const queryflagone = `use z_scope select * from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and partnumber1 = '${partnumber}' and Addedby != 7 and Maxvalue > 0 and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and Addedby != 7)`
@@ -1385,9 +1389,12 @@ const partflagCheck = async (partnumber, dealerid, locationid, flag) => {
     if (flag) {
 
         result = await pool.request().query(queryflagone)
+        // console.log(`1`,result.recordset);
+        
     }
     else {
         result = await pool.request().query(queryflagzero)
+        // console.log(2,result.recordset);
     }
     // console.log(result);
 
