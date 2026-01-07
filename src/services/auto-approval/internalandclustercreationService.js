@@ -132,9 +132,9 @@ const viewRuleService = async (BrandId, DealerId, LocationId, RuleName) => {
     try {
         const pool = await getPool1()
         const query = `use z_scope 
-                select ir.id , a.Brand , a.Dealer , a.Location ,ir.RuleName , ptm.Description , pqm.Quality , ir.Operator , ir.FromRate , ir.ToRate, ir.Status from AAP_InternalReceiver ir
+                select ir.id , a.Brand , a.Dealer , a.Location ,ir.RuleName , ptm.Description , pqm.Quality , ir.Operator , ir.FromRate , ir.ToRate, ir.Status , a.BrandId , a.DealerId , a.LocationId , ir.PartQuality , ir.PartTypeId from AAP_InternalReceiver ir
                 join (
-                select locationId , location , Brand , Dealer
+                select locationId , location , Brand , Dealer , BrandId , DealerId
                 from locationinfo 
                 where (@BrandId is null OR BrandId = @BrandId)
                 AND (@DealerId is null OR DealerId = @DealerId)
@@ -327,20 +327,22 @@ const viewClusterRuleService = async (BrandId, ClusterCode, DealerId, RuleName) 
     try {
         const pool = await getPool1()
         const query = `use z_scope
-            select cr.RuleName , a.Brand , a.Dealer , a.Location , cr.FromRate , cr.ToRate , cr.Operator , cr.Status   from AAP_ClusterReceiver cr
+            select cr.Id , cr.RuleName , a.Brand , a.Dealer , a.Location , ptm.Description , pqm.Quality , cr.FromRate , cr.ToRate , cr.Operator , cr.Status , a.BrandId , a.DealerId , a.LocationId ,cr.PartQuality,cr.PartTypeId from AAP_ClusterReceiver cr
             join AAP_ClusterSender cs on cs.ReceiverId = cr.Id
             JOIN 
             (
-            select LocationID, Brand , Dealer , Location from LocationInfo 
-            where (@BrandId IS NULL OR BrandID = @BrandId) OR (@DealerId IS NULL OR DealerID = @DealerId) and Status = 1
+            select LocationID, Brand , Dealer , Location , BrandId , DealerId from LocationInfo 
+            where (@BrandId IS NULL OR BrandID = @BrandId) AND (@DealerId IS NULL OR DealerID = @DealerId) and Status = 1
             )a on a.LocationID = cr.LocationId
             JOIN 
             (
             select tcode from Clust_ClusterLocMapping
             where (@ClusterId IS NULL OR tCode = @ClusterId) and Status = 1
             )b on b.tCode = cs.ClusterId
+            LEFT JOIN parttypemaster ptm on ptm.parttypeid = cr.parttypeid
+            left JOIN PartQualityMaster pqm on pqm.id = cr.partquality
             Where (@RuleName IS NULL OR cr.RuleName = @RuleName)
-            group by cr.RuleName , a.Brand , a.Dealer , a.Location , cr.FromRate , cr.ToRate , cr.Operator , cr.Status`
+            group by cr.Id , cr.RuleName , a.Brand , a.Dealer , a.Location , cr.FromRate , cr.ToRate , cr.Operator , cr.Status , a.BrandId , a.DealerId , a.LocationId , ptm.Description , pqm.Quality ,cr.PartQuality,cr.PartTypeId`
         const result = await pool.request()
             .input('BrandId', sql.Int, BrandId)
             .input('DealerId', sql.Int, DealerId)
