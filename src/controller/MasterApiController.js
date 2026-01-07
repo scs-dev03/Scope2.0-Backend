@@ -30,8 +30,17 @@ const getDealers = async (req, res) => {
 const getLocation = async (req, res) => {
   try {
     const pool = getPool2();
-    const { dealerid } = req.body;
-    const result = await pool.request().input('dealerid', sql.Int, dealerid).query(`use z_scope select locationid,location from locationinfo where dealerid = @dealerid and status = 1 and ogsStatus = 1 order by location`)
+    const { dealerid , userId} = req.body;
+    const adminLocationQuery = `use z_scope select locationid,location from locationinfo where dealerid = @dealerid and status = 1 and ogsStatus = 1 order by location`
+    const spmLocationQuery = `use z_scope select locationid , location from VW_SpmLocation where EmpID = @userId and locstatus = 1`
+    let result
+    if(userId){
+    // const usertypeQuery = `use z_scope select type from AdminMaster_GEN where bintId_Pk = @userId`
+    // const userType = await pool.request().input('userId', sql.Int, userId).query(usertypeQuery)
+       result = await pool.request().input('userId', sql.Int, userId).query(spmLocationQuery)
+   }else{
+     result = await pool.request().input('dealerid', sql.Int, dealerid).query(adminLocationQuery)
+   }
     res.status(200).json(result.recordset)
   } catch (error) {
     res.status(500).json(error)
@@ -95,7 +104,7 @@ const model = async (req, res) => {
 const partType = async (req, res) => {
   try {
     const pool = await getPool2()
-    const query = `select parttypeid , Description from parttypemaster`
+    const query = `select parttypeid , Description from z_scope..parttypemaster`
     const result = await pool.request().query(query)
     res.status(200).json({ Data: result.recordset })
   } catch (error) {
