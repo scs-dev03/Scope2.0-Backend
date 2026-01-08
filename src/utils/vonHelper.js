@@ -131,7 +131,7 @@ const insertData = async (formattedData, tableName) => {
     const table = new sql.Table(fullTableName); // Use fully qualified name
     table.create = false;
 
-// console.log(formattedData[0]);
+    // console.log(formattedData[0]);
 
     // 2) Define the 11 non-default columns, in exact ordinal order & types:
     table.columns.add('Brandid', sql.TinyInt, { nullable: false });   // tinyint
@@ -176,14 +176,14 @@ const insertData = async (formattedData, tableName) => {
   } catch (err) {
     // console.error('Error during bulk insert Dealer Feedback VON:', err, tableName);
     await transaction.rollback();
-    throw new ApiError(500,err.message); // Re-throw for upstream handling
+    throw new ApiError(500, err.message); // Re-throw for upstream handling
   }
 };
 
 const insertAdminFeedback = async (formattedData, brandid) => {
   const pool = await getPool2();
   const transaction = pool.transaction();
-// console.log(`1`,formattedData[0]);
+  // console.log(`1`,formattedData[0]);
 
   try {
     await transaction.begin();
@@ -245,7 +245,7 @@ const insertAdminFeedback = async (formattedData, brandid) => {
       );
     });
     // console.log(table);
-    
+
     const request = new sql.Request(transaction);
     await request.bulk(table);
 
@@ -274,7 +274,7 @@ const insertAdminFeedback = async (formattedData, brandid) => {
   } catch (err) {
     console.error('Error during admin feedback insert:', err);
     await transaction.rollback();
-    throw new ApiError(500,err.message);
+    throw new ApiError(500, err.message);
   }
 };
 
@@ -337,13 +337,13 @@ const checkPendingFeedbackAndStatus = async (dealerid, tableName, formattedData,
     // Create a Set for quick lookup
     const pendingSet = new Set(pendingStatusData.map(item => `${item.partnumber}-${item.locationid}`));
     // console.log(pendingSet);
-    
+
 
     // Find the records in formattedData that exist in pendingStatusData
     const pendingRecords = formattedData.filter(item =>
       pendingSet.has(`${item.PartNumber}-${item.locationid}`)
     );
-// console.log(pendingRecords);
+    // console.log(pendingRecords);
 
     return pendingRecords.length > 0 ? pendingRecords : [];
 
@@ -374,7 +374,7 @@ const checkReviewedFeedbackByBrand = async (brandid, formattedData) => {
       JOIN UAD_VON..UAD_VON_SPMFeedback_${brandid} sf ON sf.FeedbackID = af.FeedbackID
       --WHERE sf.Brandid = ${brandid} AND sf.status = 'Pending'
     `;
-    
+
     const result = await pool
       .request()
       .input('brandid', brandid) // Parameterized query
@@ -398,18 +398,18 @@ const checkReviewedFeedbackByBrand = async (brandid, formattedData) => {
 
 
 
-//     const query = ` use UAD_VON select CASE WHEN  count(*) > 0 then 1 else 0 end as [Check] from (select status
-//                 from UAD_VON_SPMFeedback_${brandid} 
-//                 where FeedbackID in (${ids}) 
-//                 )a where Status = 'Reviewed'`
-//                 console.log(query);
+    //     const query = ` use UAD_VON select CASE WHEN  count(*) > 0 then 1 else 0 end as [Check] from (select status
+    //                 from UAD_VON_SPMFeedback_${brandid} 
+    //                 where FeedbackID in (${ids}) 
+    //                 )a where Status = 'Reviewed'`
+    //                 console.log(query);
 
-//     const result = await pool
-//       .request()
-//       // .input('brandid', brandid) // Parameterized query
-//       .query(query);
+    //     const result = await pool
+    //       .request()
+    //       // .input('brandid', brandid) // Parameterized query
+    //       .query(query);
 
-// return result.recordset
+    // return result.recordset
 
   } catch (error) {
     console.error("Error checking reviewed feedback by brand:", error);
@@ -417,6 +417,68 @@ const checkReviewedFeedbackByBrand = async (brandid, formattedData) => {
   }
 };
 
+// Use the cleanedData you already created.
+// This will traverse cleanedData and RETURN invalid remarks (with reasons).
+
+function invalidRemarks(cleanedData) {
+  const invalidRemarks = cleanedData
+    .map((x, idx) => {
+      const remark = String(x.AdminRemark ?? "").trim();
+      const reasons = [];
+
+      // only numbers not allowed
+      if (/^\d+$/.test(remark)) reasons.push("Only numbers not allowed");
+
+      // no special chars except @ and -
+      if (!/^[A-Za-z0-9 @-]+$/.test(remark)) reasons.push("Contains invalid special character");
+
+      return reasons.length
+        ? {
+            index: idx,
+            feedbackid: x.feedbackid,
+            brand: x.brand,
+            dealer: x.dealer,
+            location: x.location,
+            AdminRemark: x.AdminRemark,
+            reasons
+          }
+        : null;
+    })
+    .filter(Boolean);
+
+  return invalidRemarks;
+}
+
+function invalidUserRemarks(cleanedData) {
+  const invalidRemarks = cleanedData
+    .map((x, idx) => {
+      const remark = String(x.UserRemark ?? "").trim();
+      const reasons = [];
+
+      // only numbers not allowed
+      if (/^\d+$/.test(remark)) reasons.push("Only numbers not allowed");
+
+      // no special chars except @ and -
+      // allowed: letters, digits, space, @, -
+      if (!/^[A-Za-z0-9 @-]+$/.test(remark)) reasons.push("Contains invalid special character");
+
+      return reasons.length
+        ? {
+            index: idx,
+            Brand: x.Brand,
+            Dealer: x.Dealer,
+            Location: x.Location,
+            Maxvalue: x.Maxvalue,
+            partnumber: x.partnumber,
+            UserRemark: x.UserRemark,
+            reasons
+          }
+        : null;
+    })
+    .filter(Boolean);
+
+  return invalidRemarks;
+}
 
 
-export { partBrandCheck, readExcel, insertData, insertAdminFeedback, findLocationPartidDuplicates, checkPendingFeedbackAndStatus, findLocationPartidDuplicatesAdmin, checkReviewedFeedbackByBrand, statusCheck }
+export { invalidUserRemarks, invalidRemarks, partBrandCheck, readExcel, insertData, insertAdminFeedback, findLocationPartidDuplicates, checkPendingFeedbackAndStatus, findLocationPartidDuplicatesAdmin, checkReviewedFeedbackByBrand, statusCheck }

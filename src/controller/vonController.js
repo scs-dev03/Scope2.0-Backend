@@ -1,8 +1,7 @@
 import { getPool1, getPool2 } from '../db/db.js'
 import sql from 'mssql'
-
 import fs from 'fs'
-import { partBrandCheck, readExcel, insertData, findLocationPartidDuplicates, checkPendingFeedbackAndStatus, findLocationPartidDuplicatesAdmin, insertAdminFeedback, checkReviewedFeedbackByBrand, statusCheck } from '../utils/vonHelper.js'
+import { partBrandCheck, readExcel, insertData, findLocationPartidDuplicates, checkPendingFeedbackAndStatus, findLocationPartidDuplicatesAdmin, insertAdminFeedback, checkReviewedFeedbackByBrand, statusCheck, invalidRemarks , invalidUserRemarks } from '../utils/vonHelper.js'
 import { partfamilySaleservice } from '../services/norms-management/utils.service.js'
 
 
@@ -614,7 +613,7 @@ const adminPendingView = async (req, res) => {
         }
         const query = `
             USE [UAD_VON]
-            EXEC sp_GetAdminView1 
+            EXEC sp_GetAdminView3 
                 @brandid = @brandid,
                 @dealerid = @dealerid,
                 @locationid = @locationid,
@@ -708,6 +707,12 @@ const dealerUpload = async (req, res) => {
                 ProposedQty
             }));
         //  console.log(cleanedData[0]);
+
+        const invalidUserRemarksData = invalidUserRemarks(cleanedData)
+    // console.log(invalidAdminRemarks1);
+    if(invalidUserRemarksData.length > 0){
+        return res.status(400).json({message:'Invalid UserRemark Found in Excel',invalidUserRemarksData})
+    }
 
         const isArrayEmpty = (arr) => !arr || arr.length === 0;
         if (isArrayEmpty(cleanedData)) {
@@ -1151,6 +1156,13 @@ const adminUpload = async (req, res) => {
             ApprovedQty
         }));
     // console.log(cleanedData);
+
+    const invalidAdminRemarks = invalidRemarks(cleanedData)
+    // console.log(invalidAdminRemarks1);
+    if(invalidAdminRemarks.length > 0){
+        return res.status(400).json({message:'Invalid AdminRemarks Found in Excel',invalidAdminRemarks})
+    }
+    
 
     const isArrayEmpty = (arr) => !arr || arr.length === 0;
     if (isArrayEmpty(cleanedData)) {
