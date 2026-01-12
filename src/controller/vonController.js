@@ -388,14 +388,13 @@ const adminFeedbackLog = async (req, res) => {
             join ${dynamicTable} B on A.FeedbackID = B.FeedbackID
             where A.FeedbackID = ${feedbackid}
             )`;
-            console.log(previousAdminFBQuery);
-
+            // console.log(previousAdminFBQuery);
+            
             const previousAdminFBResult = await pool.request().query(previousAdminFBQuery);
-            // .input('feedbackid', sql.Int, feedbackid)
-            console.log(previousAdminFBResult);
+            // console.log(previousAdminFBResult);
 
             PreviousAdminFBID = previousAdminFBResult.recordset.length > 0 ? previousAdminFBResult.recordset[0].AdminFBID : null;
-            console.log(PreviousAdminFBID);
+            // console.log(PreviousAdminFBID);
 
         } catch (error) {
             return res.status(500).json({ Error: error.message, Error: `Error in Finding Previous Feedback` })
