@@ -44,7 +44,7 @@ async function start() {
 
     // ────────────────────────────────────────────────
     // Run `scheduleTask()` every minute:
-    // cron.schedule('*/1 * * * *', async () => {
+    // cron.schedule('*/15 * * * *', async () => {
     //   await connectDB().catch(err => console.error('connectDB error', err));
     //   console.log('⚙️  Running scheduleTask at', new Date().toISOString());
     //   scheduleTask().catch(err => console.error('scheduleTask error', err));
