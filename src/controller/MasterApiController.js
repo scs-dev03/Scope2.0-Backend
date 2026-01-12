@@ -32,7 +32,9 @@ const getLocation = async (req, res) => {
     const pool = getPool2();
     const { dealerid , userId} = req.body;
     const adminLocationQuery = `use z_scope select locationid,location from locationinfo where dealerid = @dealerid and status = 1 and ogsStatus = 1 order by location`
-    const spmLocationQuery = `use z_scope select locationid , location from VW_SpmLocation where EmpID = @userId and locstatus = 1`
+    const spmLocationQuery = `use z_scope select sl.locationid , sl.location from VW_SpmLocation sl
+                              JOIN LocationInfo li on li.LocationID = sl.LocationID
+                              where EmpID = @userId and li.OgsStatus = 1 and li.Status = 1 order by sl.location`
     let result
     if(userId){
     // const usertypeQuery = `use z_scope select type from AdminMaster_GEN where bintId_Pk = @userId`
