@@ -1,4 +1,4 @@
-import { editRemarkService, insertRemarkService, remarktypeMasterService, remarkViewService } from "../../services/auto-approval/remarkMasterService.js"
+import { editRemarkService, insertRemarkService, insertRemarkSettingService, remarktypeMasterService, remarkViewService, viewRemarkSettingService } from "../../services/auto-approval/remarkMasterService.js"
 import { ApiError } from "../../utils/ApiError.js"
 import { ApiResponse } from "../../utils/ApiResponse.js"
 
@@ -6,8 +6,8 @@ const insertRemark = async (req, res) => {
     try {
         const { BrandId, DealerId, LocationId, Remark, Remarktype, userid } = req.body
         // console.log(BrandId, DealerId, LocationId, Remark, Remarktype, userid);
-        if(!Remarktype){
-            return res.status(400).json(new ApiError(400,`Remarktype is Required`))
+        if (!Remarktype) {
+            return res.status(400).json(new ApiError(400, `Remarktype is Required`))
         }
 
         const result = await insertRemarkService(BrandId, DealerId, LocationId, Remark, Remarktype, userid)
@@ -51,4 +51,36 @@ const editRemark = async (req, res) => {
     }
 }
 
-export { insertRemark, remarktypeMaster, remarkView, editRemark }
+const insertRemarkSetting = async (req, res) => {
+    try {
+        const { payload, ApprovalStatus, GroupStockStatus, GainerStatus , Addedby } = req.body
+        // console.log(payload, ApprovalStatus, GroupStockStatus, GainerStatus);
+        const result = await insertRemarkSettingService(payload,ApprovalStatus,GroupStockStatus,GainerStatus,Addedby)
+        res.status(200).json(new ApiResponse(200, result))
+    } catch (error) {
+        res.status(500).json(new ApiError(500,error.message))
+    }
+}
+
+const viewRemarkSetting = async(req,res)=>{
+try {
+        const {BrandId , DealerId , LocationId , UserId}  = req.body
+
+        function format(arr) {
+            if (!Array.isArray(arr) || arr.length === 0) return null;
+            const s = arr.map(v => String(v).trim()).filter(Boolean).join(',');
+            return s ? `${s.replace(/'/g, "''")}` : null;
+        }
+
+        const formattedLocationIds = format(LocationId);
+        const formattedBrandIds = format(BrandId);
+        const formattedDealerIds = format(DealerId);
+        const formattedUserIds = format(UserId);
+
+        const result = await viewRemarkSettingService(formattedBrandIds , formattedDealerIds , formattedLocationIds , formattedUserIds)
+        res.status(200).json(new ApiResponse(200,result))
+} catch (error) {
+    res.status(500).json(new ApiError(error.message))
+}
+}
+export { insertRemark, remarktypeMaster, remarkView, editRemark , insertRemarkSetting , viewRemarkSetting}
