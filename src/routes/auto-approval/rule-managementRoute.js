@@ -6,7 +6,8 @@ import {
     getTemplate,
     getAllRules,
     getRuleOutput,
-    viewRules
+    viewRules,
+    viewRuleById
 } from "../../controller/auto-approval/rule-managementController.js"
 
 const router = Router();
@@ -17,6 +18,7 @@ router.post("/template",getTemplate);
 
 router.post("/add-rule", addRule);
 router.post("/view-rule", viewRules);
+router.post("/rule-by-id", viewRuleById);
 
 
 router.put("/modify-rule", modifyRule);

@@ -13,7 +13,8 @@ import {
   fetchAllRules,
   fetchRuleOutput,
   insertLocationWisePriority,
-  viewRulesService
+  viewRulesService,
+  viewRuleByIdService
 } from "../../services/auto-approval/rule-managementService.js";
 import { getPool1 } from "../../db/db.js";
 import { ApiError } from "../../utils/ApiError.js";
@@ -94,7 +95,7 @@ const getTemplate = async (req, res) => {
 
 const addRule = async (req, res) => {
   const { name, description, expression, trueOutput, falseOutput, createdBy, trueRemark, falseRemark, ruleFor, RuleType, mappings } = req.body;
-  
+
   if (
     !Array.isArray(mappings) ||
     !name?.trim() ||
@@ -112,13 +113,13 @@ const addRule = async (req, res) => {
       .status(400)
       .json(new ApiError(400, "mappings , name, description, expression, trueOutput, falseOutput, trueRemark, falseRemark and createdBy are compulsory", [], ""));
   }
-  if(RuleType === 1 && mappings.length > 1){
-    return res.status(400).json(new ApiError(400,`When Creating Location Specific Rules only 1 location is Required`))
+  if (RuleType === 1 && mappings.length > 1) {
+    return res.status(400).json(new ApiError(400, `When Creating Location Specific Rules only 1 location is Required`))
   }
   const pool = await getPool1();
   const transaction = new sql.Transaction(pool);
   // console.log(transaction);
-  
+
   try {
     await transaction.begin();
 
@@ -137,7 +138,7 @@ const addRule = async (req, res) => {
       RuleType
     );
     // console.log(RuleId);
-    
+
     // 2) Prepare mappings with RuleId + createdBy
     const ruleMappings = mappings.map(row => ({
       ...row,
@@ -148,7 +149,7 @@ const addRule = async (req, res) => {
     // 3) Bulk insert mappings inside SAME transaction
     await insertRuleMapping(transaction, ruleMappings);
 
-    await insertLocationWisePriority(transaction , RuleId , createdBy)
+    await insertLocationWisePriority(transaction, RuleId, createdBy)
 
     // 4) Commit only if both succeed
     await transaction.commit();
@@ -187,7 +188,7 @@ const getAllRules = async (req, res) => {
 
 const modifyRule = async (req, res) => {
   try {
-    const { ruleId, name, description, expression, trueOutput, falseOutput, trueRemark, falseRemark , ruleFor} = req.body;
+    const { ruleId, name, description, expression, trueOutput, falseOutput, trueRemark, falseRemark, ruleFor, status} = req.body;
 
     if (ruleId == null ||
       name === undefined ||
@@ -197,14 +198,15 @@ const modifyRule = async (req, res) => {
       falseOutput === undefined ||
       trueRemark === undefined ||
       falseRemark === undefined ||
-      ruleFor === undefined
+      ruleFor === undefined || 
+      status === undefined
     ) {
       return res
         .status(400)
         .json(new ApiError(400, "ruleId,name,description,expression,trueOutput,falseOutput,trueRemark,falseRemark is mandatory for updating", [], ""));
     }
 
-    const data = await updateRule(ruleId, name, description, expression, trueOutput, falseOutput, trueRemark, falseRemark , ruleFor);
+    const data = await updateRule(ruleId, name, description, expression, trueOutput, falseOutput, trueRemark, falseRemark, ruleFor, status);
 
     res
       .status(200)
@@ -383,15 +385,84 @@ const getRuleOutput = async (req, res) => {
   }
 }
 
-const viewRules = async(req,res)=>{
-try {
-    const {BrandId , DealerId , LocationId , RuleId} = req.body
-    const result = await viewRulesService(BrandId,DealerId,LocationId,RuleId)
-    res.status(200).json(new ApiResponse(200,result))
-} catch (error) {
-  res.status(500).json(new ApiError(error.statusCode || 500 , error.message))
+const viewRules = async (req, res) => {
+  try {
+    const { BrandId, DealerId, LocationId, RuleId } = req.body
+    const result = await viewRulesService(BrandId, DealerId, LocationId, RuleId)
+    res.status(200).json(new ApiResponse(200, result))
+  } catch (error) {
+    res.status(500).json(new ApiError(error.statusCode || 500, error.message))
+  }
 }
+
+const viewRuleById = async (req, res) => {
+  try {
+    const { Id } = req.body
+    if (!Id) {
+      return res.status(400).json(new ApiError(400, `Id is Required`))
+    }
+    const result = await viewRuleByIdService(Id)
+    
+    const grouped = groupRules(result);
+
+    res.status(200).json(new ApiResponse(200, grouped))
+  } catch (error) {
+    res.status(500).json(new ApiError(500, error.message))
+  }
 }
+
+function groupRules(rows) {
+  const map = new Map();
+
+  for (const r of rows) {
+    // group by "rule identity" (everything except Brand/Dealer/Location)
+    // so same rule across multiple locations gets merged
+    const key = JSON.stringify({
+      Id: r.Id,
+      Name: r.Name,
+      RuleDesc: r.RuleDesc,
+      Rule: r.Rule,
+      TrueOutput: r.TrueOutput,
+      FalseOutput: r.FalseOutput,
+      TrueRemarks: r.TrueRemarks,
+      FalseRemarks: r.FalseRemarks,
+      RuleFor: r.RuleFor,
+      RuleType: r.RuleType,
+    });
+
+    if (!map.has(key)) {
+      map.set(key, {
+        Id: r.Id,
+        Name: r.Name,
+        RuleDesc: r.RuleDesc,
+        Rule: r.Rule,
+        TrueOutput: r.TrueOutput,
+        FalseOutput: r.FalseOutput,
+        TrueRemarks: r.TrueRemarks,
+        FalseRemarks: r.FalseRemarks,
+        RuleFor: r.RuleFor,
+        RuleType: r.RuleType,
+        BrandIds: new Set(),
+        DealerIds: new Set(),
+        LocationIds: new Set(),
+      });
+    }
+
+    const g = map.get(key);
+    if (r.BrandId != null) g.BrandIds.add(r.BrandId);
+    if (r.DealerId != null) g.DealerIds.add(String(r.DealerId));
+    if (r.LocationId != null) g.LocationIds.add(String(r.LocationId));
+  }
+
+  // convert Sets -> arrays
+  return Array.from(map.values()).map(x => ({
+    ...x,
+    BrandIds: Array.from(x.BrandIds),
+    DealerIds: Array.from(x.DealerIds),
+    LocationIds: Array.from(x.LocationIds),
+  }));
+}
+
 export {
   addTemplate,
   modifyTemplate,
@@ -406,5 +477,6 @@ export {
   getTemplate,
   getAllRules,
   getRuleOutput,
-  viewRules
+  viewRules,
+  viewRuleById
 };

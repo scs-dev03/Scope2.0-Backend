@@ -180,20 +180,34 @@ export const insertRule = async (transaction, name, description, expression, tru
     }
 };
 
-export const updateRule = async (ruleId, name, description, expression, trueOutput, falseOutput, trueRemark, falseRemark, ruleFor) => {
+export const updateRule = async (ruleId, name, description, expression, trueOutput, falseOutput, trueRemark, falseRemark, ruleFor , status) => {
     try {
         const pool = await getPool1();
-        const duplicateCheck = await pool.request()
+        // const duplicateExpresionCheck = await pool.request()
+        //     // .input("name", name)
+        //     .input("expression", expression)
+        //     .query(`
+        //         SELECT TOP 1 1 
+        //         FROM z_scope..aap_rulemaster
+        //         WHERE [Rule] = @expression
+        //     `);
+
+        // if (duplicateExpresionCheck.recordset.length > 0) {
+        //     throw new ApiError(400, "Rule already exists");
+        // }
+
+        const duplicateNameCheck = await pool.request()
+            // .input("name", name)
             .input("name", name)
-            .input("expression", expression)
+            .input("ruleId", ruleId)
             .query(`
                 SELECT TOP 1 1 
                 FROM z_scope..aap_rulemaster
-                WHERE [Name] = @name OR [Rule] = @expression
+                WHERE name = @name AND Id != @ruleId
             `);
 
-        if (duplicateCheck.recordset.length > 0) {
-            throw new ApiError(400, "Rule with same name or expression already exists");
+        if (duplicateNameCheck.recordset.length > 0) {
+            throw new ApiError(400, "Rule Name already exists");
         }
         if (expression) {
             const exists = await pool.request()
@@ -220,6 +234,7 @@ export const updateRule = async (ruleId, name, description, expression, trueOutp
         request.input("trueRemark", trueRemark);
         request.input("falseRemark", falseRemark);
         request.input("RuleFor", ruleFor);
+        request.input("Status", status);
         // request.input("RuleType", RuleType);
 
         const query = `
@@ -232,10 +247,10 @@ export const updateRule = async (ruleId, name, description, expression, trueOutp
         [FalseOutput]= COALESCE(@falseOutput, [FalseOutput]),
         TrueRemarks=COALESCE(@trueRemark,TrueRemarks),
         FalseRemarks=COALESCE(@falseRemark,FalseRemarks),
-        RuleFor=COALESCE(@RuleFor,RuleFor)
+        RuleFor=COALESCE(@RuleFor,RuleFor), 
+        Status=COALESCE(@Status,Status)
         --RuleType=COALESCE(@RuleType,RuleType),
-    WHERE Id = @RuleId
-`;
+        WHERE Id = @RuleId`;
         const result = await request.query(query);
         if (result.rowsAffected[0] === 0) {
             throw new ApiError(404, "No rule exists for this rule id");
@@ -683,31 +698,31 @@ export const fetchRuleOutput = async () => {
     }
 };
 
-export const insertLocationWisePriority = async (transaction , ruleId, userId) => {
+export const insertLocationWisePriority = async (transaction, ruleId, userId) => {
     // const pool = await getPool1()
- try {
-       const checkQuery = `select 1 from AAP_RuleMaster where Id = @Id `
-       const result = await transaction.request().input('Id',sql.Int,ruleId).query(checkQuery)
-       // console.log(result);
-       if(result.rowsAffected == 1){
-           await transaction.request()
-           .input('RuleId',ruleId)
-           .input('AddedBy',userId)
-           .execute(`dbo.AAP_SetLocationPriority`)
-       }
-       else{
-           throw new ApiError(500,`RuleId doesn't exists -> ${ruleId}`)
-       }
- } catch (error) {
-    throw new ApiError(500,error.message)
- }
-    
+    try {
+        const checkQuery = `select 1 from AAP_RuleMaster where Id = @Id `
+        const result = await transaction.request().input('Id', sql.Int, ruleId).query(checkQuery)
+        // console.log(result);
+        if (result.rowsAffected == 1) {
+            await transaction.request()
+                .input('RuleId', ruleId)
+                .input('AddedBy', userId)
+                .execute(`dbo.AAP_SetLocationPriority`)
+        }
+        else {
+            throw new ApiError(500, `RuleId doesn't exists -> ${ruleId}`)
+        }
+    } catch (error) {
+        throw new ApiError(500, error.message)
+    }
+
 }
 
-export const viewRulesService = async(BrandId,DealerId,LocationId,RuleId)=>{
-try {
+export const viewRulesService = async (BrandId, DealerId, LocationId, RuleId) => {
+    try {
         const pool = await getPool1()
-        const query = `select vcbrand Brand ,  vcName Dealer, li.Location ,rm.Name, rm.[Rule] , lp.priority   , lp.Status , rm.id , lp.LocationId
+        const query = `select vcbrand Brand ,  vcName Dealer, li.Location ,rm.Name, rm.[Rule] , lp.priority   , lp.Status , rm.id , lp.LocationId , rm.RuleDesc , rm.TrueOutput , rm.FalseOutput , rm.TrueRemarks , rm.FalseRemarks , rm.RuleFor , rm.RuleType
                         from AAP_RuleMaster rm
                         JOIN AAP_RuleMapping rmp on rm.id = rmp.ruleid
                         JOIN AAP_LocationPriority lp on lp.ruleid = rm.Id
@@ -720,14 +735,30 @@ try {
                         AND (@RuleID IS NULL OR rmp.RuleID = @RuleID)
                         order by lp.locationid , lp.priority`
         const result = await pool.request()
-        .input('BrandId',sql.Int,BrandId)
-        .input('DealerId',sql.Int,DealerId)
-        .input('LocationId',sql.Int,LocationId)
-        .input('RuleId',sql.Int,RuleId)
-        .query(query)
+            .input('BrandId', sql.Int, BrandId)
+            .input('DealerId', sql.Int, DealerId)
+            .input('LocationId', sql.Int, LocationId)
+            .input('RuleId', sql.Int, RuleId)
+            .query(query)
         return result.recordset
-} catch (error) {
-    throw new ApiError(500,error.message);
-    
+    } catch (error) {
+        throw new ApiError(500, error.message);
+
+    }
 }
+
+export const viewRuleByIdService = async (Id) => {
+    try {
+        const pool = await getPool1()
+        const query = `use z_scope
+        select rm.Id , Name , RuleDesc , [Rule] , TrueOutput , FalseOutput , TrueRemarks , FalseRemarks , RuleFor , RuleType , rmp.BrandId , DealerId , rmp.LocationId  from AAP_RuleMaster rm
+        JOIN AAP_RuleMapping rmp on rm.id = rmp.ruleid
+        where rm.Id = @Id
+        group by rm.Id , Name , RuleDesc , [Rule] , TrueOutput , FalseOutput , TrueRemarks , FalseRemarks , RuleFor , RuleType , rmp.BrandId , DealerId , rmp.LocationId`
+
+        const result = await pool.request().input('Id', sql.Int, Id).query(query)
+        return result.recordset
+    } catch (error) {
+        throw new ApiError(500, error)
+    }
 }
