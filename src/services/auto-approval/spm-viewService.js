@@ -221,7 +221,7 @@ const viewOrderStatusService = async (
             @Status          = ${Status};        
     `;
     // console.log(query);
-    
+
     const result = await pool.request().query(query);
     return result.recordset;
   } catch (error) {
@@ -341,4 +341,21 @@ const spmDashboardService = async (DealerId, LocationId, OrderTypeId, From, To) 
   }
 
 }
-export { viewOrderStatusService, viewPartyService, viewAdvisorService, updatePartyService, updateAdvisorService, existingPartyNameandCodeService, existingAdvisor, orderPlacedService, reorderService, nonMovingService, spmDashboardService }
+
+const reqToGainerService = async (payload) => {
+  try {
+    const pool = await getPool1()
+    const jsonPayload = JSON.stringify(payload)
+
+    const result = await pool.request()
+      .input('Payload', sql.NVarChar(sql.MAX), jsonPayload)
+      .execute('dbo.RequestToGainer_VB')
+      return result.recordset
+      
+  } catch (error) {
+    throw new ApiError(500, error)
+  }
+
+
+}
+export { viewOrderStatusService, viewPartyService, viewAdvisorService, updatePartyService, updateAdvisorService, existingPartyNameandCodeService, existingAdvisor, orderPlacedService, reorderService, nonMovingService, spmDashboardService, reqToGainerService }

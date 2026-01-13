@@ -1,6 +1,6 @@
 import { json } from "express"
 import { findAdvisorOnLocation, partyAlreadyExistsCheck } from "../../services/auto-approval/spm-uploadService.js"
-import { existingAdvisor, existingPartyNameandCodeService, nonMovingService, orderPlacedService, reorderService, spmDashboardService, updateAdvisorService, updatePartyService, viewAdvisorService, viewOrderStatusService, viewPartyService } from "../../services/auto-approval/spm-viewService.js"
+import { existingAdvisor, existingPartyNameandCodeService, nonMovingService, orderPlacedService, reorderService, reqToGainerService, spmDashboardService, updateAdvisorService, updatePartyService, viewAdvisorService, viewOrderStatusService, viewPartyService } from "../../services/auto-approval/spm-viewService.js"
 import { ApiError } from "../../utils/ApiError.js"
 import { ApiResponse } from "../../utils/ApiResponse.js"
 import { groupStock } from "../../services/dealerMonitoring/dealerMonitoringService.js"
@@ -22,11 +22,11 @@ const viewParty = async (req, res) => {
 
 const viewAdvisor = async (req, res) => {
     try {
-        const { LocationId , Status} = req.body
+        const { LocationId, Status } = req.body
         if (!LocationId) {
             return res.status(400).json(new ApiError(400, 'LocationId is Required', []))
         }
-        const data = await viewAdvisorService(LocationId , Status)
+        const data = await viewAdvisorService(LocationId, Status)
         res.status(200).json(new ApiResponse(200, data, 'Data Fetched Successfully'))
     } catch (error) {
         res.status(500).json(new ApiError(500, error, []))
@@ -224,7 +224,7 @@ const viewOrderStatus = async (req, res) => {
             return s ? `'${s.replace(/'/g, "''")}'` : null;
         }
         // console.log(OrderTypeIds);
-        
+
         //  // Format parameters using the formatForSql function
         const formattedLocationIds = format(LocationIds);
         const formattedRequestType = format(RequestType);
@@ -247,7 +247,7 @@ const viewOrderStatus = async (req, res) => {
         //     formattedAdvisorIds,
         //     formattedStatus);
         // console.log(formattedOrderTypeIds);
-        
+
         const result = await viewOrderStatusService(
             DealerId,
             formattedLocationIds,
@@ -345,4 +345,13 @@ const spmDashboard = async (req, res) => {
     }
 }
 
-export { viewParty, viewAdvisor, updateParty, updateAdvisor, viewOrderStatus, orderPlaced, reOrder, nonMoving, viewgroupStock, spmDashboard }
+const reqToGainer = async (req, res) => {
+    try {
+        const { payload } = req.body
+        const result = await reqToGainerService(payload)
+        res.status(200).json(new ApiResponse(200,result,`Part Requested To Gainer`))
+    } catch (error) {
+        res.status(500).json(new ApiError(500, error.message))
+    }
+}
+export { viewParty, viewAdvisor, updateParty, updateAdvisor, viewOrderStatus, orderPlaced, reOrder, nonMoving, viewgroupStock, spmDashboard, reqToGainer }
