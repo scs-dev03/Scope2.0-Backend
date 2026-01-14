@@ -16,66 +16,44 @@ import {
 
 const router = express.Router();
 
-/**
- * =========================
- * MASTER APIs
- * =========================
- */
+//MASTER APIs
 router.get("/lsps", getAllLSPsController);
 router.get("/common-fields", getCommonFieldsController);
 
-/**
- * =========================
- * FIELD MAPPING APIs
- * =========================
- */
+//FIELD MAPPING APIs
 router.get("/field-mapping/:lspCode", getFieldMappingController);
 
-/**
- * =========================
- * CORE INGESTION
- * =========================
- */
+// core ingestion
 router.post("/ingest", ingestLSPPayloadController);
 
-/**
- * =========================
- * ADMIN / INTERNAL APIs
- * (Versioned LRN Insert)
- * =========================
- */
+//Versioned LRN Insert
 router.post(
   "/lrn/version",
   insertLRNDetailsVersionController
 );
 
-/**
- * =========================
- * DISPATCH ↔ LRN
- * =========================
- */
+//DISPATCH ↔ LRN
 router.post("/dispatch-lrn", addOrSwitchLRNController);
 
-/**
- * =========================
- * READ APIs
- * =========================
- */
+//READ APIs
 router.get(
   "/dispatch/:dispatchOrderNo/lrns",
   getLRNsByDispatchController
 );
 
+// get by lrn
 router.get(
   "/lrn/:lrNumber",
   getLRNDetailsController
 );
 
+// get by status
 router.get(
   "/lrns/status/:statusId",
   getLRNsByStatusController
 );
 
+// get history
 router.get("/lrn/:lrNumber/history", getLRNHistoryController);
 
 // actions

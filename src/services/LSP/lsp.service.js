@@ -3,10 +3,7 @@ import sql from "mssql";
 
 const database = "UAD_LSPMonitoringSystemDB";
 
-/* =========================
-   HELPER FUNCTIONS
-========================= */
-
+// HELPER FUNCTIONS
 const getLRNColumnsFromDB = async () => {
   const pool = getPool1();
   const result = await pool.request().query(`
@@ -86,7 +83,7 @@ const resolveStatusId = async (statusText) => {
   return result.recordset[0]?.StatusID ?? 1;
 };
 
-// 1 = Normal, 2 = Exception, 3 = RTO
+// 1-Normal, 2-Exception, 3-RTO
 const resolveFlowType = (value) => {
   if (!value) return 1;
   const v = String(value).toLowerCase();
@@ -95,10 +92,7 @@ const resolveFlowType = (value) => {
   return 1;
 };
 
-/* =========================
-   CORE INGESTION
-========================= */
-
+//CORE INGESTION
 const ingestLSPPayloadService = async ({ lspCode, lspName, dispatchOrderNo, data }) => {
   const fieldMap = await getLSPFieldMappings(lspName);
   const normalizedData = transformToCommonFields(data, fieldMap);
@@ -143,10 +137,7 @@ const ingestLSPPayloadService = async ({ lspCode, lspName, dispatchOrderNo, data
   };
 };
 
-/* =========================
-   VERSIONED LRN INSERT
-========================= */
-
+//VERSIONED LRN INSERT
 const insertLRNDetailsVersionService = async (data) => {
   const pool = getPool1();
   const transaction = await pool.transaction();
@@ -215,10 +206,7 @@ const insertLRNDetailsVersionService = async (data) => {
   }
 };
 
-/* =========================
-   DISPATCH ↔ LRN
-========================= */
-
+// DISPATCH ↔ LRN
 const addOrSwitchLRNService = async (dispatchOrderNo, lrNumber, LSPCode) => {
   const pool = getPool1();
   const transaction = await pool.transaction();
@@ -260,10 +248,7 @@ const addOrSwitchLRNService = async (dispatchOrderNo, lrNumber, LSPCode) => {
   }
 };
 
-/* =========================
-   READ APIS
-========================= */
-
+//READ APIS
 const getAllLSPsService = async () => {
   const pool = getPool1();
   const result = await pool.request().query(`
@@ -362,28 +347,44 @@ const getLRNHistoryService = async (lrNumber) => {
   request.input("LRNumber", lrNumber);
 
   const query = `
-    SELECT ld.*, lsp.LSPName, st.StatusName
+    SELECT
+      ld.*,
+      lsp.LSPName,
+      st.StatusName,
+      a.ActionID,
+      a.Message AS ActionMessage,
+      a.Photos,
+      a.UserID,
+      a.ActionTime
     FROM ${database}.dbo.LRNDetails ld
-    JOIN ${database}.dbo.LSPMaster lsp ON ld.LSPCode = lsp.ID
-    JOIN ${database}.dbo.Status1Master st ON ld.Status = st.StatusID
+    JOIN ${database}.dbo.LSPMaster lsp
+      ON ld.LSPCode = lsp.ID
+    JOIN ${database}.dbo.Status1Master st
+      ON ld.Status = st.StatusID
+    OUTER APPLY (
+      SELECT TRY_CAST(value AS INT) AS ActionID
+      FROM STRING_SPLIT(ISNULL(ld.ActionIDs, ''), ',')
+      WHERE value <> ''
+    ) s
+    LEFT JOIN ${database}.dbo.Actions a
+      ON a.ActionID = s.ActionID
     WHERE ld.LRNumber = @LRNumber
-    ORDER BY ld.Version DESC
+    ORDER BY ld.Version DESC, a.ActionTime DESC
   `;
 
   const result = await request.query(query);
   return result.recordset;
 };
 
-/* =========================
-   Actions
-========================= */
-
+// ACTIONS
 const addActionService = async ({
   LRNumber,
   Version,
   Message,
   Photos,
-  UserID
+  UserID,
+  Issue,
+  Resolution
 }
 ) => {
   
@@ -400,12 +401,14 @@ const addActionService = async ({
       .input("Message", Message)
       .input("Photos", Photos || null)
       .input("UserID", UserID)
+      .input("Issue", Issue)
+      .input("Resolution", Resolution)
       .query(`
         INSERT INTO ${database}.dbo.Actions
-        (LRNumber, Version, Message, Photos, UserID)
+        (LRNumber, Version, Message, Photos, UserID, Issue, Resolution)
         OUTPUT INSERTED.ActionID
         VALUES
-        (@LRNumber, @Version, @Message, @Photos, @UserID)
+        (@LRNumber, @Version, @Message, @Photos, @UserID, @Issue, @Resolution)
       `);
 
     const actionId = insertResult.recordset[0].ActionID;
@@ -463,11 +466,6 @@ const getLRNActionsService = async (lrNumber, version) => {
 
   return actionsResult.recordset;
 };
-
-
-/* =========================
-   EXPORTS
-========================= */
 
 export {
   ingestLSPPayloadService,

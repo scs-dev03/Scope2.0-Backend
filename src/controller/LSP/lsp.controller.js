@@ -13,11 +13,7 @@ import {
   getLRNActionsService
 } from "../../services/LSP/lsp.service.js";
 
-/**
- * =========================
- * MASTER CONTROLLERS
- * =========================
- */
+//MASTER CONTROLLERS
 const getAllLSPsController = async (req, res) => {
   try {
     const data = await getAllLSPsService();
@@ -38,11 +34,7 @@ const getCommonFieldsController = async (req, res) => {
   }
 };
 
-/**
- * =========================
- * FIELD MAPPING
- * =========================
- */
+//FIELD MAPPING
 const getFieldMappingController = async (req, res) => {
   try {
     const { lspCode } = req.params;
@@ -54,11 +46,7 @@ const getFieldMappingController = async (req, res) => {
   }
 };
 
-/**
- * =========================
- * DISPATCH ↔ LRN
- * =========================
- */
+//DISPATCH ↔ LRN
 const addOrSwitchLRNController = async (req, res) => {
   try {
     const { dispatchOrderNo, lrNumber, LSPCode } = req.body;
@@ -78,11 +66,7 @@ const addOrSwitchLRNController = async (req, res) => {
   }
 };
 
-/**
- * =========================
- * VERSIONED LRN INSERT
- * =========================
- */
+//VERSIONED LRN INSERT
 const insertLRNDetailsVersionController = async (req, res) => {
   try {
     const payload = req.body;
@@ -112,11 +96,7 @@ const insertLRNDetailsVersionController = async (req, res) => {
   }
 };
 
-/**
- * =========================
- * READ APIs
- * =========================
- */
+//READ APIs
 const getLRNsByDispatchController = async (req, res) => {
   try {
     const { dispatchOrderNo } = req.params;
@@ -150,11 +130,7 @@ const getLRNsByStatusController = async (req, res) => {
   }
 };
 
-/**
- * =========================
- * MAIN INGESTION
- * =========================
- */
+//MAIN INGESTION
 const ingestLSPPayloadController = async (req, res) => {
   try {
     const { lspCode, lspName, dispatchOrderNo, data } = req.body;
@@ -178,6 +154,7 @@ const ingestLSPPayloadController = async (req, res) => {
   }
 };
 
+// get history of LRN
 const getLRNHistoryController = async (req, res) => {
   try {
     const { lrNumber } = req.params;
@@ -189,12 +166,48 @@ const getLRNHistoryController = async (req, res) => {
       });
     }
 
-    const data = await getLRNHistoryService(lrNumber);
+    const rows = await getLRNHistoryService(lrNumber);
+
+    const map = {};
+
+    rows.forEach(r => {
+      const key = `${r.LRNumber}-${r.Version}`;
+
+      if (!map[key]) {
+        // create base LRN object (exclude action columns)
+        const {
+          ActionID,
+          ActionMessage,
+          UserID,
+          ActionTime,
+          Photos,
+          ...lrnData
+        } = r;
+
+        map[key] = {
+          ...lrnData,
+          Actions: []
+        };
+      }
+
+      // push action if exists
+      if (r.ActionID) {
+        map[key].Actions.push({
+          ActionID: r.ActionID,
+          Message: r.ActionMessage,
+          Photos: r.Photos,
+          UserID: r.UserID,
+          ActionTime: r.ActionTime
+        });
+      }
+    });
+
+    const result = Object.values(map);
 
     return res.status(200).json({
       success: true,
-      count: data.length,
-      data
+      count: result.length,
+      data: result
     });
   } catch (err) {
     console.error("Error fetching LRN history:", err);
@@ -206,10 +219,9 @@ const getLRNHistoryController = async (req, res) => {
 };
 
 // actions
-
 const addActionController = async (req, res) => {
   try {
-    const { LRNumber, Version, Message, Photos, UserID } = req.body;
+    const { LRNumber, Version, Message, Photos, UserID, Issue, Resolution } = req.body;
     
     if (!LRNumber || !Version || !Message || !UserID) {
       return res.status(400).json({
@@ -223,7 +235,9 @@ const addActionController = async (req, res) => {
       Version,
       Message,
       Photos,
-      UserID
+      UserID,
+      Issue,
+      Resolution
     });
 
     return res.status(201).json({
