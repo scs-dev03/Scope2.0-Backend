@@ -1,9 +1,9 @@
-import { getPool2 } from "../../db/db.js";
+import { getPool } from "../../db/db.js";
 import sql from 'mssql'
 
 const remarkmasterService = async (type) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = `select Id,Remark from z_scope..PPNIRemarkMaster where RemarkFor = @type`
     const result = await pool.request()
       .input('type', sql.VarChar, type)
@@ -30,7 +30,7 @@ const partremarkInsertion = async (Dealerid, Locationid, bigid, remarkid, remark
   // console.log('remarkid:', remarkid, 'type:', typeof remarkid, 'isNaN:', Number.isNaN(remarkid));
 
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = `use [z_scope] 
                       Insert into PartRemark(Dealerid,Locationid,Approvalid,partnumber,vehicleno,Image,advancevalue,remarkid,details,Createdby)
                       Values(@Dealerid,@Locationid,@bigid,@partnumber,@vehiclenumber,@url,@advancevalue,@remarkid,@remark,@userid) `
@@ -59,7 +59,7 @@ const partremarkInsertion = async (Dealerid, Locationid, bigid, remarkid, remark
 
 const vehicleremarkInsertion = async (Dealerid, Locationid, remarkid, remark, advancevalue, url, vehiclenumber, userid, transaction) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = `use [z_scope] 
                       Insert into VehicleRemark(Dealerid,Locationid,vehicleno,Image,advancevalue,remarkid,details,Createdby)
                       Values(@Dealerid,@Locationid,@vehiclenumber,@url,@advancevalue,@remarkid,@remark,@userid) `
@@ -84,7 +84,7 @@ const vehicleremarkInsertion = async (Dealerid, Locationid, remarkid, remark, ad
 
 const ppnipartremarkInsertion = async (Dealerid, Locationid, bigid, remarkid, remark, advancevalue, url, vehiclenumber, partnumber, userid, transaction) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = `use [z_scope] 
                       Insert into PPNIPartRemark(Dealerid,Locationid,Approvalid,partnumber,vehicleno,Image,advancevalue,remarkid,details,Createdby)
                       Values(@Dealerid,@Locationid,@bigid,@partnumber,@vehiclenumber,@url,@advancevalue,@remarkid,@remark,@userid) `
@@ -113,7 +113,7 @@ const ppnipartremarkInsertion = async (Dealerid, Locationid, bigid, remarkid, re
 
 const ppnivehicleremarkInsertion = async (Dealerid, Locationid, remarkid, remark, advancevalue, url, vehiclenumber, userid, transaction) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = `use [z_scope] 
                       Insert into PPNIVehicleRemark(Dealerid,Locationid,vehicleno,Image,advancevalue,remarkid,details,Createdby)
                       Values(@Dealerid,@Locationid,@vehiclenumber,@url,@advancevalue,@remarkid,@remark,@userid) `

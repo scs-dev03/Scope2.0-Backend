@@ -1,8 +1,8 @@
-import { getPool1 } from "../../db/db.js";
+import { getPool } from "../../db/db.js";
 import { ApiError } from "../../utils/ApiError.js";
 
 export const getOperator = async () => {
-    const pool = await getPool1();
+    const pool = await getPool();
     try {
         const result = await pool.request()
             .query(`

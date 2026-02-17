@@ -1,9 +1,9 @@
-import { getPool2 } from "../../db/db.js"
+import { getPool } from "../../db/db.js"
 import moment from 'moment-timezone';
 export const addMapping=async (req,res)=>{
 
     try{
-     const pool=await getPool2();
+     const pool=await getPool();
 
       let isExist=false;
       let existedMappingQuery=`select part_number from stock_Upload_Mapping 
@@ -59,7 +59,7 @@ export const addMapping=async (req,res)=>{
 
 export const viewMapping=async (req,res)=>{
     try{
-        const pool=await getPool2();
+        const pool=await getPool();
         let brandId=req.brand_id;
         let query='use [z_scope] Select * from Stock_Upload_Mapping where brand_id=@brandId and uploadTypeId=@uploadTypeId';
         const result=await pool.request().input('brandId',brandId).input('uploadTypeId',req.uploadTypeId).query(query);
@@ -75,7 +75,7 @@ export const viewMapping=async (req,res)=>{
 export const editMapping=async(req,res)=>{
     try{
         const currentDateInIST = moment.tz("Asia/Kolkata").format('YYYY-MM-DD HH:mm:ss');
-       const pool=await getPool2();
+       const pool=await getPool();
        let query=`use [z_scope] Update Stock_Upload_Mapping set 
        part_number=@partNumber,
        stock_qty=@stockQty,
@@ -126,7 +126,7 @@ export const editMapping=async(req,res)=>{
 
 export const alreadyExistedMapping=async(req,res)=>{
     try{
-        const pool=await getPool2();
+        const pool=await getPool();
         let query =`use [z_scope] select * from stock_upload_mapping`;
         const result =await pool.request().query(query);
   

@@ -1,9 +1,9 @@
-import { getPool2 } from "../../db/db.js";
+import { getPool } from "../../db/db.js";
 import sql from 'mssql'
 
 const orderDetailsByPartnumberService = async(brandid,dealerid,locationid,partnumber,Udate,Ldate)=>{
     try {
-    const pool = await getPool2()
+    const pool = await getPool()
     
     const query = `
  DECLARE 

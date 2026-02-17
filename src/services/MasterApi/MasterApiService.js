@@ -1,9 +1,9 @@
 import sql from 'mssql'
-import { getPool1, getPool2 } from '../../db/db.js'
+import { getPool } from '../../db/db.js'
 import { ApiError } from '../../utils/ApiError.js';
 
 const stockQty = async (locationId) => {
-    const pool = await getPool2();
+    const pool = await getPool();
 
     const stockquery = ` use [z_scope]
     SELECT SUM(qty) AS StockQty, AddedDate FROM [z_scope].dbo.CurrentStock1 cs1
@@ -19,7 +19,7 @@ const stockQty = async (locationId) => {
 }
 
 const stockValue = async (locationId) => {
-    const pool = await getPool2();
+    const pool = await getPool();
 
     const stockvaluequery = `SELECT SUM((cs2.Qty * pm.landedcost)) AS stockvalue FROM [z_scope].dbo.CurrentStock1 cs1
                                JOIN [z_scope].dbo.CurrentStock2 cs2 ON cs2.StockCode = cs1.tCode
@@ -33,7 +33,7 @@ const stockValue = async (locationId) => {
 }
 
 const ppniValue = async (dealerid, locationId) => {
-    const pool = await getPool2();
+    const pool = await getPool();
 
     const ppnivaluequery = `SELECT SUM(PPNI_Val) AS PPNIValue FROM [UAD_BI_PPNI].dbo.PPNI_report_${dealerid} ppni
                               join z_scope..LocationInfo li on ppni.LocationID = li.LocationID
@@ -46,7 +46,7 @@ const ppniValue = async (dealerid, locationId) => {
 }
 
 const snstockValue = async (dealerid, locationId) => {
-    const pool = await getPool2();
+    const pool = await getPool();
 
     const snstockvaluequery = `
         use [z_scope] 
@@ -89,7 +89,7 @@ const snstockValue = async (dealerid, locationId) => {
 }
 
 const lastOrderValue = async (dealerid, locationId) => {
-    const pool = await getPool2();
+    const pool = await getPool();
 
     const lastorderValuequery = `SELECT scsorderno, SUM(finalorderqty) AS QTY, SUM(finalorderval) AS Value, addeddate
                                   FROM [10.10.152.17].[z_scope].dbo.ogs_orderdata_td001_${dealerid}
@@ -106,7 +106,7 @@ const lastOrderValue = async (dealerid, locationId) => {
 }
 
 const jobcardDate = async (dealerid, locationId) => {
-    const pool = await getPool2();
+    const pool = await getPool();
 
     const jobcardDatequery = `SELECT MAX(Close_Date) joblineupdatedate, MAX(Final_Close_Date) jobcardcloseddate
                                 FROM [z_scope].dbo.create_order_request_td001_${dealerid} 
@@ -117,7 +117,7 @@ const jobcardDate = async (dealerid, locationId) => {
     return result.recordset
 }
 const SixMonthLocationwiseSaleValue = async (dealerid, locationId) => {
-    const pool = await getPool2();
+    const pool = await getPool();
 
     const SixMonthLocationwiseSaleValueQuery = `
         DECLARE @ls INT = 6, @st INT = 1, @Columnsold NVARCHAR(MAX) = '', @SumColumns NVARCHAR(MAX) = '',
@@ -157,7 +157,7 @@ const SixMonthLocationwiseSaleValue = async (dealerid, locationId) => {
 
 const multiDealerService = async (BrandIds) => {
     try {
-        const pool = await getPool2()
+        const pool = await getPool()
         const query = `
         use z_scope
         select BrandId , DealerID , Dealer from LocationInfo where Brandid in (${BrandIds}) 
@@ -173,7 +173,7 @@ const multiDealerService = async (BrandIds) => {
 
 const multiLocationService = async (DealerIds) => {
     try {
-        const pool = await getPool2()
+        const pool = await getPool()
         const query = `
         use z_scope
         select BrandId , DealerId , LocationID , Location from LocationInfo where DealerId in (${DealerIds}) 
@@ -189,7 +189,7 @@ const multiLocationService = async (DealerIds) => {
 
 const multiAdvisorService = async (LocationIds) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `
         use z_scope
         select Id , li.Location , Advisor from AAP_SPMAdvisorMaster ad
@@ -209,7 +209,7 @@ const multiAdvisorService = async (LocationIds) => {
 
 const getUserService = async () => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `use z_scope select bintId_Pk ,CONCAT(vcFirstName,' ',vcLastName)Name from AdminMaster_GEN where type = 'A' and btStatus = 1`
         const result = await pool.request().query(query)
         return result.recordset
@@ -219,7 +219,7 @@ const getUserService = async () => {
 }
 const partQualityService = async () => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `use z_scope select Id , Quality from partqualitymaster where status = 1`
         const result = await pool.request().query(query)
         return result.recordset
@@ -229,7 +229,7 @@ const partQualityService = async () => {
 }
 const tranferTypeService = async () => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `use z_scope select Id , Name from AAP_TransferQtyMaster where Status = 1`
         const result = await pool.request().query(query)
         return result.recordset
@@ -240,7 +240,7 @@ const tranferTypeService = async () => {
 
 const clusterByBrandService = async (BrandId) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `use z_scope
                         select ClusterCode , Cluster from (
                         select ClusterCode from Clust_ClusterLocMapping where LocationID in 
@@ -256,7 +256,7 @@ const clusterByBrandService = async (BrandId) => {
 
 const dealerByClusterService = async (ClusterCode) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `use z_scope 
                         select Dealer , DealerID from locationinfo where locationid in 
                         (select LocationID from Clust_ClusterLocMapping where ClusterCode  = @ClusterCode and Status = 1)

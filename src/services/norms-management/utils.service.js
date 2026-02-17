@@ -1,9 +1,9 @@
-import {getPool1 , getPool2} from '../../db/db.js'
+import {getPool } from '../../db/db.js'
 const partfamilySaleservice = async (brandid,dealerid,locationid,partnumber) => {
     try {
         // console.log(brandid,dealerid,locationid,partnumber);
         
-        const pool = await getPool2()
+        const pool = await getPool()
         const query = `use [z_scope] EXEC sp_partfamilysale '${partnumber}',${brandid},${dealerid},${locationid}`
         const result = await pool.request().query(query)
         return result
@@ -17,7 +17,7 @@ const partfamilySaleservice = async (brandid,dealerid,locationid,partnumber) => 
 // MAX and Stock of any Location (Family)
 const singlePartMaxByLocationService = async (brandid,dealerid,locationid,partnumber)=>{
 try {
-        const pool = getPool2()
+        const pool = getPool()
 //         const query = 
 //         ` use z_scope DECLARE  
 //          @InputPart    VARCHAR(40) = '${partnumber}',      -- ←  input part 
@@ -145,7 +145,7 @@ join z_scope..CurrentStock2 cs2 on cs1.tCode = cs2.StockCode and pf.part = cs2.P
 
 const partFamilyService = async(partnumber , brandid)=>{
 try {
-        const pool = await getPool2()
+        const pool = await getPool()
         const query =     ` DECLARE 
                             @InputPart    VARCHAR(40) = '${partnumber}',   -- ← your input part
                             @InputBrandID INT         = ${brandid};               -- ← your input brand
@@ -239,7 +239,7 @@ try {
 }
 const partBrandMapping = async(brandid,partnumber)=>{
 try {
-        const pool = await getPool2()
+        const pool = await getPool()
         const query = `use z_scope select * from part_master where partnumber1 = '${partnumber}' and brandid = ${brandid}`
         const result = await pool.request().query(query)
         if(result.recordset.length > 0){

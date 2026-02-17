@@ -2,7 +2,7 @@
 // import { password } '../../db/db.js';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
-import { getPool1 } from '../../db/db.js';
+import { getPool } from '../../db/db.js';
 import { getLocalIp, getPublicIp, getClientIp }  from "../getIP.js";
 import "dotenv/config"
 
@@ -16,7 +16,7 @@ const transporter = nodemailer.createTransport({
 
    const getUsers=async function(){
         try{
-            const pool=await getPool1();
+            const pool=await getPool();
             let query=`use [z_scope] Select vcFirstName,vcLastName ,bintId_pk as userId from [adminmaster_gen]`;
             const result=await pool.request().query(query);
             // console.log("----------",result)
@@ -55,7 +55,7 @@ const transporter = nodemailer.createTransport({
 
             let publicIp = "Fetching public IP..."
             publicIp = await getPublicIp();
-            let pool=await getPool1();
+            let pool=await getPool();
             status=1;
           
         let query=`use [z_scope] Insert into adminmaster_gen (vcFirstName,vcLastName,designation,roleId,vcEmail,vcMobile,vcPassword,btstatus,addedby,business_vertical,vcUserName,type) 
@@ -135,7 +135,7 @@ const transporter = nodemailer.createTransport({
 
    const allUsers=async function(req){
         try{
-            const pool=await getPool1();
+            const pool=await getPool();
             let userType=req.userType;
             let query,result;
             let brandId=req.brandId;
@@ -175,7 +175,7 @@ const transporter = nodemailer.createTransport({
             
             let publicIp = "Fetching public IP..."
             publicIp = await getPublicIp();
-            const pool=await getPool1();
+            const pool=await getPool();
             let btstatus=0;
             // if(status=='Active' || status=='active'){
             //     btstatus=1;
@@ -233,7 +233,7 @@ const transporter = nodemailer.createTransport({
             let brand=parseInt(req.brand,10);
             let dealer=parseInt(req.dealer,10);
             let location=req.location;
-            let pool = await getPool1()
+            let pool = await getPool()
             if(status=='Active' || status=='active'){
                 btstatus=1;
             }
@@ -466,7 +466,7 @@ dealerUserRecords = dealerUserRecords.map(record => ({
     const getUserInfo=async function(req){
 
         try{
-            const pool = await getPool1()
+            const pool = await getPool()
             const token= req.token;
             const query = `use z_scope SELECT bintId_pk as userId ,concat (vcFirstName,' ',vcLastName) as username from adminmaster_gen
             where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `;
@@ -482,7 +482,7 @@ dealerUserRecords = dealerUserRecords.map(record => ({
     
             try{
                 
-                const pool=await getPool1();
+                const pool=await getPool();
                 let brandId=req.brandId;
                 let dealerId=req.dealerId;
                 let locationid=req.locationid;

@@ -1,10 +1,10 @@
-import { getPool1 } from "../../db/db.js"
+import { getPool } from "../../db/db.js"
 import sql from 'mssql'
 import { ApiError } from "../../utils/ApiError.js"
 
 const uploadInternalRule = async (receiver, sender, addedby) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const jsonReceiver = JSON.stringify(receiver)
         const jsonSender = JSON.stringify(sender)
         // console.log(jsonReceiver,jsonSender);
@@ -26,7 +26,7 @@ const uploadInternalRule = async (receiver, sender, addedby) => {
 const insertInternalRule = async (receiver, sender, addedby) => {
     let transaction;
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         transaction = pool.transaction()
 
         const receiverobj = JSON.parse(receiver)
@@ -130,7 +130,7 @@ const insertInternalRule = async (receiver, sender, addedby) => {
 
 const viewRuleService = async (BrandId, DealerId, LocationId, RuleName) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `use z_scope 
                 select ir.id , a.Brand , a.Dealer , a.Location ,ir.RuleName , ptm.Description , pqm.Quality , ir.Operator , ir.FromRate , ir.ToRate, ir.Status , a.BrandId , a.DealerId , a.LocationId , ir.PartQuality , ir.PartTypeId from AAP_InternalReceiver ir
                 join (
@@ -160,7 +160,7 @@ const viewRuleService = async (BrandId, DealerId, LocationId, RuleName) => {
 
 const ruleExistingCheck = async (RuleName) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const existing = await pool.request().input('RuleName', sql.VarChar, RuleName).query(`use z_scope SELECT CASE WHEN EXISTS (SELECT 1 FROM AAP_InternalReceiver WHERE RuleName = @RuleName AND Status = 1) THEN 1 ELSE 0 END AS RuleExists`)
         // console.log(existing);
 
@@ -172,7 +172,7 @@ const ruleExistingCheck = async (RuleName) => {
 
 const clusterruleExistingCheck = async (RuleName) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const existing = await pool.request().input('RuleName', sql.VarChar, RuleName).query(`use z_scope SELECT CASE WHEN EXISTS (SELECT 1 FROM AAP_ClusterReceiver WHERE RuleName = @RuleName AND Status = 1) THEN 1 ELSE 0 END AS RuleExists`)
         // console.log(existing);
 
@@ -184,7 +184,7 @@ const clusterruleExistingCheck = async (RuleName) => {
 
 const getClusterService = async (LocationId) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `use z_scope 
         select cm.Cluster , lm.LocationID , cm.tcode ClusterCode  from Clust_ClusterLocMapping lm 
         join Clust_ClusterMaster cm on cm.tCode = lm.ClusterCode
@@ -199,7 +199,7 @@ const getClusterService = async (LocationId) => {
 const insertClusterRule = async (receiver, sender, addedby) => {
     let transaction;
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         transaction = pool.transaction()
 
         // const receiverobj = JSON.parse(receiver)
@@ -304,7 +304,7 @@ const insertClusterRule = async (receiver, sender, addedby) => {
 
 const uploadClusterRule = async (receiver, sender, addedby) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const jsonReceiver = JSON.stringify(receiver)
         const jsonSender = JSON.stringify(sender)
         // console.log(jsonReceiver,jsonSender);
@@ -325,7 +325,7 @@ const uploadClusterRule = async (receiver, sender, addedby) => {
 
 const viewClusterRuleService = async (BrandId, ClusterCode, DealerId, RuleName) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `use z_scope
             select cr.Id , cr.RuleName , a.Brand , a.Dealer , a.Location , ptm.Description , pqm.Quality , cr.FromRate , cr.ToRate , cr.Operator , cr.Status , a.BrandId , a.DealerId , a.LocationId ,cr.PartQuality,cr.PartTypeId from AAP_ClusterReceiver cr
             join AAP_ClusterSender cs on cs.ReceiverId = cr.Id
@@ -359,7 +359,7 @@ const updateInternalRuleService = async (receiverId, receiver, sender, addedby) 
     let transaction;
 
     try {
-        const pool = await getPool1();
+        const pool = await getPool();
         transaction = pool.transaction();
         await transaction.begin();
 
@@ -445,7 +445,7 @@ const updateClusterRuleService = async (receiverId, receiver, sender, addedby) =
   let transaction;
 
   try {
-    const pool = await getPool1();
+    const pool = await getPool();
     transaction = pool.transaction();
     await transaction.begin();
 

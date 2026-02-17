@@ -1,10 +1,10 @@
 // const sql=require('mssql2');
 // const connection=require('../../connection')
-import { getPool1, getPool2 } from "../../db/db.js";
+import { getPool } from "../../db/db.js";
   const  getAllModules=async function(req){
 
         try{
-            const pool=await getPool2();
+            const pool=await getPool();
             const result=await pool.request().query('use z_scope Select * from module_master');
             return result;
         }
@@ -16,7 +16,7 @@ import { getPool1, getPool2 } from "../../db/db.js";
    const  getModulesBasedOnRoles=async function(req){
 
         try{
-            const pool=await getPool2();
+            const pool=await getPool();
             let userId=parseInt(req.userId,10);
             let moduleType=req.moduleType;
             let query1=`select roleId ,vcphoto from z_scope..adminmaster_gen where bintId_pk=@userId`;

@@ -1,4 +1,4 @@
-import { getPool1, getPool2 } from '../db/db.js'
+import { getPool } from '../db/db.js'
 import sql from 'mssql'
 import fs from 'fs'
 import { partBrandCheck, readExcel, insertData, findLocationPartidDuplicates, checkPendingFeedbackAndStatus, findLocationPartidDuplicatesAdmin, insertAdminFeedback, checkReviewedFeedbackByBrand, statusCheck, invalidRemarks , invalidUserRemarks } from '../utils/vonHelper.js'
@@ -9,7 +9,7 @@ import { partfamilySaleservice } from '../services/norms-management/utils.servic
 const remarkMaster = async (req, res) => {
     try {
 
-        const pool = await getPool2()
+        const pool = await getPool()
         const { brandid, usertype } = req.body
         if (!brandid || !usertype) {
             return res.status(500).json({ Error: `Brandid and usertype are required` })
@@ -23,7 +23,7 @@ const remarkMaster = async (req, res) => {
 }
 const newRemark = async (req, res) => {
     try {
-        const pool = await getPool2()
+        const pool = await getPool()
         const { remark, brandid, addedby, usertype } = req.body
         if (!remark || !addedby || !usertype) {
             return res.status(400).json({ message: `All fields are required` })
@@ -61,7 +61,7 @@ const newRemark = async (req, res) => {
 }
 const viewRemark = async (req, res) => {
     try {
-        const pool = await getPool2()
+        const pool = await getPool()
         const { brandid, usertype } = req.body
 
         if (!usertype === 'A' || !usertype === 'U') {
@@ -94,7 +94,7 @@ const viewRemark = async (req, res) => {
 }
 const userView = async (req, res) => {
     try {
-        const pool = await getPool2()
+        const pool = await getPool()
         const { brandid, dealerid, r1, r2, l1, l2, partnumber, locationid, flag, seasonalid, modelid, natureid, parttype } = req.body
         if (!dealerid && !brandid) {
             return res.status(400).json({ Error: `Dealerid and Brandid is a required Parameter` })
@@ -143,7 +143,7 @@ const userView = async (req, res) => {
 }
 const userFeedbacklog = async (req, res) => {
     try {
-        const pool = await getPool2()
+        const pool = await getPool()
         const { brandid, dealerid, locationid, partnumber, max, remarkid, customrem, proposedqty, addedby } = req.body
         if (!brandid || !dealerid || !locationid || !addedby || !partnumber || max == null || proposedqty == null || !remarkid) {
             return res.status(400).json({ Error: `All Fields are required` })
@@ -225,7 +225,7 @@ const userFeedbacklog = async (req, res) => {
 }
 const viewLog = async (req, res) => {
     try {
-        const pool = await getPool2()
+        const pool = await getPool()
         const { brandid, dealerid, locationid, partnumber } = req.body
         if (!brandid || !dealerid) {
             return res.status(400).json({ message: `Brandid and Dealerid are required Parameter` })
@@ -311,7 +311,7 @@ const viewLog = async (req, res) => {
 }
 const adminView = async (req, res) => {
     try {
-        const pool = await getPool2()
+        const pool = await getPool()
         const { brandid, dealerid, r1, r2, l1, l2, partnumber, locationid, flag, seasonalid, modelid, natureid, status, parttype, pageno, pagesize } = req.body
         // console.log(brandid, dealerid, r1, r2 ,l1,l2, partnumber , locationid , flag, seasonalid, modelid, natureid, status,parttype);
 
@@ -370,7 +370,7 @@ const adminView = async (req, res) => {
 }
 const adminFeedbackLog = async (req, res) => {
     try {
-        const pool = await getPool2()
+        const pool = await getPool()
         const { brandid, dealerid, locationid, feedbackid, AdminRemark, customRem, ApprovedQty, addedby } = req.body
         if ((!brandid || !dealerid || !locationid || !AdminRemark || !addedby) || (feedbackid == null) || (ApprovedQty == null)) {
             return res.status(400).json({ message: `All Fields are required and Feedbackid cannot be null` })
@@ -432,7 +432,7 @@ const adminFeedbackLog = async (req, res) => {
 }
 const partFamily = async (req, res) => {
     try {
-        const pool = await getPool2()
+        const pool = await getPool()
         const { partnumber, brandid } = req.body
         if (!partnumber || !brandid) {
             return res.status(400).json({ Error: `partnumber and brandid is required` })
@@ -479,7 +479,7 @@ const partFamily = async (req, res) => {
 }
 const countPending = async (req, res) => {
     try {
-        const pool = await getPool2()
+        const pool = await getPool()
         const { brandid, dealerid } = req.body
 
         const query = `USE [UAD_VON]; 
@@ -511,7 +511,7 @@ EXEC sp_executesql @sql;`
 }
 const partFamilySale = async (req, res) => {
     try {
-        // const pool = await getPool1()
+        // const pool = await getPool()
         const { partnumber, brandid, dealerid, locationid } = req.body
         if (!partnumber || !brandid || !dealerid || !locationid) {
             return res.status(400).json({ message: `All fields are required` })
@@ -525,7 +525,7 @@ const partFamilySale = async (req, res) => {
 }
 // const adminPendingView = async (req, res) => {
 //     try {
-//         const pool = await getPool1()
+//         const pool = await getPool()
 //         const { brandid, dealerid, locationid, status, seasonalid, modelid, natureid , partnumber , r1 , r2 , l1 , l2 ,flag , parttype } = req.body
 //         // console.log(brandid, dealerid, locationid, status, seasonalid, modelid, natureid , partnumber , r1 , r2 , l1 , l2 ,flag , parttype);
 //         if (!brandid) {
@@ -558,7 +558,7 @@ const partFamilySale = async (req, res) => {
 // }
 const adminPendingView = async (req, res) => {
     try {
-        const pool = await getPool2();
+        const pool = await getPool();
         let {
             brandid,
             dealerid,
@@ -657,7 +657,7 @@ const dealerUpload = async (req, res) => {
     const { addedby } = req.body
 
     try {
-        const pool = await getPool2();
+        const pool = await getPool();
         transaction = await pool.transaction(); // Initialize transaction
 
         if (!req.file || req.file.length === 0) {
@@ -1111,8 +1111,8 @@ const dealerUpload = async (req, res) => {
 };
 
 const adminUpload = async (req, res) => {
-    // const pool = await getPool1()
-    const pool = await getPool2()
+    // const pool = await getPool()
+    const pool = await getPool()
     const { file, addedby } = req.body
     if (!addedby) {
         return res.status(400).json({ message: "addedby is required" });
@@ -1370,7 +1370,7 @@ const adminUpload = async (req, res) => {
 }
 
 const maxpartmapping = async (partNumber, DealerId, LocationId) => {
-    const pool = await getPool2()
+    const pool = await getPool()
     // const query = `select * from z_scope..stockable_nonstockable_td001_${DealerId} where locationid = ${LocationId} and partnumber1 = '${partNumber}' and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${DealerId} where locationid = ${LocationId})`
     const query = `with data as (
                     select locationid , MAX(Stockdate)Stockdate from z_scope..stockable_nonstockable_td001_${DealerId} where Addedby !=7
@@ -1393,7 +1393,7 @@ const partflagCheck = async (partnumber, dealerid, locationid, flag) => {
     if(flag == null){
         return true
     }
-    const pool = await getPool2()
+    const pool = await getPool()
     const queryflagzero = `use z_scope select * from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and partnumber1 = '${partnumber}' and Addedby != 7 and Maxvalue = 0 and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and Addedby != 7)`
     const queryflagone = `use z_scope select * from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and partnumber1 = '${partnumber}' and Addedby != 7 and Maxvalue > 0 and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and Addedby != 7)`
     let result;
@@ -1417,7 +1417,7 @@ const partflagCheck = async (partnumber, dealerid, locationid, flag) => {
 
 async function getFeedbackId(brandid, usertype) {
     try {
-        const pool = await getPool2()
+        const pool = await getPool()
         const query = `select remarkid from UAD_VON..UAD_VON_RemarksMaster where brandid = '${brandid}' and remark = 'Custom' and usertype = '${usertype}'`
         const result = await pool.request().query(query)
         return result.recordset[0].remarkid

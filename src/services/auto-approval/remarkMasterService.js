@@ -1,9 +1,9 @@
-import { getPool1 } from "../../db/db.js"
+import { getPool } from "../../db/db.js"
 import sql from 'mssql'
 import { ApiError } from "../../utils/ApiError.js"
 
 const insertRemarkService = async (BrandId, DealerId, LocationId, Remark, Remarktype, userid) => {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `use z_scope
     insert into aap_remarkmaster(BrandId,DealerId,LocationId , Remark  , Remarktype , AddedBy)
     values(@BrandId,@DealerId,@LocationId,@Remark,@RemarkType,@AddedBy)
@@ -25,7 +25,7 @@ const insertRemarkService = async (BrandId, DealerId, LocationId, Remark, Remark
 
 const remarktypeMasterService = async (Type) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `use z_scope
         select Id , Remark from aap_remarktypemaster where remarkfor = '${Type}' and status = 1`
         const result = await pool.request().query(query)
@@ -38,7 +38,7 @@ const remarktypeMasterService = async (Type) => {
 
 const remarkViewService = async (BrandId, DealerId, LocationId, RemarkFor, RemarkTypeId) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `use z_scope select rm.Id ,bm.vcbrand Brand , dm.vcName Dealer , li.Location , bm.bigid BrandId , dm.bigid DealerId , li.locationid , rm.Remark, rtm.RemarkFor , rtm.Remark Type , rm.Addedby AddedbyId ,CONCAT(vcFirstName,' ',vcLastName)Addedby , rm.AddedOn  from AAP_RemarkMaster rm
             JOIN AAP_RemarkTypeMaster rtm on rm.Remarktype = rtm.Id
             LEFT JOIN LocationInfo li on li.locationid = rm.locationid
@@ -67,7 +67,7 @@ const remarkViewService = async (BrandId, DealerId, LocationId, RemarkFor, Remar
 
 const editRemarkService = async (Id, BrandId, DealerId, LocationId, Remark, RemarkTypeId) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `use z_scope
         update AAP_RemarkMaster
         set BrandId = @BrandId,
@@ -91,7 +91,7 @@ const editRemarkService = async (Id, BrandId, DealerId, LocationId, Remark, Rema
 }
 
 const insertRemarkSettingService = async (payload, ApprovalStatus, GroupStockStatus, GainerStatus, addedBy) => {
-    const pool = await getPool1();
+    const pool = await getPool();
 
     if (!Array.isArray(payload) || payload.length === 0) {
         throw new Error("payload must be a non-empty array");
@@ -185,7 +185,7 @@ const insertRemarkSettingService = async (payload, ApprovalStatus, GroupStockSta
 
 const viewRemarkSettingService = async (BrandId, DealerId, LocationId, UserId) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `
         use z_scope    
         select bm.vcbrand Brand , dm.vcName Dealer , li.Location , rsm.ApprovalRemarks , rsm.GroupStockRemarks , rsm.GainerReqRemarks , bm.bigid BrandId , dm.bigid DealerId , li.LocationID , CONCAT(amg.vcFirstName,' ',amg.vcLastName)AddedBy , rsm.AddedOn from AAP_RemarkSettingMaster rsm

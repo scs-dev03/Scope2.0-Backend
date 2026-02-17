@@ -1,12 +1,12 @@
-import { getPool2, OgysPool } from "../../db/db.js";
+import { getPool } from "../../db/db.js";
 import { readExcelFile } from "../utilities/utilities.service.js";
 import sql from "mssql";
 
 
 const singleTOCInService = async (req, res) => {
   try {
-    const ogysPool = await OgysPool();
-    const pool = await getPool2();
+    const getPool = await getPool();
+    const pool = await getPool();
     let locations = req.body.location_id;
     let location=req.body.location_id;
     let updatedBy=req.body.updatedBy;
@@ -218,12 +218,12 @@ const singleTOCInService = async (req, res) => {
     //  console.log("depued ",deduped,formattedDate)
       if (deduped.length) {
         const deleteQuery = `delete from Temp_OGS_TOC where locationId=@locationId `;
-        await ogysPool
+        await getPool
           .request()
           .input("locationId", locationId)
           .query(deleteQuery);
 
-        await ogysPool.request().query("use z_scope");
+        await getPool.request().query("use z_scope");
         const stockTable = new sql.Table("Temp_OGS_TOC");
 
         stockTable.columns.add("PartNumber", sql.VarChar(35), {
@@ -234,9 +234,9 @@ const singleTOCInService = async (req, res) => {
         deduped.forEach((row) => {
           stockTable.rows.add(String(row.part_number), parseFloat(row.qty), locationId);
         });
-        await ogysPool.request().bulk(stockTable);
+        await getPool.request().bulk(stockTable);
         console.log("----",brandId,dealerId,locationId,formattedDate,updatedBy)
-        const request = ogysPool.request();
+        const request = getPool.request();
         await request
           .input("brandId", brandId)
           .input("dealerId", dealerId)
@@ -266,8 +266,8 @@ const bulkTOCInService=async (req,res)=>{
 
 
   try {
-    const pool = await getPool2();
-    const ogysPool=await OgysPool();
+    const pool = await getPool();
+    const getPool=await getPool();
     let addedBy = parseInt(req.body.user_id,10);
     let rowData;
     let brandId = parseInt(req.body.brand_id,10);
@@ -525,12 +525,12 @@ updatedFilteredRowData = Array.from(partCountMap.values());
     
       if (filteredData.length) {
         const deleteQuery = `delete from Temp_OGS_TOC where locationId=@locationId `;
-        await ogysPool
+        await getPool
           .request()
           .input("locationId", locationId)
           .query(deleteQuery);
 
-        await ogysPool.request().query("use z_scope");
+        await getPool.request().query("use z_scope");
         const stockTable = new sql.Table("Temp_OGS_TOC");
 
         stockTable.columns.add("PartNumber", sql.VarChar(35), {
@@ -542,9 +542,9 @@ updatedFilteredRowData = Array.from(partCountMap.values());
           stockTable.rows.add(String(row.part_number), parseFloat(row.qty), row.locationId);
         });
        // console.log("filtered data ",stockTable)
-            await ogysPool.request().bulk(stockTable);
+            await getPool.request().bulk(stockTable);
        
-        const request = ogysPool.request();
+        const request = getPool.request();
         await request
           .input("brandId", brandId)
           .input("dealerId", dealerId)
@@ -625,7 +625,7 @@ const getRecordsInService=async (req,res)=>{
 
     try{
 
-        let pool=await getPool2();
+        let pool=await getPool();
         let locations=req.locations;
         let dealerId=req.dealerId;
         let records=[];

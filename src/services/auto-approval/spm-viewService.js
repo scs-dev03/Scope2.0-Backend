@@ -1,10 +1,10 @@
-import { getPool1, getPool2 } from "../../db/db.js";
+import { getPool } from "../../db/db.js";
 import sql from 'mssql'
 import { ApiError } from "../../utils/ApiError.js";
 
 const viewPartyService = async (LocationId, Status) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `use [z_scope] select Id,  PartyName , PartyCode , CreatedAt , Status from AAP_SPMPartyMaster where LocationId = @LocationId and (@Status is NULL OR Status = @Status) Order BY Id Desc `
     const result = await pool.request()
       .input('LocationId', sql.Int, LocationId)
@@ -19,7 +19,7 @@ const viewPartyService = async (LocationId, Status) => {
 
 const viewAdvisorService = async (LocationId, Status) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `use [z_scope] select Id, Advisor , PhoneNo , Email , CreatedAt , Status from AAP_SPMAdvisorMaster where LocationId = @LocationId and (@Status is NULL OR Status = @Status) Order By Id Desc`
     const result = await pool.request()
       .input('LocationId', sql.Int, LocationId)
@@ -35,7 +35,7 @@ const viewAdvisorService = async (LocationId, Status) => {
 
 const updatePartyService = async (Id, PartyName, PartyCode, status) => {
   try {
-    const pool = await getPool1();
+    const pool = await getPool();
 
     const idInt = Number(Id);
     if (!Number.isInteger(idInt)) {
@@ -88,7 +88,7 @@ const updateAdvisorService = async (
   tableName = 'dbo.AAP_SPMAdvisorMaster'
 ) => {
   try {
-    const pool = await getPool1();
+    const pool = await getPool();
 
     // --- validate Id ---
     const idInt = Number(Id);
@@ -165,7 +165,7 @@ const updateAdvisorService = async (
 
 const existingPartyNameandCodeService = async (Id) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `select PartyName , PartyCode from z_scope..AAP_SPMPartyMaster where LocationId = (select LocationId from z_scope..AAP_SPMPartyMaster where Id = @Id) and Id <> @Id`
     const result = await pool.request().input(`Id`, sql.Int, Id).query(query)
     return result.recordset
@@ -176,7 +176,7 @@ const existingPartyNameandCodeService = async (Id) => {
 
 const existingAdvisor = async (Id) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `select Advisor from AAP_SPMAdvisorMaster where LocationId = (Select LocationId from AAP_SPMAdvisorMaster where Id = @Id) and Id <> @Id 
      select PhoneNo , Email from AAP_SPMAdvisorMaster where Id <> @Id `
     const result = await pool.request().input('Id', sql.Int, Id).query(query)
@@ -188,7 +188,7 @@ const existingAdvisor = async (Id) => {
 }
 // const existingAdvisorDetails = async (Id) => {
 //   try {
-//     const pool = await getPool1()
+//     const pool = await getPool()
 //     const query = `select PhoneNo , Email from AAP_SPMAdvisorMaster where LocationId = (Select LocationId from AAP_SPMAdvisorMaster where Id = @Id) and Id <> @Id `
 //     const result = await pool.request().input('Id', sql.Int, Id).query(query)
 //     // console.log(result.recordset);
@@ -204,7 +204,7 @@ const viewOrderStatusService = async (
   JobCardNumbers, AdvisorIds, Status
 ) => {
   try {
-    const pool = await getPool1();
+    const pool = await getPool();
     const query = `
         use z_scope
         EXEC dbo.sp_SPMViewOrderStatustest_VB
@@ -231,7 +231,7 @@ const viewOrderStatusService = async (
 
 const orderPlacedService = async (tableName, bigid, orderPlace, POnumber) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `use z_scope
       update  ${tableName}
       set orderplace = @OrderPlace , PONumber = @POnumber
@@ -252,7 +252,7 @@ const orderPlacedService = async (tableName, bigid, orderPlace, POnumber) => {
 
 const reorderService = async (DealerId, bigid, Remarks) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `EXEC DBO.USP_OrderStatusReSubmitNT '${bigid}','${Remarks}','${DealerId}'`
     const result = await pool.request().query(query)
     return result
@@ -264,7 +264,7 @@ const reorderService = async (DealerId, bigid, Remarks) => {
 
 const nonMovingService = async (PartNumber, BrandId, LocationId) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `use z_scope Select   D.work_location LOCATION,ISNULL(SUM(QTY),0)QTY,C.DISCOUNT,E.vcName as Dealer 
       from CurrentStock1 X1 (NOLOCK) 
       INNER JOIN  CurrentStock2 X2 (NOLOCK) ON(X1.tCode=X2.StockCode) 
@@ -284,7 +284,7 @@ const nonMovingService = async (PartNumber, BrandId, LocationId) => {
 
 const spmDashboardService = async (DealerId, LocationId, OrderTypeId, From, To) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `use z_scope
   declare @PendingCount1 int,@PendingCount2 int
   DECLARE @Approve int
@@ -344,7 +344,7 @@ const spmDashboardService = async (DealerId, LocationId, OrderTypeId, From, To) 
 
 const reqToGainerService = async (payload) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const jsonPayload = JSON.stringify(payload)
 
     const result = await pool.request()

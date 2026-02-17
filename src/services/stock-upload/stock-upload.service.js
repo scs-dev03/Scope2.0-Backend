@@ -1,4 +1,4 @@
-import { getPool1, getPool2 } from "../../db/db.js"
+import { getPool } from "../../db/db.js"
 import {
   readExcelFile,
   readExcelFileWithSubColumns,
@@ -11,7 +11,7 @@ import path from 'path';
 import xlsx from 'xlsx';
 
 const stockUploadSingleLocation = async (req, res) => {
-  const pool = await getPool2();
+  const pool = await getPool();
   const { location_id: locationId, user_id: addedBy } = req.body;
 
   // 1. Fetch dealer and brandId
@@ -384,7 +384,7 @@ const stockUploadSingleLocation = async (req, res) => {
 
 const getPartNotInMasterSingleLocationInService = async (req, res) => {
   try {
-    const pool = await getPool2();
+    const pool = await getPool();
  
     let locationId = req.location_id;
    
@@ -411,7 +411,7 @@ const getPartNotInMasterSingleLocationInService = async (req, res) => {
 
 const getAllRecordsSingleLocation = async (req, res) => {
   try {
-    const pool = await getPool2();
+    const pool = await getPool();
     let locationId = req.location_id;
    // let userId=req.added_by;
     let getQuery = `use [z_scope] select added_on,added_by,stockUploadCount,quantitySum,prevQuantitySum,prevStockUploadCount from stock_upload_logs
@@ -436,7 +436,7 @@ const getAllRecordsSingleLocation = async (req, res) => {
 
 const getUploadedDataSingleLocationInService = async (req, res) => {
   try {
-    const pool = await getPool2();
+    const pool = await getPool();
     let locationId = req.location_id;
     let brand,dealer;
     let location;
@@ -539,7 +539,7 @@ const stockUploadMultiLocation = async (req, res) => {
     let dealerId = parseInt(req.body.dealer_id);
     let files = req.files;
     // console.log(files,files[0].path)
-    const pool=await getPool2();
+    const pool=await getPool();
     let addedBy = parseInt(req.body.user_id);
 
     // let brandQuery = `use [z_scope] select brandId,brand from locationInfo where dealerID=@dealerId`;
@@ -1064,7 +1064,7 @@ prevStockUploadCount,prevQuantitySum) values(@locationId,@tCode,@addedBy,@brandI
 const getAllRecordsMultiLocation=async (req,res)=>{
 
     try {
-        const pool = await getPool2();
+        const pool = await getPool();
         let locations=req.locations;
         let data=[];
      //   let userId=req.added_by;
@@ -1092,7 +1092,7 @@ const getAllRecordsMultiLocation=async (req,res)=>{
 }
 
 const getUploadedDataMultiLocationInService = async (req, res) => {
-  const pool = await getPool2();
+  const pool = await getPool();
   const locations = req.locations; 
   const archive = new yazl.ZipFile();
   const brandId=req.brand_id;
@@ -1177,7 +1177,7 @@ left join  [z_scope].dbo.Substitution_Master s on s.brandid=vw.BrandID and vw.Pa
 
 const getPartNotInMasterMultiLocationInService=async(req,res)=>{
 
-    const pool = await getPool2();
+    const pool = await getPool();
     const locations = req.locations; // Assuming locations are passed in the request bod
   
     const tempDir = path.join(process.cwd(), 'temp');
@@ -1246,7 +1246,7 @@ const getPartNotInMasterMultiLocationInService=async(req,res)=>{
 const getPartNotInMasterBulkInService=async(req,res)=>{
 
  try {
-    const pool = await getPool2();
+    const pool = await getPool();
 
     let dealerId = req.dealer_id;
     let brandId=parseInt(req.brand_id,10);
@@ -1277,7 +1277,7 @@ const getPartNotInMasterBulkInService=async(req,res)=>{
 
 const uploadBulkData=async(req,res)=>{
    try {
-    const pool = await getPool2();
+    const pool = await getPool();
     let addedBy = parseInt(req.body.user_id,10);
     let rowData;
     let brandId = parseInt(req.body.brand_id,10);

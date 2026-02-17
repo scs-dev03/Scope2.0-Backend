@@ -1,10 +1,10 @@
-import {getPool2 } from "../db/db.js";
+import {getPool } from "../db/db.js";
 import sql from 'mssql';
 
 
 //Return Location for with data is not uploaded
 const dataValidator = async (dealerid) => {    
-  const pool = await getPool2();
+  const pool = await getPool();
 
   try {
     const dynamicTable = `z_scope.dbo.dealer_sale_upload1_td001_${dealerid}`;
@@ -88,7 +88,7 @@ return pending;
 // Check dashboard is already scheduled or not
 const checkisAlreadyScheduled = async (dashboardcode, brandid, dealerid) => {
   try {
-  const pool = await getPool2();
+  const pool = await getPool();
     const query = `
     use [UAD_BI] 
     SELECT scheduledon 
@@ -140,7 +140,7 @@ return false;
 // const checkisAlreadyScheduled = async(dashboardcode, brandid, dealerid,scheduledon)=>{
 //   console.log(`hi2`);
   
-//   const pool = await getPool1()
+//   const pool = await getPool()
 //   const query = `use [UAD_BI]
 //     SELECT 
 //     CASE WHEN DATEDIFF(MONTH, scheduledon, ${scheduledon}) = 1 and status in (5, 6)THEN 'Yes' ELSE 'No' END AS Result
@@ -163,7 +163,7 @@ return false;
 
 // Checking User is Authorised to Perform Actions or not 
 const checkisUserValid = async(addedby)=>{
-  const pool = await getPool2()
+  const pool = await getPool()
   const query = `use [z_scope] select designation , isBDM from [z_scope].[dbo].adminmaster_gen where bintid_pk = @addedby`
   const result = await pool.request().input('addedby',sql.Int,addedby).query(query)
   if(result.recordset[0].designation == 5 || result.recordset[0].isBDM == 'Y'){
@@ -174,7 +174,7 @@ const checkisUserValid = async(addedby)=>{
 }
 // Check group setting for CID
 const checkGroupSetting = async(dealerid)=>{
-  const pool = await getPool2()
+  const pool = await getPool()
   let query = `select count(dealerid) from z_scope.dbo.locationinfo where dealerid =  @dealerid `
   let result = await pool.request().input('dealerid',sql.Int,dealerid).query(query)
   if(result.recordset.count = 1 ){
@@ -195,7 +195,7 @@ const checkGroupSetting = async(dealerid)=>{
 const checkisMappingExists = async (dashboardcode,dealerid)=>{
   // console.log(dashboardcode,dealerid);
   try {
-    const pool  = await getPool2()
+    const pool  = await getPool()
     const query = `select dashboardcode , dealerid from UAD_BI..SBS_DBS_DashboardDealerMapping where dealerid = @dealerid and dashboardcode = @dashboardcode`
     const result =  await pool.request()
                     .input('dealerid',sql.Int,dealerid)

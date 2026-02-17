@@ -1,10 +1,10 @@
-import { getPool1 , getPool2} from "../../db/db.js"
+import { getPool } from "../../db/db.js"
 
 
 // Part Details with location-wise part quality -> (stockable , non-stockable , non-moving)
 const partDetailsservice = async (brandid,dealerid,locationid,partnumber,res)=>{
     try {
-            const pool = getPool2()
+            const pool = getPool()
             const query = `
             SELECT DISTINCT
                 pm.partnumber, pm.partid,

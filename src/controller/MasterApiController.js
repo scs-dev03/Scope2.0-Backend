@@ -1,12 +1,12 @@
 import sql from 'mssql'
-import { getPool1, getPool2 } from '../db/db.js'
+import { getPool } from '../db/db.js'
 import { clusterByBrandService, dealerByClusterService, getUserService, jobcardDate, lastOrderValue, multiAdvisorService, multiDealerService, multiLocationService, partQualityService, ppniValue, SixMonthLocationwiseSaleValue, snstockValue, stockQty, stockValue, tranferTypeService } from '../services/MasterApi/MasterApiService.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 
 const getBrands = async (req, res) => {
   try {
-    const pool = getPool2();
+    const pool = getPool();
     const result = await pool
       .request()
       .query('use z_scope select bigid , vcbrand from Brand_master')
@@ -17,7 +17,7 @@ const getBrands = async (req, res) => {
 }
 const getDealers = async (req, res) => {
   try {
-    const pool = getPool2();
+    const pool = getPool();
     const { brandid } = req.body;
     const result = await pool.request().input('brandid', sql.Int, brandid).query(`use z_scope select distinct(dealerid),dealer from locationinfo where brandid = @brandid and dealerStatus = 1 `)
     res.status(200).json(result.recordset)
@@ -29,7 +29,7 @@ const getDealers = async (req, res) => {
 
 const getLocation = async (req, res) => {
   try {
-    const pool = getPool2();
+    const pool = getPool();
     const { dealerid , userId} = req.body;
     const adminLocationQuery = `use z_scope select locationid,location from locationinfo where dealerid = @dealerid and status = 1 and ogsStatus = 1 order by location`
     const spmLocationQuery = `use z_scope select sl.locationid , sl.location from VW_SpmLocation sl
@@ -52,7 +52,7 @@ const getLocation = async (req, res) => {
 
 const getWorkspace = async (req, res) => {
   try {
-    const pool = getPool2();
+    const pool = getPool();
     // const {dealerid} = req.body;
     const result = await pool.request().query(`select WorkspaceID, Workspace from UAD_BI..SBS_DBS_WorkspaceMaster`)
     res.status(200).json(result.recordset)
@@ -63,7 +63,7 @@ const getWorkspace = async (req, res) => {
 }
 const getDashboard = async (req, res) => {
   try {
-    const pool = getPool2();
+    const pool = getPool();
     // const {dealerid} = req.body;
     const result = await pool.request().query(`select tcode , Dashboard from DB_DASHboardmaster where status = 1`)
     res.status(200).json(result.recordset)
@@ -74,7 +74,7 @@ const getDashboard = async (req, res) => {
 }
 const partNature = async (req, res) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = `select  tCode , Description  from z_scope..PartNatureMaster`
     const result = await pool.request().query(query)
     res.status(200).json({ Data: result.recordset })
@@ -84,7 +84,7 @@ const partNature = async (req, res) => {
 }
 const seasonal = async (req, res) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = `use [z_scope] select tCode , Description  from seasonalmaster`
     const result = await pool.request().query(query)
     res.status(200).json({ Data: result.recordset })
@@ -94,7 +94,7 @@ const seasonal = async (req, res) => {
 }
 const model = async (req, res) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const { brandid } = req.body
     const query = `select ModelID , Model  from ModelMaster where Brandid = ${brandid}`
     const result = await pool.request().query(query)
@@ -105,7 +105,7 @@ const model = async (req, res) => {
 }
 const partType = async (req, res) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = `select parttypeid , Description from z_scope..parttypemaster`
     const result = await pool.request().query(query)
     res.status(200).json({ Data: result.recordset })
@@ -115,7 +115,7 @@ const partType = async (req, res) => {
 }
 const pagination = async (req, res) => {
   try {
-    const pool = await getPool1(); // Ensure the connection is awaited
+    const pool = await getPool(); // Ensure the connection is awaited
     const { pageno, pagelimit } = req.params
     const page = parseInt(req.query.page) || pageno
     const pageSize = parseInt(req.query.pageSize) || pagelimit;
@@ -152,7 +152,7 @@ const pagination = async (req, res) => {
 
 const userInfo = async (req, res) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const { token, usertype } = req.body
 
     //   console.log(token , usertypehj);
@@ -189,7 +189,7 @@ const homePageData = async (req, res) => {
   }
 
   try {
-    const pool = await getPool2();
+    const pool = await getPool();
 
     // Define all static queries
     // const stockquery = `SELECT SUM(qty) AS StockQty, AddedDate FROM [z_scope].dbo.CurrentStock1 cs1
@@ -342,7 +342,7 @@ JOIN sn on sn.latest = s.latest
 
 const latestDates = async (req, res) => {
   try {
-    const pool = await getPool2();
+    const pool = await getPool();
     const { locationid, dealerid } = req.body;
 
     if (!locationid || !dealerid) {
@@ -407,7 +407,7 @@ const getUserModules = async (req, res) => {
       return res.status(400).json({ error: "userId is required" });
     }
 
-    const pool = await getPool1();
+    const pool = await getPool();
 
     const result = await pool.request()
       .input("userId", sql.Int, userId)
@@ -578,7 +578,7 @@ const spmhomepage = async (req, res) => {
 
 const ordertype = async (req, res) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `use z_scope select Id,Name from ordertypemaster`
     const result = await pool.request().query(query)
     res.status(200).json(new ApiResponse(200, result.recordset, `Data Fetched Successfully`))
@@ -589,7 +589,7 @@ const ordertype = async (req, res) => {
 
 const jobtype = async (req, res) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `use z_scope select bigid Id,jobcart_type Jobtype from Job_Card_Type where status = 1`
     const result = await pool.request().query(query)
     res.status(200).json(new ApiResponse(200, result.recordset, `Data Fetched Successfully`))
@@ -600,7 +600,7 @@ const jobtype = async (req, res) => {
 
 const hsncode = async (req, res) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `use z_scope select tcode , description from hsnmaster`
     const result = await pool.request().query(query)
     res.status(200).json(new ApiResponse(200, result.recordset, `Data Fetched Successfully`))

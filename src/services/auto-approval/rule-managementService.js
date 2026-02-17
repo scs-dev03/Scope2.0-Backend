@@ -1,10 +1,10 @@
-import { getPool1 } from "../../db/db.js";
+import { getPool } from "../../db/db.js";
 import { ApiError } from "../../utils/ApiError.js";
 import sql from 'mssql'
 
 
 export const insertTemplate = async (name, TempDesc, Template, createdBy, trueOutput, falseOutput, trueRemark, falseRemark) => {
-    const pool = await getPool1();
+    const pool = await getPool();
     const transaction = pool.transaction();
     try {
         await transaction.begin();
@@ -46,7 +46,7 @@ VALUES (@name, @tempDesc, @Template, @createdBy, @trueOutput, @falseOutput, @tru
 
 export const updateTemplate = async (templateId, name, tempDesc, template, createdBy, status, trueOutput, falseOutput, trueRemark, falseRemark) => {
     try {
-        const pool = await getPool1();
+        const pool = await getPool();
         const duplicateCheck = await pool.request()
             .input("name", name)
             .input("template", template)
@@ -110,7 +110,7 @@ WHERE Id = @templateId
 };
 
 export const fetchTemplate = async (createdBy, startDate, endDate) => {
-    const pool = await getPool1();
+    const pool = await getPool();
     try {
         const result = await pool.request()
             .input("createdBy", createdBy)
@@ -132,7 +132,7 @@ WHERE (@createdBy IS NULL OR CreatedBy =@createdby)
 }
 
 export const insertRule = async (transaction, name, description, expression, trueOutput, falseOutput, createdBy, trueRemark, falseRemark, ruleFor, RuleType) => {
-    // const pool = await getPool1();
+    // const pool = await getPool();
     // const transaction = pool.transaction();
     try {
         // await transaction.begin();
@@ -182,7 +182,7 @@ export const insertRule = async (transaction, name, description, expression, tru
 
 export const updateRule = async (ruleId, name, description, expression, trueOutput, falseOutput, trueRemark, falseRemark, ruleFor , status) => {
     try {
-        const pool = await getPool1();
+        const pool = await getPool();
         // const duplicateExpresionCheck = await pool.request()
         //     // .input("name", name)
         //     .input("expression", expression)
@@ -265,7 +265,7 @@ export const updateRule = async (ruleId, name, description, expression, trueOutp
 
 // export const insertRuleMapping = async (BrandId, RuleId, CreatedBy, DealerId, LocationId) => {
 
-//     const pool = await getPool1();
+//     const pool = await getPool();
 //     const transaction = pool.transaction();
 //     try {
 //         await transaction.begin();
@@ -346,7 +346,7 @@ export const insertRuleMapping = async (transaction, mappings) => {
     if (!Array.isArray(mappings) || mappings.length === 0) return;
 
     try {
-        // const pool = await getPool1();
+        // const pool = await getPool();
 
         // 👇 Table definition must match your real table columns
         const table = new sql.Table("AAP_RuleMapping"); // if needed: "dbo.AAP_RuleMapping"
@@ -379,7 +379,7 @@ export const insertRuleMapping = async (transaction, mappings) => {
 
 export const updateRuleMapping = async (id, BrandId, RuleId, DealerId, LocationId, Status) => {
     try {
-        const pool = await getPool1();
+        const pool = await getPool();
         const request = pool.request();
 
         const existing = await request.input("Id", id).query(`
@@ -496,7 +496,7 @@ export const updateRuleMapping = async (id, BrandId, RuleId, DealerId, LocationI
 };
 
 export const insertPriorityMapping = async (LocationId, RuleId, Priority, CreatedBy) => {
-    const pool = await getPool1();
+    const pool = await getPool();
     const transaction = pool.transaction();
     try {
         await transaction.begin();
@@ -540,7 +540,7 @@ export const insertPriorityMapping = async (LocationId, RuleId, Priority, Create
 };
 
 export const updatePriorityMapping = async (LocationId, RuleId, Priority, Status) => {
-    const pool = await getPool1();
+    const pool = await getPool();
     const transaction = pool.transaction();
 
     try {
@@ -626,7 +626,7 @@ export const updatePriorityMapping = async (LocationId, RuleId, Priority, Status
 
 export const fetchRuleMappings = async (BrandId, LocationId, DealerId) => {
     try {
-        const pool = await getPool1();
+        const pool = await getPool();
         let query = `    
         select li.Brand,li.Dealer,li.Location,mp.RuleID,r.Name,r.RuleDesc,r.[Rule],r.TrueOutput,r.FalseOutput from z_scope..AAP_RuleMapping mp
         Left join z_scope..AAP_RuleMaster r on mp.RuleID=r.id
@@ -654,7 +654,7 @@ export const fetchRuleMappings = async (BrandId, LocationId, DealerId) => {
 
 export const fetchPriorityMappings = async (LocationId) => {
     try {
-        const pool = await getPool1();
+        const pool = await getPool();
         const result = await pool.request()
             .input("LocationId", LocationId)
             .query(`
@@ -674,7 +674,7 @@ export const fetchPriorityMappings = async (LocationId) => {
 
 export const fetchAllRules = async () => {
     try {
-        const pool = await getPool1();
+        const pool = await getPool();
         const result = await pool.request()
             .query(`
            select Id,Name from z_scope..AAP_RuleMaster
@@ -687,7 +687,7 @@ export const fetchAllRules = async () => {
 
 export const fetchRuleOutput = async () => {
     try {
-        const pool = await getPool1();
+        const pool = await getPool();
         const result = await pool.request()
             .query(`
            select Id,Condition from z_scope..AAP_RuleOutput
@@ -699,7 +699,7 @@ export const fetchRuleOutput = async () => {
 };
 
 export const insertLocationWisePriority = async (transaction, ruleId, userId) => {
-    // const pool = await getPool1()
+    // const pool = await getPool()
     try {
         const checkQuery = `select 1 from AAP_RuleMaster where Id = @Id `
         const result = await transaction.request().input('Id', sql.Int, ruleId).query(checkQuery)
@@ -721,8 +721,8 @@ export const insertLocationWisePriority = async (transaction, ruleId, userId) =>
 
 export const viewRulesService = async (BrandId, DealerId, LocationId, RuleId) => {
     try {
-        const pool = await getPool1()
-        const query = `select vcbrand Brand ,  vcName Dealer, li.Location ,rm.Name, rm.[Rule] , lp.priority   , lp.Status , rm.id , lp.LocationId , rm.RuleDesc , rm.TrueOutput , rm.FalseOutput , rm.TrueRemarks , rm.FalseRemarks , rm.RuleFor , rm.RuleType
+        const pool = await getPool()
+        const query = `select vcbrand Brand ,  vcName Dealer, li.Location ,rm.Name, rm.[Rule] , lp.priority   , rm.Status , rm.id , lp.LocationId , rm.RuleDesc , rm.TrueOutput , rm.FalseOutput , rm.TrueRemarks , rm.FalseRemarks , rm.RuleFor , rm.RuleType
                         from AAP_RuleMaster rm
                         JOIN AAP_RuleMapping rmp on rm.id = rmp.ruleid
                         JOIN AAP_LocationPriority lp on lp.ruleid = rm.Id
@@ -749,7 +749,7 @@ export const viewRulesService = async (BrandId, DealerId, LocationId, RuleId) =>
 
 export const viewRuleByIdService = async (Id) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `use z_scope
         select rm.Id , Name , RuleDesc , [Rule] , TrueOutput , FalseOutput , TrueRemarks , FalseRemarks , RuleFor , RuleType , rmp.BrandId , DealerId , rmp.LocationId  from AAP_RuleMaster rm
         JOIN AAP_RuleMapping rmp on rm.id = rmp.ruleid

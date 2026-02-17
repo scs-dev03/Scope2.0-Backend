@@ -1,8 +1,8 @@
-import { getPool1 } from "../../db/db.js"
+import { getPool } from "../../db/db.js"
 
 const viewBucketService = async(req,res)=>{
 try {
-        const pool= await getPool1()
+        const pool= await getPool()
         const query = `select * from AAP_bucketmaster`
         const result = await pool.request().query(query)
         return result

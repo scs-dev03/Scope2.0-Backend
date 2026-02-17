@@ -1,8 +1,8 @@
-import { getPool1 } from "../../db/db.js";
+import { getPool } from "../../db/db.js";
 import { ApiError } from "../../utils/ApiError.js";
 
 export const insertModuleViewConfig = async (userId, moduleId, columns) => {
-  const pool = await getPool1();
+  const pool = await getPool();
   const transaction = pool.transaction();
   try {
     await transaction.begin();
@@ -24,7 +24,7 @@ export const insertModuleViewConfig = async (userId, moduleId, columns) => {
 
 export const updateModuleViewConfig = async (userId, moduleId, columns) => {
   try {
-    const pool = await getPool1();
+    const pool = await getPool();
     //     const useridForeignKeyCheckCheck = await pool.request()
     //       .input("userId", userId)
     //       .query(

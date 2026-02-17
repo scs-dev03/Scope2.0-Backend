@@ -1,9 +1,9 @@
-import { getPool1 } from "../../db/db.js"
+import { getPool } from "../../db/db.js"
 import { ApiError } from "../../utils/ApiError.js"
 
 const viewParameterService = async (bucketId) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `select BucketId , Parameter , ColumnName from AAP_ParameterMaster where BucketId = ${bucketId}`
         const result = await pool.request().query(query)
         return result
@@ -15,7 +15,7 @@ const viewParameterService = async (bucketId) => {
 
 const valuedParamsListService = async (tableName) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `
        SELECT *
        FROM ${tableName}
@@ -35,7 +35,7 @@ const valuedParamsListService = async (tableName) => {
 
 const locationSpecificParamsListService = async (tableName, LocationId) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
 
         const query = `
        SELECT *
@@ -57,7 +57,7 @@ const locationSpecificParamsListService = async (tableName, LocationId) => {
 
 const remarkParametersService = async () => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const query = `use z_scope select Parameter from AAP_RemarkParameter`
         const result = await pool.request().query(query)
         return result.recordset

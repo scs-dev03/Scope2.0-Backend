@@ -1,4 +1,4 @@
-import { getPool2 } from "../../db/db.js";
+import { getPool } from "../../db/db.js";
 import {
   readExcelFile,
   readExcelFileWithSubColumns,
@@ -12,7 +12,7 @@ import xlsx from "xlsx";
 
 const singleUploadStockInService = async (req, res) => {
 
-  const pool = await getPool2();
+  const pool = await getPool();
     let locationId = parseInt(req.body.location_id,10);
     let addedBy = parseInt(req.body.user_id,10);
     let rowData;
@@ -399,7 +399,7 @@ async function upsertSPMTable(dealerId, stockDate, data, brandId, locationId, ad
     const formatDateOnly = (date) => {
   return new Date(date).toISOString().split('T')[0]; // '2025-07-21'
 };
-    const pool = await getPool2();
+    const pool = await getPool();
     await pool.request().query('USE z_scope');
     const tableName = `stock_upload_spm_td001_${dealerId}`;
 
@@ -514,7 +514,7 @@ async function upsertSPMTable(dealerId, stockDate, data, brandId, locationId, ad
 
 async function updateMaxCountDaysStockZero(dealerId, stockDate, locationId, partNumbersToUpdate, sameDateParts) {
   try {
-    const pool = await getPool2();
+    const pool = await getPool();
    // console.log(sameDateParts);
     const stockUploadTable = `stock_upload_spm_td001_${dealerId}`;
     const maxCountTable = `max_CountDayStockZero_td001_${dealerId}`;
@@ -613,7 +613,7 @@ async function updateMaxCountDaysStockZero(dealerId, stockDate, locationId, part
 
  //async function updateMaxCountDaysStockZero(dealerId,previousStockDate,stockDate,locationId) {
 //   try {
-//     const pool = await getPool2();
+//     const pool = await getPool();
 
 //     // Get the current month column, e.g., "jul_2025"
 //     const now = new Date();
@@ -716,7 +716,7 @@ async function updateMaxCountDaysStockZero(dealerId, stockDate, locationId, part
 
 const getPartNotInMasterSingleUploadInService = async (req, res) => {
   try {
-    const pool = await getPool2();
+    const pool = await getPool();
     let brandId = req.brand_id;
     let getQuery = `use [z_scope] Select partnumber from part_not_in_master where brand_id=@brandId`;
     const result1 = await pool
@@ -733,7 +733,7 @@ const getPartNotInMasterSingleUploadInService = async (req, res) => {
 
 const uploadStock = async (req, res) => {
   try {
-    const pool = await getPool2();
+    const pool = await getPool();
   } catch (error) {
     return error;
   }
@@ -741,7 +741,7 @@ const uploadStock = async (req, res) => {
 
 const getAllRecords = async (req, res) => {
   try {
-    const pool = await getPool2();
+    const pool = await getPool();
     let locationId = req.location_id;
    // let userId = req.added_by;
     let getQuery = `use [z_scope] select added_on,added_by,stockUploadCount,quantitySum,prevQuantitySum,operation_type,
@@ -765,7 +765,7 @@ const getAllRecords = async (req, res) => {
 
 // const uploadBulkStock = async (req, res) => {
 //   try {
-//     const pool = await getPool2();
+//     const pool = await getPool();
 //     let addedBy = req.body.user_id;
 //     let rowData;
 //     let brandId = parseInt(req.body.brand_id,10);
@@ -1455,7 +1455,7 @@ const getAllRecords = async (req, res) => {
 
 const uploadBulkStock = async (req, res) => {
   try {
-    const pool = await getPool2();
+    const pool = await getPool();
     let addedBy = parseInt(req.body.user_id,10);
     let rowData;
     let brandId = parseInt(req.body.brand_id,10);
@@ -2098,7 +2098,7 @@ const deleteRequest = pool.request().input("brandId", brandId).query(deletePartM
 
 const getBulkRecordsInService = async (req, res) => {
   try {
-    const pool = await getPool2();
+    const pool = await getPool();
     let dealerId = parseInt(req.dealer_id, 10);
    // let userId = req.added_by;
    
@@ -2132,7 +2132,7 @@ const getBulkRecordsInService = async (req, res) => {
 const getBulkDataInService = async (req, res) => {
   try {
     const archive = new yazl.ZipFile();
-    const pool = await getPool2();
+    const pool = await getPool();
     let dealerId = req.dealer_id;
     let userId = req.added_by;
     let brand;

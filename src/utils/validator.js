@@ -1,4 +1,4 @@
-import { getPool1 } from "../db/db.js";
+import { getPool } from "../db/db.js";
 import sql from 'mssql'
 import { ApiError } from "./ApiError.js";
 
@@ -697,7 +697,7 @@ export function validateCommonRows(data, { allowDuplicates = false } = {}) {
 
 export const partBrandMappingCheck = async (BrandId, Data) => {
   try {
-    const pool = await getPool1();
+    const pool = await getPool();
     const query = `
       SELECT brandid, partnumber1 PartNumber
       FROM z_scope.dbo.Part_Master

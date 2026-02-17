@@ -3,6 +3,7 @@ import {connectDB} from "./db/db.js"
 import {app}  from "./app.js"
 import cron from 'node-cron'
 import { scheduleTask, siRefresh } from './controller/dashboardSchedulerController.js'
+
 const PORT = process.env.PORT || 3000
 // connectDB()
 // // .then(()=>{
@@ -54,10 +55,11 @@ async function start() {
     // cron.schedule('*/15 * * * *', async () => {
     //   await connectDB().catch(err => console.error('connectDB error', err));
     //   console.log('🔄 Running siRefresh at', new Date().toISOString());
-    //   siRefresh().catch(err => console.error('siRefresh error', err));
+      // siRefresh().catch(err => console.error('siRefresh error', err));
     // });
     // ────────────────────────────────────────────────
 
+    
     // 3) Then start your HTTP server:
     app.listen(PORT, () => {
       console.log(`Server is running at :${PORT}`);

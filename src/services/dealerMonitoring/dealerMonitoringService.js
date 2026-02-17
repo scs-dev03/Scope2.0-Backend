@@ -1,9 +1,9 @@
-import { getPool2 , getPool1 } from "../../db/db.js";
+import { getPool  } from "../../db/db.js";
 import sql from 'mssql'
 import { ApiError } from "../../utils/ApiError.js";
 const partInfo = async (brandid, partnumber) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = `
         use [z_scope]
           SELECT DISTINCT
@@ -36,7 +36,7 @@ const partInfo = async (brandid, partnumber) => {
 
 const reservedForVehicle = async (dealerid, locationid, partnumber) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     // const query = ` use z_scope
     // select count(Part_Number1)as ReservedforVehicle from Create_Order_Request_TD001_${dealerid}
     // where Part_Number1 = '${partnumber}' and Final_Close = 'N'
@@ -63,7 +63,7 @@ const reservedForVehicle = async (dealerid, locationid, partnumber) => {
 
 const groupStock = async (brandid, dealerid, locationid, partnumber) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = `
         DECLARE
         @InputPart VARCHAR(40) = '${partnumber}',
@@ -158,7 +158,7 @@ const groupStock = async (brandid, dealerid, locationid, partnumber) => {
 
 const groupNorms = async (brandid, dealerid, locationid, partnumber) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = ` use z_scope
     DECLARE 
               @InputPart VARCHAR(40) =  '${partnumber}',
@@ -222,7 +222,7 @@ const groupNorms = async (brandid, dealerid, locationid, partnumber) => {
 }
 const jobCardByVehicleService = async (filter, vehicleno, dealerid) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query =
       `
         DECLARE @StatusFilter VARCHAR(20) 
@@ -246,7 +246,7 @@ const jobCardByVehicleService = async (filter, vehicleno, dealerid) => {
 
 const partsByJobCardService = async (dealerid, jobcardno) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query =
       `
             select distinct co.part_number1 , pm.partdesc , pm.mrp , co.Qty as StockQty , 
@@ -275,7 +275,7 @@ const partsByJobCardService = async (dealerid, jobcardno) => {
 
 const partSubstituteDetailService = async (brandid, dealerid, locationid, partnumber) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = `
         DECLARE  
          @InputPart    VARCHAR(40) = '${partnumber}',      -- ←  input part 
@@ -368,7 +368,7 @@ ORDER BY pm.PartNumber1, pm.BrandID;
 
 const userroleService = async (userid) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = `select rm.Role,concat(amg.vcFirstName,' ',amg.vcLastName)as Name from z_scope..adminmaster_gen amg 
                         join Role_Master rm on rm.bigid = amg.Designation
                         where bintId_Pk = ${userid}`
@@ -381,7 +381,7 @@ const userroleService = async (userid) => {
 
 // const locationwisePPNIValueService = async(dealerid,jobcardstatus , nonstockable)=>{
 // try {
-//         const pool = await getPool2()
+//         const pool = await getPool()
 //         const query = `
 //         DECLARE @All_Time_NonStck VARCHAR(1) = ${nonstockable};  -- 'Y', 'N', or NULL
 //         DECLARE @JobCardStatus VARCHAR(10) = ${jobcardstatus};    -- 'OPEN', 'CLOSE', or NULL
@@ -426,7 +426,7 @@ const locationwisePPNIValueService = async (dealerid, jobcardstatus, nonstockabl
   try {
     if (!dealerid) throw new Error("dealerid is required");
 
-    const pool = await getPool2();
+    const pool = await getPool();
 
     const request = pool.request()
       .input('All_Time_NonStck', sql.VarChar, nonstockable || null)
@@ -528,7 +528,7 @@ const locationwisePPNIValueService = async (dealerid, jobcardstatus, nonstockabl
 
 const advisorwisePPNIValueService = async (dealerid, locationid, jobcardstatus, nonstockable, month) => {
   try {
-    const pool = await getPool2();
+    const pool = await getPool();
 
     const request = pool.request()
       .input('All_Time_NonStck', sql.VarChar(1), nonstockable)
@@ -621,7 +621,7 @@ const advisorwisePPNIValueService = async (dealerid, locationid, jobcardstatus, 
 
 const vehiclewisePPNIValueService = async (dealerid, locationid, jobcardstatus, nonstockable, advisor, month, pageno, pagesize) => {
   try {
-    const pool = await getPool2();
+    const pool = await getPool();
     const request = pool.request()
     //   .input('All_Time_NonStck', sql.VarChar, nonstockable)
     //   .input('JobCardStatus', sql.VarChar, jobcardstatus)
@@ -762,7 +762,7 @@ FETCH NEXT @pagesize ROWS ONLY;`
 
 const partwisePPNIValueService = async (dealerid, locationid, jobcardstatus, nonstockable, advisor, vehicleno, month) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const advisorSQL =
       advisor === null || advisor === undefined
         ? "NULL"
@@ -911,7 +911,7 @@ order by SUM(PPNI_Val) desc
 
 const PPNIVALUE12MonthsService = async (dealerid, locationid, nonstockable, jobcardstatus, advisior) => {
   try {
-    const pool = await getPool2();
+    const pool = await getPool();
     const tableName = `UAD_BI_PPNI..PPNI_report_${dealerid}`;
 
     const advisorSQL = advisior === null || advisior === undefined ? "NULL" : `'${advisior}'`;
@@ -981,7 +981,7 @@ Declare @locationid int = ${locationid},
 
 const vehicleSearchService = async (dealerid, locationid, vehicleno, alltimenonstk, filter, issued, pageno, pagesize) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     //  const query  = `
     //   use z_scope 
     // 	;with data as(
@@ -1156,7 +1156,7 @@ FETCH NEXT @pagesize ROWS ONLY;
 
 const gainerListingService = async (dealerid, locationid, partnumber) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     // const query = `
     // select pm.partnumber1 , pm.partdesc , pm.Category , pm.mrp , pm.landedcost ,CONCAT(unm.DISCOUNT,'%')as Discount  from SH_UPLOADNONMOVINGPART unm 
     // join locationinfo li on li.locationid = unm.locationid
@@ -1175,7 +1175,7 @@ const gainerListingService = async (dealerid, locationid, partnumber) => {
 
 const predictiveVehicleSearchService = async (dealerid, vehicleno) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = `
         --Declare @vehicleno varchar(10) = '@vehicleno'
     	select distinct(UPPER(Vehiclenumber))as Vehiclenumber from z_scope..Create_Order_Request_TD001_${dealerid}
@@ -1189,7 +1189,7 @@ const predictiveVehicleSearchService = async (dealerid, vehicleno) => {
 }
 
 const vehicledealercheck = async (vehicleno, dealerid, locationid) => {
-  const pool = await getPool2()
+  const pool = await getPool()
   const query = `select * from z_scope..Create_Order_Request_TD001_${dealerid} where vehiclenumber = '${vehicleno}' and LocationId = ${locationid}`
   const result = await pool.request().query(query)
   // console.log(result.recordset);
@@ -1199,7 +1199,7 @@ const vehicledealercheck = async (vehicleno, dealerid, locationid) => {
 
 const partfamilywiseStockColor = async (brandid, dealerid, locationid, partnumber) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = ` use z_scope
      DECLARE 
               @InputPart VARCHAR(40) = '${partnumber}',
@@ -1281,7 +1281,7 @@ group by l.Part
 
 const vehicleScore = async (dealerid,locationid, vehiclenumber) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query =
       ` use z_scope
 	SELECT
@@ -1318,7 +1318,7 @@ const vehicleScore = async (dealerid,locationid, vehiclenumber) => {
 //   console.log(pagesize,dealerid,vehicleno,alltimestk,issued,filter);
 
 // try {
-//     const pool = await getPool2()
+//     const pool = await getPool()
 //     const query = `select count(co.bigid)count from z_scope..Create_Order_Request_TD001_${dealerid} co
 //         join uad_bi_ppni..ppni_report_${dealerid} p on p.locationid = co.LocationID and p.partnumber = co.Part_Number1 where co.vehiclenumber = '${vehicleno}' 
 //              AND (@filter IS NULL OR co.final_close = @filter)
@@ -1350,7 +1350,7 @@ const vehicleSearchPagination = async (page, pageSize, dealerId, vehicleNo, allT
   try {
     if (!pageSize || pageSize <= 0) throw new Error('pagesize must be > 0');
 
-    const pool = await getPool2();
+    const pool = await getPool();
 
     const sql = `
       SELECT COUNT(1) AS count
@@ -1389,17 +1389,18 @@ const vehicleSearchPagination = async (page, pageSize, dealerId, vehicleNo, allT
   }
 };
 
-const vehicleSearchlogsService = async (moduleName, event, details, userid) => {
+const vehicleSearchlogsService = async (moduleName, event, details, userid , locationid) => {
   try {
-    const pool = await getPool2()
-    const query = `use z_scope Insert into App_Logging(ModuleName,Event,Details,CreatedBy)
-                    OUTPUT inserted.ModuleName, inserted.Event, inserted.Details, inserted.CreatedBy
-                    values(@ModuleName,@Event,@Details,@CreatedBy)`
+    const pool = await getPool()
+    const query = `use z_scope Insert into App_Logging(ModuleName,Event,Details,CreatedBy,LocationId)
+                    OUTPUT inserted.ModuleName, inserted.Event, inserted.Details, inserted.CreatedBy , inserted.LocationId
+                    values(@ModuleName,@Event,@Details,@CreatedBy,@LocationId)`
     const result = await pool.request()
       .input('ModuleName', sql.VarChar, moduleName)
       .input('Event', sql.VarChar, event)
       .input('Details', sql.VarChar,JSON.stringify(details))
       .input('CreatedBy', sql.Int, userid)
+      .input('LocationId', sql.Int, locationid)
       .query(query)
     return result
 
@@ -1408,7 +1409,7 @@ const vehicleSearchlogsService = async (moduleName, event, details, userid) => {
   }
 }
 const viewLogService = async (type, partnumber, vehiclenumber, from, to) => {
-  const pool = await getPool2()
+  const pool = await getPool()
   const query = `use [z_scope] EXEC dbo.sp_dealerapplogsView @type,@partnumber,@vehiclenumber,@from,@to`
   const result = await pool.request()
     .input('type', sql.VarChar, type)
@@ -1423,7 +1424,7 @@ const viewLogService = async (type, partnumber, vehiclenumber, from, to) => {
 
 const vehicleSearchConsentService = async (vehiclenumber, dealerid, locationid, userId) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const query = `
      use z_scope
      insert into vehicleremark (dealerId , LocationId , vehicleno , createdby)

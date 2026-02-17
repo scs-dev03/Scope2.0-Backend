@@ -16,7 +16,7 @@ import {
   viewRulesService,
   viewRuleByIdService
 } from "../../services/auto-approval/rule-managementService.js";
-import { getPool1 } from "../../db/db.js";
+import { getPool } from "../../db/db.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { ApiResponse } from "../../utils/ApiResponse.js";
 import sql from 'mssql'
@@ -116,7 +116,7 @@ const addRule = async (req, res) => {
   if (RuleType === 1 && mappings.length > 1) {
     return res.status(400).json(new ApiError(400, `When Creating Location Specific Rules only 1 location is Required`))
   }
-  const pool = await getPool1();
+  const pool = await getPool();
   const transaction = new sql.Transaction(pool);
   // console.log(transaction);
 
@@ -203,7 +203,7 @@ const modifyRule = async (req, res) => {
     ) {
       return res
         .status(400)
-        .json(new ApiError(400, "ruleId,name,description,expression,trueOutput,falseOutput,trueRemark,falseRemark is mandatory for updating", [], ""));
+        .json(new ApiError(400, "ruleId,name,description,expression,trueOutput,falseOutput,trueRemark,falseRemark and status is mandatory for updating", [], ""));
     }
 
     const data = await updateRule(ruleId, name, description, expression, trueOutput, falseOutput, trueRemark, falseRemark, ruleFor, status);

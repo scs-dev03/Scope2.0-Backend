@@ -1,7 +1,7 @@
 import { ApiError } from '../../utils/ApiError.js'
 import { ApiResponse } from '../../utils/ApiResponse.js'
 import { locationSpecificParamsListService, remarkParametersService, valuedParamsListService, viewParameterService } from '../../services/auto-approval/parameter-managementService.js'
-import { getPool1 } from '../../db/db.js'
+import { getPool } from '../../db/db.js'
 import { partNature } from '../MasterApiController.js'
 
 const viewParameter = async (req, res) => {
@@ -21,7 +21,7 @@ const viewParameter = async (req, res) => {
 
 const parameterValue = async (req, res) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const { parameter, LocationId } = req.body
 
     const preDefinedMap = {

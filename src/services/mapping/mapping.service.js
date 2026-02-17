@@ -3,7 +3,7 @@ import sql from 'mssql2';
 import XLSX from "xlsx";
 import moment from 'moment';
 import { connect } from 'tedious';
-import { getPool2 } from '../../db/db.js';
+import { getPool } from '../../db/db.js';
 
  const readExcelFileMappingService=async function (filePath,res) {
     try {
@@ -141,7 +141,7 @@ import { getPool2 } from '../../db/db.js';
 
   const  mappedColumns=async function(req,res){
         try{
-            const pool = await getPool2();
+            const pool = await getPool();
       console.log('Connected to the database successfully!');
       // Begin a transaction for inserting data
       const transaction = new sql.Transaction();

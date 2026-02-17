@@ -1,6 +1,6 @@
 // services/authService.js
 import jwt from 'jsonwebtoken';
-import { getPool1 } from "../../db/db.js"
+import { getPool } from "../../db/db.js"
 import bcrypt from 'bcryptjs';
 import speakeasy from 'speakeasy';
 import qrcode from 'qrcode';
@@ -37,7 +37,7 @@ const generateAccessToken = (user) => {
 // Login Service
 const login = async (email, password) => {
   // const user = userDatabase.find(u => u.username === username);
-  pool=await getPool1();
+  pool=await getPool();
   const user = await findUserByUsername(pool,email,password);
   if (!user) {
     res.sendStatus(404).json({message:'Invalid Credentials',status:"404"});
@@ -47,7 +47,7 @@ const login = async (email, password) => {
 findUserById=async (userId)=>{
     try {
      // console.log("user id ",userId)
-      pool=await getPool1();
+      pool=await getPool();
     let query=`use [UAD_BI_LEAD_TIME] SELECT * FROM [user] WHERE userId=@userId`
   const result = await pool.request()
     .input('userId',  userId)
@@ -154,7 +154,7 @@ const generate2FA = async () => {
 
   //console.log("verify ",secret,token,userId)
   try{
-    const pool=await getPool1();
+    const pool=await getPool();
 
     let query=`use [UAD_BI_LEAD_TIME] Update [user] set secretKey=@secret ,token=@token ,isGoogleAuthentication=1 where userId=@userId;`
 
@@ -179,7 +179,7 @@ const generate2FA = async () => {
 const updatePasswordWhileCreatingUser=async(req)=>{
 
   try{
-    const pool=await getPool1();
+    const pool=await getPool();
     let email=req.email;
     let secret=req.secretKey;
     let password=req.password;
@@ -198,7 +198,7 @@ const updatePasswordWhileCreatingUser=async(req)=>{
 const updatePasswordWhileCreatingDealerUser=async(req)=>{
 
    try{
-    const pool=await getPool1();
+    const pool=await getPool();
     let email=req.email;
     let secret=req.secretKey;
     let password=req.password;
@@ -219,7 +219,7 @@ const getEmails=async(req)=>{
   //console.log(req.email)
   try {
     // Connect to the SQL Server
-    const pool=await getPool1();
+    const pool=await getPool();
 
     // Query to check if the email exists
     const result = await pool.request().query`
@@ -239,7 +239,7 @@ const getDealerEmails=async(req)=>{
   //console.log(req.email)
   try {
     // Connect to the SQL Server
-    const pool=await getPool1();
+    const pool=await getPool();
 
     // Query to check if the email exists
     const result = await pool.request().query`

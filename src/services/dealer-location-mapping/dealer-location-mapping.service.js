@@ -1,4 +1,4 @@
-import { getPool2 } from "../../db/db.js"
+import { getPool } from "../../db/db.js"
 import {readExcelFile} from '../utilities/utilities.service.js'
 import sql from 'mssql';
 const addDealerLocationMappingInService=async (req,res)=>{
@@ -12,7 +12,7 @@ const addDealerLocationMappingInService=async (req,res)=>{
         let filePath=req.file.path;
        let  isDealerAndLocationExist=true;        
         fileData=await readExcelFile(filePath)
-        const pool=await getPool2();
+        const pool=await getPool();
         const dealerLocationNotInMaster = [];
         headers=fileData.headers;
         rowData=fileData.data;
@@ -282,7 +282,7 @@ const editDealerLocationMappingInService=async(req,res)=>{
 
     try{
         let brandId=req.body.brand_id;
-        const pool=await getPool2();
+        const pool=await getPool();
         let getMappingQuery=`use [z_scope]  Select dealerId,locationId,inventory_location as 'inventory location',location,id from dealer_location_mapping where brandId=@brandId `;
         const res1=await pool.request().input('brandId',brandId).query(getMappingQuery);
         let mappedData=res1.recordset;
@@ -737,7 +737,7 @@ const exportUploadedData=async (req,res)=>{
 
     try{
         let brandId=req.brand_id;
-        const pool=await getPool2();
+        const pool=await getPool();
         // console.log(brandId)
         let query=`use [z_scope] Select dealer,location ,inventory_location,added_by,added_on,brandId from dealer_location_mapping where brandId=@brandId`;
         const result=await pool.request().input('brandId',brandId).query(query);
@@ -753,7 +753,7 @@ const exportUploadedData=async (req,res)=>{
 
 const deleteQuery=async (updatedElement)=>{
 
-    const pool=await getPool2();
+    const pool=await getPool();
     // console.log(updatedElement);
     let id=updatedElement.id;
     
@@ -785,7 +785,7 @@ const  getCurrentDateTimeInIST=async ()=> {
 const viewDealerLocationMappingInService=async(req)=>{
 
     try{
-        const pool=await getPool2();
+        const pool=await getPool();
         let brandId=req.brand_id;
         let added_by=req.user_id;
         
@@ -806,7 +806,7 @@ const viewDealerLocationMappingInService=async(req)=>{
 const deleteDealerLocationMappingInService=async(req,res)=>{
 
     try{
-        const pool=await getPool2();
+        const pool=await getPool();
 
         let added_by=req.user_id;
         let brandId=req.brand_id;
@@ -828,7 +828,7 @@ const deleteDealerLocationMappingInService=async(req,res)=>{
 const editLocationInService=async(req,res)=>{
 
   try{
-    let pool=await getPool2();
+    let pool=await getPool();
     let locationId=req.location_id;
     let location=req.location;
     let inventoryLocation=req.inventory_location;

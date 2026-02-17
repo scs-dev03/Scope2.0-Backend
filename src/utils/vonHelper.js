@@ -1,11 +1,11 @@
 import sql from 'mssql'
 import xlsx from 'xlsx'
-import { getPool1, getPool2 } from '../db/db.js'
+import { getPool } from '../db/db.js'
 import { ApiError } from './ApiError.js'
 
 const partBrandCheck = async (dealerid, locationid, partnumber) => {
   try {
-    const pool = await getPool2()
+    const pool = await getPool()
     const partCheck = `
         use z_scope
         SELECT 
@@ -37,7 +37,7 @@ const partBrandCheck = async (dealerid, locationid, partnumber) => {
   }
 }
 const statusCheck = async (locationid, partnumber, table) => {
-  const pool = await getPool2()
+  const pool = await getPool()
   // console.log(locationid,partid,table);
   const query = `select top 1 status from ${table} where locationid = ${locationid} and partnumber = '${partnumber}' order by feedbackid desc`
   const result = await pool.request().query(query)
@@ -83,7 +83,7 @@ const readExcel = async (filePath) => {
 //----------ROW BY ROW INSERTION -----------
 
 // const insertData = async (formattedData,tableName)=>{
-//   const pool = await getPool1()
+//   const pool = await getPool()
 //   const transaction = pool.transaction() 
 
 //   await transaction.begin();
@@ -113,7 +113,7 @@ const readExcel = async (filePath) => {
 
 // -----------BULK INSERTION ---------------------------
 const insertData = async (formattedData, tableName) => {
-  const pool = await getPool2();
+  const pool = await getPool();
   const transaction = pool.transaction();
   // console.log(`tablename`,tableName);
 
@@ -181,7 +181,7 @@ const insertData = async (formattedData, tableName) => {
 };
 
 const insertAdminFeedback = async (formattedData, brandid) => {
-  const pool = await getPool2();
+  const pool = await getPool();
   const transaction = pool.transaction();
   // console.log(`1`,formattedData[0]);
 
@@ -325,7 +325,7 @@ function findLocationPartidDuplicatesAdmin(data) {
 const checkPendingFeedbackAndStatus = async (dealerid, tableName, formattedData, res) => {
   try {
     // Get database connection
-    const pool = await getPool2();
+    const pool = await getPool();
 
     // Fetch pending feedback records for the given dealer
     const query = `SELECT partnumber, locationid FROM ${tableName} WHERE dealerid = ${dealerid} and status = 'Pending'`;
@@ -365,7 +365,7 @@ const checkReviewedFeedbackByBrand = async (brandid, formattedData) => {
     // console.log(brandid, formattedData);
 
     // Get database connection
-    const pool = await getPool2();
+    const pool = await getPool();
 
     // SQL query with parameterized Brandid
     const query = `

@@ -2,7 +2,7 @@
 // import { password } '../../db/db.js';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
-import { getPool1 } from '../../db/db.js';
+import { getPool } from '../../db/db.js';
 import { getLocalIp, getPublicIp, getClientIp }  from "../getIP.js";
 import "dotenv/config"
 const transporter = nodemailer.createTransport({
@@ -15,7 +15,7 @@ const transporter = nodemailer.createTransport({
 
    const getDealerUsers=async function(){
         try{
-            const pool=await getPool1();
+            const pool=await getPool();
             let query=`use [z_scope] Select brandId,dealerId,locationId,vcFirstName,vcLastName ,bintId_pk as userId from [UAD_user_master]`;
             const result=await pool.request().query(query);
             // console.log("----------",result)
@@ -51,7 +51,7 @@ const transporter = nodemailer.createTransport({
            // console.log("password generate in user service ",password)
             let publicIp = "Fetching public IP..."
             publicIp = await getPublicIp();
-            let pool=await getPool1();
+            let pool=await getPool();
             status=1;
             let query=`use [z_scope] Insert into UAD_user_master (vcFirstName,vcLastName,designation,roleId,vcEmail,vcMobile,vcPassword,btstatus,addedby,business_vertical,vcUserName,brandId,dealerId,locationId) 
             OUTPUT INSERTED.bintID_pk values (@firstName,@lastName,@designationId,@roleId,@email,@mobileNo,@password,@status,@addedBy,@businessVertical,'SCS$2025',@brandId,@dealerId,@locationId)`;
@@ -124,7 +124,7 @@ const transporter = nodemailer.createTransport({
    const allDealerUsers=async function(req){
         try{
             // use [z_scope] Select um.brandId,um.dealerId,um.locationId,um.vcFirstName,um.vcLastName ,um.bintId_pk as userId ,l.brand,l.dealer,l.location from [UAD_user_master] um join [locationInfo] l on um.brandId=l.brandId and um.dealerId=l.dealerId and um.locationId=l.locationId
-            const pool=await getPool1();
+            const pool=await getPool();
             let userType=req.userType;
             let dealerId=parseInt(req.dealerId,10);
             let query=`Select um.bintId_pk as userId,um.vcFirstName,um.vcLastName,concat(vcFirstName,' ',vcLastName) as name, um.roleId,um.designation as designation,um.business_vertical,um.vcEmail as emailId,um.vcMobile as mobileNo,
@@ -157,7 +157,7 @@ const transporter = nodemailer.createTransport({
             
             let publicIp = "Fetching public IP..."
             publicIp = await getPublicIp();
-            const pool=await getPool1();
+            const pool=await getPool();
             let btstatus=0;
             // if(status=='Active' || status=='active'){
             //     btstatus=1;
@@ -225,7 +225,7 @@ const transporter = nodemailer.createTransport({
             let publicIp = "Fetching public IP...";
             publicIp = await getPublicIp();
             
-            let pool = await getPool1()
+            let pool = await getPool()
             
             // Update the user details in the database
             let query = ` use [z_scope]
@@ -338,7 +338,7 @@ const transporter = nodemailer.createTransport({
     const getDealerUserInfo=async function(req){
 
         try{
-            const pool = await getPool1()
+            const pool = await getPool()
             const token= req.token;
             const query = `use z_scope SELECT bintId_pk as userId from UAD_user_master
             where bintId_Pk=z_scope.dbo.f_Decryption('${token}') `;

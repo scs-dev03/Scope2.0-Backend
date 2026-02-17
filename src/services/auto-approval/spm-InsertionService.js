@@ -1,4 +1,4 @@
-import { getPool1 } from "../../db/db.js";
+import { getPool } from "../../db/db.js";
 import sql from 'mssql'
 import { ApiError } from "../../utils/ApiError.js";
 
@@ -16,7 +16,7 @@ import { ApiError } from "../../utils/ApiError.js";
 
 const insertApprovals = async (data) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const tableName = 'Temp_createorderrequest_VB'
         const table = new sql.Table(tableName); // Use fully qualified name
         table.create = false;
@@ -125,7 +125,7 @@ const insertApprovals = async (data) => {
 
 const insertSpmParty = async (data) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const tableName = 'AAP_SPMPartyMaster'
         const table = new sql.Table(tableName)
         table.create = false;
@@ -168,7 +168,7 @@ const insertSpmParty = async (data) => {
 
 const insertadvisorParty = async (data) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const tableName = 'AAP_SPMAdvisorMaster'
         const table = new sql.Table(tableName)
         table.create = false;

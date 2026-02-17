@@ -1,6 +1,6 @@
 import { remarkmasterService , partremarkInsertion , vehicleremarkInsertion, ppnipartremarkInsertion, ppnivehicleremarkInsertion } from "../../services/dealerMonitoring/remarksService.js"
 import { uploadToS3 } from "../../middlewares/multer.middleware.js"
-import { getPool2 } from "../../db/db.js"
+import { getPool } from "../../db/db.js"
 
 const remarkMaster = async(req,res)=>{
 try {
@@ -17,7 +17,7 @@ try {
 
 const partremark = async(req,res)=>{
 try {   
-        const pool = await getPool2()
+        const pool = await getPool()
         const transaction = await pool.transaction();
 
         await transaction.begin()
@@ -54,7 +54,7 @@ try {
 
 const vehicleremark = async(req,res)=>{
 try {   
-        const pool = await getPool2()
+        const pool = await getPool()
         const transaction = await pool.transaction();
 
         await transaction.begin()
@@ -91,7 +91,7 @@ try {
 
 const ppnipartremark = async(req,res)=>{
 try {   
-        const pool = await getPool2()
+        const pool = await getPool()
         const transaction = await pool.transaction();
 
         await transaction.begin()
@@ -129,7 +129,7 @@ try {
 
 const ppnivehicleremark = async(req,res)=>{
 try {   
-        const pool = await getPool2()
+        const pool = await getPool()
         const transaction = await pool.transaction();
 
         await transaction.begin()

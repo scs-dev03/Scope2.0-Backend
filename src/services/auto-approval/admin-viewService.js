@@ -1,10 +1,10 @@
-import { getPool1 } from "../../db/db.js"
+import { getPool } from "../../db/db.js"
 import { ApiError } from "../../utils/ApiError.js"
 import sql from 'mssql'
 
 const adminDashboardService = async (BrandIds, DealerIds, LocationIds, OrderTypeId, From, To) => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const result = await pool.request()
             .input('BrandIdsCsv', sql.VarChar(100), BrandIds ?? null)
             .input('DealerIdsCsv', sql.VarChar(100), DealerIds ?? null)
@@ -23,7 +23,7 @@ const adminDashboardService = async (BrandIds, DealerIds, LocationIds, OrderType
 
 const adminBrandwiseService = async () => {
     try {
-        const pool = await getPool1()
+        const pool = await getPool()
         const request = pool.request()
         const query = `use z_scope EXEC dbo.sp_AAP_BrandWiseAdminDashboard_VB;`
         const result = await request.query(query)

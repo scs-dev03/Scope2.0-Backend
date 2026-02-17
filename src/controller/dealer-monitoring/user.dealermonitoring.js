@@ -45,7 +45,7 @@ const partSale = async (req, res) => {
     }
     finally {
         if (req.body.userId) {
-            await vehicleSearchlogsService('Sale Trend', 'Check', req.body, req.body.userId)
+            await vehicleSearchlogsService('Sale Trend', 'Check', req.body, req.body.userId,req.body.locationid)
         }
     }
 }
@@ -102,7 +102,7 @@ const singlePartMaxByLocation = async (req, res) => {
         })
     } finally {
         if (req.body.userId) {
-            await vehicleSearchlogsService('SCS Norms', 'Check', req.body, req.body.userId)
+            await vehicleSearchlogsService('SCS Norms', 'Check', req.body, req.body.userId,req.body.locationid)
         }
     }
 }
@@ -145,7 +145,7 @@ const orderDetailsByPartnumber = async (req, res) => {
     }
     finally {
         if (req.body.userId) {
-            await vehicleSearchlogsService('Order Details', 'Check', req.body, req.body.userId)
+            await vehicleSearchlogsService('Order Details', 'Check', req.body, req.body.userId,req.body.locationid)
         }
     }
 }
@@ -219,14 +219,14 @@ const partStock = async (req, res) => {
     }
     finally {
         if (req.body.userId) {
-            await vehicleSearchlogsService('Part Stock Check', 'Check', req.body, req.body.userId)
+            await vehicleSearchlogsService('Part Stock Check', 'Check', req.body, req.body.userId,req.body.locationid)
         }
     }
 }
 
 const vehicleSearch = async (req, res) => {
     try {
-        // const pool = await getPool2()
+        // const pool = await getPool()
         const { dealerid, locationid, vehicleno, alltimestk, filter, issued, pageno, pagesize, userId } = req.body
         const converted = filter === null
             ? null
@@ -273,8 +273,10 @@ const vehicleSearch = async (req, res) => {
         await ErrorLog("Vehicle Search",error.message,req.body.userId)
         res.status(500).json(error)
     }finally {
+        // console.log("Inside",req.body);
+        
         if (req.body.userId) {
-            await vehicleSearchlogsService('Vehicle Search', 'Check', req.body, req.body.userId)
+            await vehicleSearchlogsService('Vehicle Search', 'Check', req.body, req.body.userId, req.body.locationid)
         }
     }
 }
@@ -333,7 +335,7 @@ const substituteParts = async (req, res) => {
         })
     } finally {
         if (req.body.userId) {
-            await vehicleSearchlogsService('Substitution Check', 'Check', req.body, req.body.userId)
+            await vehicleSearchlogsService('Substitution Check', 'Check', req.body, req.body.userId,req.body.locationid)
         }
     }
 
@@ -362,7 +364,7 @@ const userRole = async (req, res) => {
 
 const locationwisePPNIValue = async (req, res) => {
     try {
-        const { dealerid, nonstockable, jobcardstatus, month, userId } = req.body
+        const { dealerid, nonstockable, jobcardstatus, month, userId , locationid} = req.body
         if (!dealerid || !nonstockable == null || !jobcardstatus == null || !month == null || !userId) {
             return res.status(400).json({
                 message: `dealerid , nonstockable , userId and partstatus is required`
@@ -380,7 +382,7 @@ const locationwisePPNIValue = async (req, res) => {
         })
     } finally {
         if (req.body.userId) {
-            await vehicleSearchlogsService('LocationWise PPNI', 'Check', req.body, req.body.userId)
+            await vehicleSearchlogsService('LocationWise PPNI', 'Check', req.body, req.body.userId,req.body.locationid)
         }
     }
 }
@@ -406,7 +408,7 @@ const advisorwisePPNIValue = async (req, res) => {
         })
     } finally {
         if (req.body.userId) {
-            await vehicleSearchlogsService('AdvisorWise PPNI', 'Check', req.body, req.body.userId)
+            await vehicleSearchlogsService('AdvisorWise PPNI', 'Check', req.body, req.body.userId,req.body.locationid)
         }
     }
 }
@@ -510,7 +512,7 @@ const vehiclewisePPNIValue = async (req, res) => {
         })
     } finally {
         if (req.body.userId) {
-            await vehicleSearchlogsService('VehicleWise PPNI', 'Check', req.body, req.body.userId)
+            await vehicleSearchlogsService('VehicleWise PPNI', 'Check', req.body, req.body.userId,req.body.locationid)
         }
     }
 }
@@ -534,7 +536,7 @@ const partwisePPNIValue = async (req, res) => {
         })
     } finally {
         if (req.body.userId) {
-            await vehicleSearchlogsService('PartWise PPNI', 'Check', req.body, req.body.userId)
+            await vehicleSearchlogsService('PartWise PPNI', 'Check', req.body, req.body.userId,req.body.locationid)
         }
     }
 }
@@ -560,7 +562,7 @@ const PPNIVALUE12Months = async (req, res) => {
     }
     finally {
         if (req.body.userId) {
-            await vehicleSearchlogsService('PPNIGraph', 'Check', req.body, req.body.userId)
+            await vehicleSearchlogsService('PPNIGraph', 'Check', req.body, req.body.userId,req.body.locationid)
         }
     }
 }
@@ -581,7 +583,7 @@ const gainerListing = async (req, res) => {
         })
     }finally {
         if (req.body.userId) {
-            await vehicleSearchlogsService('Gainer Listing', 'Check', req.body, req.body.userId)
+            await vehicleSearchlogsService('Gainer Listing', 'Check', req.body, req.body.userId,req.body.locationid)
         }
     }
 }

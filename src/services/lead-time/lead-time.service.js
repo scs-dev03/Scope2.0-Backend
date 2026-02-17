@@ -21,13 +21,13 @@ import {bulkMahindraInsertMRNData,bulkMahindraInsertPOData} from './Mahindra-Bul
 import bulkTATAPCInsertPOData from './TATA-PC-Bulk-Data.js'
 import bulkTATACVPOInsertData from './TATA-CV-Bulk-Data.js'
 import archiver from 'archiver';
-import { getLeadTimePool, getPool2 } from "../../db/db.js"
+import { getPool } from "../../db/db.js"
 
  const getLocationMaster= async function (req) {
   try {
    let brandId=req;
    // console.log(brandId)
-   const pool=await getLeadTimePool()
+   const pool=await getPool()
 //     const query = `
    
 // select b.brand,c.dealer_name,a.location_name
@@ -70,7 +70,7 @@ import { getLeadTimePool, getPool2 } from "../../db/db.js"
         console.log(error, "error in lead time");
         publicIp = "Error fetching public IP";
       }
-      const pool = await getLeadTimePool();
+      const pool = await getPool();
       brand = req.brand;
       jsonData = JSON.stringify(req.brandColumns);
       // console.log("jsonData ", jsonData);
@@ -133,7 +133,7 @@ import { getLeadTimePool, getPool2 } from "../../db/db.js"
 
   const updateColumns=async function (req) {
     try {
-      const pool = await getLeadTimePool();
+      const pool = await getPool();
     } catch (error) {}
   }
 
@@ -143,7 +143,7 @@ import { getLeadTimePool, getPool2 } from "../../db/db.js"
       brand_id = req.brand_id;
       fileTypeId=req.fileTypeId
       
-      const pool = await getLeadTimePool();
+      const pool = await getPool();
 
       let query = `  SELECT  ft.file_name, ft.file_type ,mm.sequence,ft.brand_id, mm.brandColumns,mm.columnName
             FROM mappingmaster mm
@@ -184,7 +184,7 @@ import { getLeadTimePool, getPool2 } from "../../db/db.js"
         // console.log("req ",req)
         brand_id = req.brand;
         fileTypeId=req.fileType;
-        const pool = await getLeadTimePool();
+        const pool = await getPool();
 
         let query = `  SELECT  ft.file_name, ft.file_type ,mm.sequence,ft.brand_id, mm.brandColumns,mm.columnName
                 FROM mappingmaster mm
@@ -334,7 +334,7 @@ import { getLeadTimePool, getPool2 } from "../../db/db.js"
     let  userId=req.userId;
     let  fileType = req.fileType;
       //console.log("--------",fileType)
-      let pool = await getLeadTimePool();
+      let pool = await getPool();
       let dealer,location;
       let rowCount=req.rowCount;
       let insertResponse;
@@ -540,7 +540,7 @@ import { getLeadTimePool, getPool2 } from "../../db/db.js"
       }
 
       if(brandId==32 && req.fileType=='PO'){
-        pool=await getLeadTimePool();
+        pool=await getPool();
         if(dealer && location){
         insertResponse=  await bulkJCBInsertPOData(excelData.data,pool,dealer,location,res)
         if(!insertResponse){
@@ -615,7 +615,7 @@ import { getLeadTimePool, getPool2 } from "../../db/db.js"
         
       }
     if (brandId === 20) {
-      // pool=await getLeadTimePool();
+      // pool=await getPool();
       if(dealer && location){
         insertResponse= await bulkHeroInsertData(excelData.data,pool,dealer,location,res);
         if(!insertResponse){
@@ -762,7 +762,7 @@ import { getLeadTimePool, getPool2 } from "../../db/db.js"
 
         
     }
-   let pool=await getLeadTimePool();
+   let pool=await getPool();
     
       let query1=` TRUNCATE TABLE ${tableNamePO}`
       let query2=` TRUNCATE TABLE ${tableNameMRN}`
@@ -859,7 +859,7 @@ import { getLeadTimePool, getPool2 } from "../../db/db.js"
  const getExportFileTypeData= async function (req,res) {
     try {
       // Connect to the database
-      const pool = await getLeadTimePool();
+      const pool = await getPool();
     
       // Extract values from the request object
       const {
@@ -1034,7 +1034,7 @@ import { getLeadTimePool, getPool2 } from "../../db/db.js"
 
   const getFileTypeBasedOnBrand= async function(req){
     try{
-      let pool=await getLeadTimePool();
+      let pool=await getPool();
      let brandId=parseInt(req.brand_id,10);
      // console.log(brandId)
       let query=` use [uad_bi_lead_time] Select * from FileType_Master where brandID=@brandId`;
@@ -1244,7 +1244,7 @@ const __dirname = path.dirname(__filename);
   const getUploadLogs = async function(req){
     try{
 
-      const pool=await getLeadTimePool();
+      const pool=await getPool();
       let brandId = req.brand;
       let dealerId = req?.dealer;
       let locationId = req?.location;
@@ -1476,7 +1476,7 @@ const __dirname = path.dirname(__filename);
   }
 
   const mappingExist=async function(req){
-    const pool = await getLeadTimePool();
+    const pool = await getPool();
     brand = req.brand;
     fileTypeId = req.id;
     let query = ` Select brand_id,file_type where brand_id=@brand and file_type=@fileTypeId`;
@@ -1698,7 +1698,7 @@ const createZipAndDownload = async (filePaths, res) => {
 async function insertInAuditLogs(pool,userId,dealer_id,location,brand_id,publicIp,rowCount,fileTypeId,error_status,operation){
   // console.log(rowCount)
   try{
-    pool=await getLeadTimePool();
+    pool=await getPool();
     const utcDate = new Date();
     const indiaOffset = 5.5 * 60; // IST is UTC+5:30
     const indiaTime = new Date(utcDate.getTime() + indiaOffset * 60000);
@@ -1739,7 +1739,7 @@ async function insertInAuditLogs(pool,userId,dealer_id,location,brand_id,publicI
 }
 
 async function heroLeadTimeSPOperations(pool){
-  // const pool=await getLeadTimePool();
+  // const pool=await getPool();
   const request=await pool.request();
   const res = await request.execute('sp_HeroLeadTimeOperations');
   //  console.log("Stored procedure executed successfully.",res);

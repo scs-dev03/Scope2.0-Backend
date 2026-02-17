@@ -1,6 +1,6 @@
 import { readExcel } from "../../utils/vonHelper.js";
 import fs from 'fs'
-import { getPool1 } from "../../db/db.js";
+import { getPool } from "../../db/db.js";
 import { ApiError } from "../../utils/ApiError.js";
 import sql from 'mssql'
 import { validateCommonRows, orderTypeCheck, validateAndClean, validateAndCleanVehicle, validateHeaders } from "../../utils/validator.js";
@@ -387,7 +387,7 @@ const spmMultiVehicleUpload = async (excelFile, keys) => {
 
 const partyNameCodeMapping = async (LocationId) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `
         use z_scope
         select Id , PartyName , PartyCode , LocationId from AAP_SPMPartyMaster
@@ -403,7 +403,7 @@ const partyNameCodeMapping = async (LocationId) => {
 
 const stockViewService = async (formattedData, BrandId, DealerId) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const jsonPayload = JSON.stringify(formattedData);
 
     const result = await pool.request()
@@ -422,7 +422,7 @@ const stockViewService = async (formattedData, BrandId, DealerId) => {
 
 const vehicleViewService = async (formattedData, BrandId, DealerId) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const jsonPayload = JSON.stringify(formattedData);
 
     const result = await pool.request()
@@ -439,7 +439,7 @@ const vehicleViewService = async (formattedData, BrandId, DealerId) => {
 }
 
 const partyAlreadyExistsCheck = async (data) => {
-  const pool = await getPool1();
+  const pool = await getPool();
 
   // normalize helpers
   const toVarchar = (v, max = 30) =>
@@ -534,7 +534,7 @@ const getduplicatesArray = async (arr) => {
 }
 
 const advisorAlreadyExistsCheck = async (data, tableName) => {
-  const pool = await getPool1();
+  const pool = await getPool();
 
   // --- helpers ---
   const normPhone = (v) => {
@@ -629,7 +629,7 @@ const findAdvisorOnLocation = async (
   data,
   tableName = 'dbo.AAP_SPMAdvisorMaster'  // change if your table differs
 ) => {
-  const pool = await getPool1();
+  const pool = await getPool();
 
   // --- helpers ---
   const toIntOrNull = v => (v == null ? null : Number(v));
@@ -724,7 +724,7 @@ const findAdvisorOnLocation = async (
 
 // const isPhoneEmailExists = async (phoneno, email, tableName) => {
 //   try {
-//     const pool = await getPool1()
+//     const pool = await getPool()
 //     const query = `use [z_scope] select * from ${tableName} where PhoneNo = @PhoneNo OR Email = @Email`
 
 //     const result = await pool.request()
@@ -740,7 +740,7 @@ const findAdvisorOnLocation = async (
 
 const mappingVehicleOrder = async (data) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `use z_scope
                 select Id , Name from OrderTypeMaster where Status = 1
                 select bigid , jobcart_type from Job_Card_Type where status = 1`

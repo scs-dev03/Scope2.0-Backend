@@ -16,7 +16,7 @@ const transporter = nodemailer.createTransport({
   });
 
   const  loginUser= async function(req,res){
-             pool=await getPool1();
+             pool=await getPool();
             // Check if the user exists
             const user = await findUserByUsername(pool,req.email,req.userPassword);
             if (!user) {
@@ -42,7 +42,7 @@ const transporter = nodemailer.createTransport({
             return { status: 400, data   : { error: 'Email is required.' } };
           }
       
-          const pool = await getPool1();
+          const pool = await getPool();
           let query=`SELECT emailId FROM [User] WHERE emailId = @email`;
           const result = await pool.request()
             .input('email', sql.NVarChar, email)
@@ -116,7 +116,7 @@ const transporter = nodemailer.createTransport({
           }
           const hashedPassword=password;
           // const hashedPassword = await bcrypt.hash(password, 10);
-          const pool = await getPool1();
+          const pool = await getPool();
       
           await pool.request()
             .input('email', sql.NVarChar(100), email)

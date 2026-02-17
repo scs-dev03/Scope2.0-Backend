@@ -1,9 +1,9 @@
-import { getPool1 } from "../../db/db.js"
+import { getPool } from "../../db/db.js"
 import sql from 'mssql'
 import { ApiError } from "../../utils/ApiError.js";
 
 // const insertPartNumbers = async(BrandId,data)=>{
-//     const pool = await getPool1()
+//     const pool = await getPool()
 // //     console.log(data);
 // //     const partnumbers = data.forEach(row => {
 // //         row.PartNumber,
@@ -81,7 +81,7 @@ const insertPartNumbers = async (BrandId, DealerId, userId, data) => {
 
   if (tuples.length === 0) return { inserted: 0 };
 
-  const pool = await getPool1();
+  const pool = await getPool();
 
   // Column order must match rows.add(...)
   const table = new sql.Table('dbo.NotInMaster');
@@ -100,7 +100,7 @@ const insertPartNumbers = async (BrandId, DealerId, userId, data) => {
 
 const viewNotInMasterService = async (BrandId, DealerId, LocationId, PartNumber, PartTypeId, Addedby, From, To, Status) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `
     use z_scope
     select nim.id , li.Brand , nim.BrandId, li.Dealer ,nim.DealerId, li.Location,nim.LocationId , nim.PartNumber ,nim.LatestPartNumber, nim.PartDesc , nim.MRP , nim.LandedCost , nim.MOQ , pt.Description PartType ,nim.PartTypeId, nim.Model , nim.GSTPer , nim.QtyPerVehicle , hsn.Description HSNCode ,nim.HSNID, CONCAT(amg.vcFirstName , ' ' , amg.vcLastName) Name ,nim.Addedby  , nim.DaetailsAddedby , nim.DaetailsAddedon , nim.Remarks , nim.SCSRemarks , Image
@@ -138,7 +138,7 @@ const viewNotInMasterService = async (BrandId, DealerId, LocationId, PartNumber,
 }
 
 const addNotinMasterService = async (data) => {
-  const pool = await getPool1()
+  const pool = await getPool()
   // Check existence of Id first
   const chk = await pool.request()
     .input('Id', sql.Int, Number(data.Id))
@@ -201,7 +201,7 @@ const addNotinMasterService = async (data) => {
 }
 
 const uploadNotinMasterService = async (BrandId, data, userId) => {
-  const pool = await getPool1();
+  const pool = await getPool();
   const tx = new sql.Transaction(pool);
 
   // helpers
@@ -332,7 +332,7 @@ const uploadNotinMasterService = async (BrandId, data, userId) => {
 
 const mappingParttypeHSNCode = async (data) => {
   try {
-    const pool = await getPool1()
+    const pool = await getPool()
     const query = `use z_scope
                 select * from PartTypeMaster
                 select tCode , Description from HSNMaster`
@@ -428,7 +428,7 @@ const mappingParttypeHSNCode = async (data) => {
 
 const adminActionService = async (Id, Status, Approvedby, Remarks) => {
  try {
-   const pool = await getPool1()
+   const pool = await getPool()
    if (Status == 2) {
      const result = await pool.request()
        .input('Id', sql.Int, Id)

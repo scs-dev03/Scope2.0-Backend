@@ -1,5 +1,5 @@
 // import sql from 'mssql'
-// import {getPool2} from '../db/db.js'
+// import {getPool} from '../db/db.js'
 // import { readExcel } from '../utils/vonHelper.js'
 // import fs from 'fs'
 
@@ -8,7 +8,7 @@
 // const partDetails = async(req,res)=>{
 
 //     try {
-//         const pool =  getPool2()
+//         const pool =  getPool()
 //         const {Brandid,Partnumber,excel}=req.body
 
 //         if (!Brandid || !excel) {
@@ -97,7 +97,7 @@
 // }
 // // const getLedgerbyPartid = async (req, res) => {
 // //     try {
-// //         const pool = getPool2();
+// //         const pool = getPool();
 // //         const { Dealerid, Locationid, Partid, from, to , excel} = req.body;
 // //         // console.log(Partid);
 
@@ -157,7 +157,7 @@
 // // };
 
 // const getLedger = async (req, res) => {
-//     const pool = await getPool2();
+//     const pool = await getPool();
 //     const {Brandid, Dealerid, Locationid, PartNumber, from, to, excel } = req.body;
 
 //     let partnumbers = [];
@@ -258,7 +258,7 @@
 
 //   const partBrandMappingCheck = async (Brandid, Data) => {
 //     try {
-//       const pool = await getPool2();
+//       const pool = await getPool();
 //       const partBrandMappingQuery = `USE z_scope; SELECT brandid, partnumber FROM Part_Master WHERE brandid = ${Brandid}`;
 //       const partBrandMappingResult = await pool.request().query(partBrandMappingQuery);
 
@@ -282,7 +282,7 @@
 
 // export {partDetails,getLedger}
 
-import { getPool1, getPool2 } from '../db/db.js';
+import { getPool } from '../db/db.js';
 import { readExcel } from '../utils/vonHelper.js';
 import fs from 'fs';
 
@@ -292,7 +292,7 @@ import fs from 'fs';
  */
 const partDetails = async (req, res) => {
   try {
-    const pool = getPool2();
+    const pool = getPool();
     const { Brandid, Partnumber, excel } = req.body;
 
     if (!Brandid || !excel) {
@@ -414,7 +414,7 @@ const partDetails = async (req, res) => {
  * Supports reading from body or Excel file
  */
 const getLedger = async (req, res) => {
-  const pool = await getPool2();
+  const pool = await getPool();
   const { Brandid, Dealerid, Locationid, PartNumber, from, to, excel } = req.body;
   if(!Brandid || !Dealerid || !Locationid == null || !from || !to || !excel){
     return res.status(400).json({message:`All Fields are required`})
@@ -548,7 +548,7 @@ const getLedger = async (req, res) => {
   }
 };
 const getPartsAndLedger = async (req, res) => {
-  const pool = await getPool2();
+  const pool = await getPool();
   const {
     Brandid,
     Dealerid,
@@ -694,7 +694,7 @@ const partBrandMappingCheck = async (Brandid, Data) => {
   try {
     // console.log(Data);
 
-    const pool = await getPool2();
+    const pool = await getPool();
     const query = `
       USE z_scope;
       SELECT brandid, partnumber FROM z_scope.dbo.Part_Master WHERE brandid = ${Brandid}
