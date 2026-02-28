@@ -1388,7 +1388,7 @@ const maxpartmapping = async (partNumber, BrandId , DealerId, LocationId) => {
         where brandid = @brandid and (partnumber1 = @partnumber or subpartnumber1 = @partnumber)
 
 		insert into @Part(partnumber)
-        select partnumber1  from substitution_master (nolock) where brandid = 9 and subpartnumber1= @latestpart
+        select partnumber1  from substitution_master (nolock) where brandid = @brandid and subpartnumber1= @latestpart
         union 
         select ISNULL(@latestpart,@partnumber) 
         ;with data as (
