@@ -100,7 +100,7 @@ const userView = async (req, res) => {
             return res.status(400).json({ Error: `Dealerid and Brandid is a required Parameter` })
         }
         if (partnumber) {
-            const Check = await maxpartmapping(partnumber, dealerid, locationid)
+            const Check = await maxpartmapping(partnumber,brandid, dealerid, locationid)
             if (Check == false) {
                 return res.status(400).json({ message: `No Sales in 12 Month for this part` })
             }
@@ -322,7 +322,7 @@ const adminView = async (req, res) => {
              if(!dealerid || !locationid){
                 return res.status(400).json({message : `dealerid and locationid are required when searching a part`})
             }
-            const Check = await maxpartmapping(partnumber, dealerid, locationid)
+            const Check = await maxpartmapping(partnumber,brandid, dealerid, locationid)
             if (Check == false) {
                 return res.status(400).json({ message: `No Sales in 12 Month for this part` })
             }
@@ -598,7 +598,7 @@ const adminPendingView = async (req, res) => {
             if(!dealerid || !locationid){
                 return res.status(400).json({message : `Dealer and Location are required when searching a part`})
             }
-            const Check = await maxpartmapping(partnumber, dealerid, locationid)
+            const Check = await maxpartmapping(partnumber,brandid, dealerid, locationid)
             // console.log(Check);
 
             if (Check == false) {
@@ -1369,18 +1369,39 @@ const adminUpload = async (req, res) => {
 
 }
 
-const maxpartmapping = async (partNumber, DealerId, LocationId) => {
+const maxpartmapping = async (partNumber, BrandId , DealerId, LocationId) => {
     const pool = await getPool()
     // const query = `select * from z_scope..stockable_nonstockable_td001_${DealerId} where locationid = ${LocationId} and partnumber1 = '${partNumber}' and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${DealerId} where locationid = ${LocationId})`
-    const query = `with data as (
+    // const query = `with data as (
+    //                 select locationid , MAX(Stockdate)Stockdate from z_scope..stockable_nonstockable_td001_${DealerId} where Addedby !=7
+    //                 group by Locationid
+    //                 )
+    //                 select * from z_scope..stockable_nonstockable_td001_${DealerId} sn
+    //                 join data d on d.Locationid = sn.Locationid and d.Stockdate = sn.Stockdate
+    //                 where partnumber1 = '${partNumber}' and d.LocationId = ${LocationId}`
+
+    const query = `
+    use z_scope
+        DECLARE @Part TABLE (partnumber varchar(30))
+        declare @latestpart varchar(20) 
+        select @latestpart = subpartnumber1 from Substitution_Master (nolock)
+        where brandid = @brandid and (partnumber1 = @partnumber or subpartnumber1 = @partnumber)
+
+		insert into @Part(partnumber)
+        select partnumber1  from substitution_master (nolock) where brandid = 9 and subpartnumber1= @latestpart
+        union 
+        select ISNULL(@latestpart,@partnumber) 
+        ;with data as (
                     select locationid , MAX(Stockdate)Stockdate from z_scope..stockable_nonstockable_td001_${DealerId} where Addedby !=7
                     group by Locationid
                     )
-                    select * from z_scope..stockable_nonstockable_td001_${DealerId} sn
-                    join data d on d.Locationid = sn.Locationid and d.Stockdate = sn.Stockdate
-                    where partnumber1 = '${partNumber}'`
+        select * from z_scope..stockable_nonstockable_td001_${DealerId} sn
+        join data d on d.Locationid = sn.Locationid and d.Stockdate = sn.Stockdate
+        JOIN @Part p on p.partnumber = sn.partnumber1
+        where d.Locationid = @locationid
+    `
 
-    const result = await pool.request().query(query)
+    const result = await pool.request().input('brandid',sql.Int,BrandId).input('partnumber',sql.VarChar,partNumber).input('locationid',sql.Int,LocationId).query(query)
     // console.log(query);
     
     if (result.recordset.length === 0) {
