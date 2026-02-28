@@ -526,9 +526,18 @@ const partwisePPNIValue = async (req, res) => {
             })
         }
         const data = await partwisePPNIValueService(dealerid, locationid, jobcardstatus, nonstockable, advisor, vehicleno, month)
+       // 23 Feb 2026 
+       // If data is empty return ""Parts Are Not In Stock""  
+       // By Harish Sir on Mail
+        if(data.recordset.length == 0){
+            res.status(204).json({
+            Data: data.recordset,
+            message:"Parts Are Not In Stock"
+        })
+        }else{
         res.status(200).json({
             Data: data.recordset
-        })
+        })}
     } catch (error) {
         await ErrorLog("PartWise PPNI",error.message,req.body.userId)
         res.status(500).json({
