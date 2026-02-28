@@ -3,51 +3,6 @@ import sql from 'mssql'
 import { checkGroupSetting } from "./dashboardscheduleHelper.js";
 
 
-// const refreshSI = async(dealerid,reqid)=>{
-//    // console.log(dealerid , reqid);
-
-//    try {
-//       const pool = await getPool()
-//             const today = new Date();
-//             const year = today.getMonth() === 0 ? today.getFullYear() - 1 : today.getFullYear();
-//             const month = today.getMonth() === 0 ? 11 : today.getMonth() - 1;
-//             const firstDayLastMonth = new Date(year, month, 1);
-//             // 
-//             // Format date properly in YYYY-MM-DD format
-//             const date = firstDayLastMonth.toLocaleDateString('en-CA'); // en-CA gives YYYY-MM-DD format
-//             // console.log(typeof(date),date)
-
-//             // console.log(date); //  outputs like "2025-01-01"
-//             let query = ` exec [UAD_BI_SI].[dbo].uad_si_report_3 '${dealerid}','${date}'`
-
-//           const result =  await pool.request().query(query)
-//           console.log(`Data Refreshing SI for reqid: ${reqid} at ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`);
-
-//       let Check =  isDataRefreshed(result.recordset[0])
-
-//       //Data Refresh Done Successfully
-//       if(Check){
-//          query = `use [UAD_BI] Update SBS_DBS_ScheduledDashboard set status = 3 where reqid = @reqid`
-//          await pool.request().input('reqid',sql.Int,reqid).query(query)
-//       }
-//    } 
-//    // if SP fails then error is catched in catch block and then status = 2 (Data Refresh Failed) is updated here 
-//    catch (error) {
-//       console.error("Error refreshing SI:", error.message);
-//       // Handle the failure scenario: update status to 2
-//       try {
-//         const pool = await getPool();
-//         let query = `use [UAD_BI] Update SBS_DBS_ScheduledDashboard set status = 2 where reqid = @reqid`;
-//         await pool.request().input('reqid', sql.Int, reqid).query(query);
-
-//         query = `use [UAD_BI] Insert into SBS_DBS_ErrorLog (reqid,Reason,addedon) values(@reqid,@error,GETDATE())`
-//       await pool.request().input('reqid', sql.Int, reqid).input('error', sql.VarChar, error.message).query(query);
-//       } catch (updateError) {
-//         console.error("Error updating SBS_DBS_ScheduledDashboard:", updateError.message);
-//       }
-//     }
-// }
-
 const refreshSI = async (dealerid, reqid) => {
   try {
     const pool = await getPool();
@@ -58,12 +13,13 @@ const refreshSI = async (dealerid, reqid) => {
 
     let query = `exec [UAD_BI_SI].[dbo].uad_si_report_GT '${dealerid}','${date}'`;
     const result = await pool.request().query(query);
-
+    // console.log(result);
+    
     console.log(`Data Refreshing SI for reqid: ${reqid} at ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`);
 
-    const record = result.recordset[0];
-    const Check = isDataRefreshed(record);
-    console.log("SP Output:", record, "| isDataRefreshed:", Check);
+    // const record = result.recordset[0];
+    const Check = isSIDataRefreshed(result);
+    console.log("SP Output:", result.recordset[0], "| isSIDataRefreshed:", Check);
 
     query = `use [UAD_BI] Update SBS_DBS_ScheduledDashboard set status = @status where reqid = @reqid`;
     const status = Check ? 3 : 2;
@@ -81,15 +37,15 @@ const refreshSI = async (dealerid, reqid) => {
         .query(errQuery);
     }
 
-  } catch (error) {
-    console.error("Error refreshing SI:", error.message);
+  } catch (err) {
+    console.error("Error refreshing SI:", err.message);
     try {
       const pool = await getPool();
       const query = `use [UAD_BI] Update SBS_DBS_ScheduledDashboard set status = 2 where reqid = @reqid`;
       await pool.request().input('reqid', sql.Int, reqid).query(query);
 
       const errLog = `use [UAD_BI] Insert into SBS_DBS_ErrorLog (reqid, Reason, addedon) values (@reqid, @error, GETDATE())`;
-      await pool.request().input('reqid', sql.Int, reqid).input('error', sql.VarChar, error.message).query(errLog);
+      await pool.request().input('reqid', sql.Int, reqid).input('error', sql.VarChar, err.message).query(errLog);
     } catch (updateError) {
       console.error("Error updating SBS_DBS_ScheduledDashboard:", updateError.message);
     }
@@ -127,6 +83,7 @@ const refreshBenchmarking = async (dealerid, reqid) => {
     }
   }
 }
+
 const refreshCID = async (dealerid, reqid) => {
   try {
     const pool = await getPool()
@@ -164,6 +121,7 @@ const refreshCID = async (dealerid, reqid) => {
     }
   }
 }
+
 const refreshPPNI = async (brandid, dealerid, reqid) => {
   try {
     const pool = await getPool()
@@ -191,6 +149,7 @@ const refreshPPNI = async (brandid, dealerid, reqid) => {
     }
   }
 }
+
 const refreshSpecialList = async (reqid) => {
   try {
     const pool = await getPool()
@@ -203,6 +162,7 @@ const refreshSpecialList = async (reqid) => {
     console.error("Error refreshing spl:", error.message);
   }
 }
+
 const refreshGainerMini = async (reqid) => {
   try {
     const pool = await getPool()
@@ -215,6 +175,7 @@ const refreshGainerMini = async (reqid) => {
     console.error("Error refreshing GainerMini:", error.message);
   }
 }
+
 const refreshTOPS = async (dealerid, reqid) => {
   try {
     const pool = await getPool()
@@ -222,6 +183,10 @@ const refreshTOPS = async (dealerid, reqid) => {
     //   const test = `use uad_bi select * from BackupTbl`
     const result = await pool.request().input('dealerid', sql.Int, dealerid).query(query)
     console.log(`Data Refreshing TOPS for reqid: ${reqid} at ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}`)
+    if (result.recordset[0].Status =='No Update') {
+      query = `use [UAD_BI] Update SBS_DBS_ScheduledDashboard set status = 7 where reqid = @reqid`
+      await pool.request().input('reqid', sql.Int, reqid).query(query)
+    }
     let Check = isDataRefreshed(result.recordset[0])
     //Data Refresh Done Successfully
     if (Check) {
@@ -229,7 +194,7 @@ const refreshTOPS = async (dealerid, reqid) => {
       await pool.request().input('reqid', sql.Int, reqid).query(query)
     }
   } catch (error) {
-    console.error("Error refreshing Benchmarking:", error.message);
+    console.error("Error refreshing TOPS:", error.message);
     // Handle the failure scenario: update status to 2
     try {
       const pool = await getPool();
@@ -254,7 +219,7 @@ function isDataRefreshed(result) {
 }
 
 function isSIDataRefreshed(result) {
-  if (result === `{ '': 'Success' }`) {
+  if (result.recordset[0].Status =='Success') {
     return true;
   }
   else {
@@ -277,7 +242,7 @@ const refreshGSI = async (dealerid, reqid) => {
 
     const record = result.recordset[0];
     const Check = isDataRefreshed(record);
-    console.log("SP Output:", record, "| isDataRefreshed:", Check);
+    console.log("GSI Output:", record, "| isDataRefreshed:", Check);
 
     query = `use [UAD_BI] Update SBS_DBS_ScheduledDashboard set status = @status where reqid = @reqid`;
     const status = Check ? 3 : 2;
@@ -309,19 +274,6 @@ const refreshGSI = async (dealerid, reqid) => {
     }
   }
 }
-// function isDataRefreshed(result) {
-//   return result && result.Success === 1;
-// }
-// function isDataRefreshed(result) {
-//   if (!result) return false;
-
-//   if (result.status === 'Success' || result.Success === 1) {
-//     return true;
-//   }
-
-//   console.warn("Unexpected result from SP:", result);
-//   return false;
-// }
 
 
 export { refreshGSI, refreshSI, refreshBenchmarking, refreshCID, refreshPPNI, refreshTOPS, refreshSpecialList, refreshGainerMini }

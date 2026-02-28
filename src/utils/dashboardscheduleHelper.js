@@ -38,7 +38,7 @@ const query = `WITH data AS (
   SELECT li.locationid, dsm.NonMovingSale
   FROM z_scope.dbo.Dealer_Setting_Master dsm -- Direct server reference
   JOIN z_scope.dbo.locationinfo li ON li.LocationID = dsm.locationid
-  WHERE dsm.dealerid = @dealerid AND li.Status = 1 and li.OgsStatus = 1
+  WHERE dsm.dealerid = @dealerid AND li.Status = 1 and li.OgsStatus = 1 and li.LocationID not in (select  LocationID from locationinfo where ((location like '%CW' ) OR (location like '%NTC' )) and dealerid = @dealerid)
 )
 SELECT li.location, d.NonMovingSale
 FROM data d
@@ -137,29 +137,6 @@ return false;
     throw error;
   }
 };
-// const checkisAlreadyScheduled = async(dashboardcode, brandid, dealerid,scheduledon)=>{
-//   console.log(`hi2`);
-  
-//   const pool = await getPool()
-//   const query = `use [UAD_BI]
-//     SELECT 
-//     CASE WHEN DATEDIFF(MONTH, scheduledon, ${scheduledon}) = 1 and status in (5, 6)THEN 'Yes' ELSE 'No' END AS Result
-//     FROM SBS_DBS_ScheduledDashboard 
-//    WHERE dashboardcode = ${dashboardcode} AND dealerid = ${dealerid} AND brandid = ${brandid};`
-   
-//    const result = await pool.request().query(query)
-//    console.log(`hi3`);
-//    console.log(result);
-//    const abc = result.recordset.result
-//    console.log(result.recordset);
-   
-//    if(abc == "No"){
-//     return true
-//    }
-//    else{
-//     return false
-//    }
-// }
 
 // Checking User is Authorised to Perform Actions or not 
 const checkisUserValid = async(addedby)=>{
@@ -201,8 +178,6 @@ const checkisMappingExists = async (dashboardcode,dealerid)=>{
                     .input('dealerid',sql.Int,dealerid)
                     .input('dashboardcode',sql.Int,dashboardcode)
                     .query(query)
-    // const dashboardcode = result.recordset.dashboardcode
-    // const dealerid = result.recordset.dealerid
     if (dashboardcode == result.recordset.dashboardcode && dealerid == result.recordset.dealerid){
       return false
     }

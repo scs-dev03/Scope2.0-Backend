@@ -254,7 +254,7 @@ const uploadSchedule = async (req, res) => {
     if (isUserValid) {
       let parsedDashboardCodes;
       try {
-        parsedDashboardCodes = JSON.parse(JSON.stringify(dashboardcodes)); // Ensure it's a proper array
+        parsedDashboardCodes = JSON.parse(JSON.stringify(dashboardcodes)); 
         if (!Array.isArray(parsedDashboardCodes) || parsedDashboardCodes.length === 0) {
           throw new Error("Invalid dashboardcodes format.");
         }
