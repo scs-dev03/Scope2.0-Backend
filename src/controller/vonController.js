@@ -1,9 +1,8 @@
 import { getPool } from '../db/db.js'
 import sql from 'mssql'
 import fs from 'fs'
-import { partBrandCheck, readExcel, insertData, findLocationPartidDuplicates, checkPendingFeedbackAndStatus, findLocationPartidDuplicatesAdmin, insertAdminFeedback, checkReviewedFeedbackByBrand, statusCheck, invalidRemarks , invalidUserRemarks } from '../utils/vonHelper.js'
-import { partfamilySaleservice } from '../services/norms-management/utils.service.js'
-
+import { partBrandCheck, readExcel, insertData, findLocationPartidDuplicates, checkPendingFeedbackAndStatus, findLocationPartidDuplicatesAdmin, insertAdminFeedback, checkReviewedFeedbackByBrand, statusCheck, invalidRemarks , invalidUserRemarks, cleanPartNumber } from '../utils/vonHelper.js'
+import { MotherChildFamilySaleservice } from '../services/norms-management/utils.service.js'
 
 
 const remarkMaster = async (req, res) => {
@@ -99,12 +98,14 @@ const userView = async (req, res) => {
         if (!dealerid && !brandid) {
             return res.status(400).json({ Error: `Dealerid and Brandid is a required Parameter` })
         }
+        let cleanPart = "";
         if (partnumber) {
-            const Check = await maxpartmapping(partnumber,brandid, dealerid, locationid)
+            cleanPart = cleanPartNumber(partnumber)
+            const Check = await maxpartmapping(cleanPart,brandid, dealerid, locationid)
             if (Check == false) {
                 return res.status(400).json({ message: `No Sales in 12 Month for this part` })
             }
-            const flagCheck = await partflagCheck(partnumber, dealerid, locationid, flag)
+            const flagCheck = await partflagCheck(cleanPart, dealerid, locationid, flag)
             // console.log(flagCheck);
             if (flagCheck == false) {
                 return res.status(400).json({ message: `Please choose correct filter` })
@@ -112,8 +113,8 @@ const userView = async (req, res) => {
 
         }
         const query = `exec [z_scope].dbo.GetMAXData1 @brandid, @dealerid , @r1, @r2, @l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@parttype;`
-
-        if (!partnumber && !locationid) {
+        
+        if (!cleanPart && !locationid) {
             return res.status(400).json({ Error: `partnumber or locationid is required` })
         }
         const request = pool.request();
@@ -128,13 +129,13 @@ const userView = async (req, res) => {
         request.input('seasonalid', sql.Int, seasonalid ?? null);
         request.input('natureid', sql.Int, natureid ?? null);
         request.input('modelid', sql.Int, modelid ?? null);
-        request.input('partnumber', sql.VarChar, partnumber ?? null);
+        request.input('partnumber', sql.VarChar, cleanPart ?? null);
         request.input('locationid', sql.Int, locationid ?? null);
         request.input('maxvalueflag', sql.Int, flag ?? null);
         request.input('parttype', sql.Int, parttype ?? null);
 
         const result = await request.query(query);
-        // console.log(result.recordset[0]);
+        // console.log(result.recordset);
 
         res.status(200).json({ Data: result.recordset })
     } catch (error) {
@@ -313,28 +314,32 @@ const adminView = async (req, res) => {
     try {
         const pool = await getPool()
         const { brandid, dealerid, r1, r2, l1, l2, partnumber, locationid, flag, seasonalid, modelid, natureid, status, parttype, pageno, pagesize } = req.body
-        // console.log(brandid, dealerid, r1, r2 ,l1,l2, partnumber , locationid , flag, seasonalid, modelid, natureid, status,parttype);
+        // console.log(brandid, dealerid, r1, r2 ,l1,l2, partnumber , locationid , flag, seasonalid, modelid, natureid, status,parttype, pageno, pagesize);
+        let cleanPart = null;
 
         if (!brandid || !dealerid || !pageno || !pagesize) {
             return res.status(400).json({ Error: `Brandid and Dealerid are required Parameter` })
         }
         if (partnumber) {
-             if(!dealerid || !locationid){
-                return res.status(400).json({message : `dealerid and locationid are required when searching a part`})
+             if(!dealerid){
+                return res.status(400).json({message : `Dealer Is required when searching a part`})
             }
-            const Check = await maxpartmapping(partnumber,brandid, dealerid, locationid)
+        //  cleanPart = cleanPartNumber(partnumber)
+         cleanPart = partnumber ? cleanPartNumber(partnumber) : null;
+
+            const Check = await maxpartmapping(cleanPart,brandid, dealerid, locationid)
             if (Check == false) {
                 return res.status(400).json({ message: `No Sales in 12 Month for this part` })
             }
-            const flagCheck = await partflagCheck(partnumber, dealerid, locationid, flag)
+            const flagCheck = await partflagCheck(cleanPart, dealerid, locationid, flag)
             // console.log(flagCheck);
             if (flagCheck == false) {
                 return res.status(400).json({ message: `Please choose correct filter` })
             }
         }
+        // const query = `use z_scope EXEC sp_MAXAdminView @brandid ,@dealerid ,@locationid ,@seasonalid ,@natureid ,@modelid,@PartNumber,@r1 ,@r2,@l1,@l2 ,@MaxValueFlag,@parttype,@pageno,@pagesize;`
         // const query = `exec [z_scope].dbo.GetMAXDataAdmin @brandid,@dealerid , @r1, @r2,@l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@status,@parttype;`
         // console.log(query);
-        const query = `use z_scope EXEC sp_MAXAdminView @brandid ,@dealerid ,@locationid ,@seasonalid ,@natureid ,@modelid,@PartNumber,@r1 ,@r2,@l1,@l2 ,@MaxValueFlag,@parttype,@pageno,@pagesize;`
 
         // if (!partnumber && !locationid) {
         //     return res.status(400).json({ Error: `partnumber or locationid is required` })
@@ -342,26 +347,42 @@ const adminView = async (req, res) => {
 
         const request = pool.request();
 
-        // Handle potential NULL values correctly
-        request.input('brandid', sql.Int, brandid)
-        request.input('dealerid', sql.Int, dealerid)
-        request.input('pageno', sql.Int, pageno)
-        request.input('pagesize', sql.Int, pagesize)
-        request.input('r1', sql.Int, r1 ?? null);
-        request.input('r2', sql.Int, r2 ?? null);
-        request.input('l1', sql.Int, l1 ?? null);
-        request.input('l2', sql.Int, l2 ?? null);
-        request.input('seasonalid', sql.Int, seasonalid ?? null);
-        request.input('natureid', sql.Int, natureid ?? null);
-        request.input('modelid', sql.Int, modelid ?? null);
-        request.input('partnumber', sql.VarChar, partnumber ?? null);
-        request.input('locationid', sql.Int, locationid ?? null);
-        request.input('maxvalueflag', sql.Int, flag ?? null);
-        request.input('status', sql.Bit, status ?? null);
-        request.input('parttype', sql.Bit, parttype ?? null);
+        // // Handle potential NULL values correctly
+        // request.input('brandid', sql.Int, brandid)
+        // request.input('dealerid', sql.Int, dealerid)
+        // request.input('pageno', sql.Int, pageno)
+        // request.input('pagesize', sql.Int, pagesize)
+        // request.input('r1', sql.Int, r1 ?? null);
+        // request.input('r2', sql.Int, r2 ?? null);
+        // request.input('l1', sql.Int, l1 ?? null);
+        // request.input('l2', sql.Int, l2 ?? null);
+        // request.input('seasonalid', sql.Int, seasonalid ?? null);
+        // request.input('natureid', sql.Int, natureid ?? null);
+        // request.input('modelid', sql.Int, modelid ?? null);
+        // request.input('PartNumber', sql.VarChar, cleanPart);
+        // request.input('locationid', sql.Int, locationid ?? null);
+        // request.input('MaxValueFlag', sql.Int, flag ?? null);
+        // request.input('parttype', sql.Bit, parttype ?? null);
 
-        const result = await request.query(query);
-        // console.log(result.recordset[0]);
+        const result = await pool.request()
+    .input('brandid', sql.Int, brandid)
+    .input('dealerid', sql.Int, dealerid)
+    .input('locationid', sql.Int, locationid ?? null)
+    .input('seasonalid', sql.Int, seasonalid ?? null)
+    .input('natureid', sql.Int, natureid ?? null)
+    .input('modelid', sql.Int, modelid ?? null)
+    .input('PartNumber', sql.VarChar, cleanPart)
+    .input('r1', sql.Int, r1 ?? null)
+    .input('r2', sql.Int, r2 ?? null)
+    .input('l1', sql.Int, l1 ?? null)
+    .input('l2', sql.Int, l2 ?? null)
+    .input('MaxValueFlag', sql.Int, flag ?? null)
+    .input('parttype', sql.Bit, parttype ?? null)
+    .input('pageno', sql.Int, pageno)
+    .input('pagesize', sql.Int, pagesize)
+    .execute('z_scope.dbo.sp_MAXAdminView');
+        // const result = await request.query(query);
+        // console.log(result.recordset);
 
         res.status(200).json({ Data: result.recordset })
     } catch (error) {
@@ -509,6 +530,7 @@ EXEC sp_executesql @sql;`
         res.status(500).json({ Error: error.message })
     }
 }
+
 const partFamilySale = async (req, res) => {
     try {
         // const pool = await getPool()
@@ -516,13 +538,14 @@ const partFamilySale = async (req, res) => {
         if (!partnumber || !brandid || !dealerid || !locationid) {
             return res.status(400).json({ message: `All fields are required` })
         }
-        const data = await partfamilySaleservice(brandid, dealerid, locationid, partnumber)
+        const data = await MotherChildFamilySaleservice(brandid, dealerid, locationid, partnumber)
         res.status(200).json({ Data: data.recordset })
     } catch (error) {
         res.status(500).json({ Error: error.message })
     }
 
 }
+
 // const adminPendingView = async (req, res) => {
 //     try {
 //         const pool = await getPool()
@@ -573,10 +596,10 @@ const adminPendingView = async (req, res) => {
             l1,
             l2,
             flag,
-            parttype
+            parttype,
+            exportFlag
         } = req.body;
 
-        // Ensure proper typing
         brandid = Number(brandid);
         dealerid = dealerid !== null ? Number(dealerid) : null;
         locationid = locationid !== null ? Number(locationid) : null;
@@ -594,57 +617,80 @@ const adminPendingView = async (req, res) => {
         if (!brandid) {
             return res.status(400).json({ message: `Brandid is required` });
         }
+        let cleanPart = null;
         if (partnumber) {
-            if(!dealerid || !locationid){
-                return res.status(400).json({message : `Dealer and Location are required when searching a part`})
+            if(!dealerid){
+                return res.status(400).json({message : `Dealer Is required when searching a part`})
             }
-            const Check = await maxpartmapping(partnumber,brandid, dealerid, locationid)
+            // cleanPart = cleanPartNumber(partnumber)
+            cleanPart = partnumber ? cleanPartNumber(partnumber) : null;
+            const Check = await maxpartmapping(cleanPart,brandid, dealerid, locationid)
             // console.log(Check);
 
             if (Check == false) {
                 return res.status(400).json({ message: `No Sales in 12 Month for this part` })
             }
-            const flagCheck = await partflagCheck(partnumber, dealerid, locationid, flag)
+            const flagCheck = await partflagCheck(cleanPart, dealerid, locationid, flag)
             // console.log(flagCheck);
             if (flagCheck == false) {
                 return res.status(400).json({ message: `Please choose correct MAX filter` })
             }
         }
-        const query = `
-            USE [UAD_VON]
-            EXEC sp_GetAdminView3 
-                @brandid = @brandid,
-                @dealerid = @dealerid,
-                @locationid = @locationid,
-                @Status = @status,
-                @seasonalid = @seasonalid,
-                @natureid = @natureid,
-                @modelid = @modelid,
-                @PartNumber = @PartNumber,
-                @r1 = @r1,
-                @r2 = @r2,
-                @l1 = @l1,
-                @l2 = @l2,
-                @MaxValueFlag = @MaxValueFlag,
-                @parttype = @parttype;
-        `;
+
+        // const query = `
+        //     USE [UAD_VON]
+        //     EXEC sp_GetAdminView4 
+        //         @brandid = @brandid,
+        //         @dealerid = @dealerid,
+        //         @locationid = @locationid,
+        //         @Status = @status,
+        //         @seasonalid = @seasonalid,
+        //         @natureid = @natureid,
+        //         @modelid = @modelid,
+        //         @PartNumber = @PartNumber,
+        //         @r1 = @r1,
+        //         @r2 = @r2,
+        //         @l1 = @l1,
+        //         @l2 = @l2,
+        //         @MaxValueFlag = @MaxValueFlag,
+        //         @parttype = @parttype;
+        // `;
+        // console.log(query);
+        
+        // const result = await pool.request()
+        //     .input('brandid', sql.Int, brandid)
+        //     .input('dealerid', sql.Int, dealerid)
+        //     .input('locationid', sql.Int, locationid)
+        //     .input('status', sql.Bit, status)
+        //     .input('seasonalid', sql.Int, seasonalid)
+        //     .input('natureid', sql.Int, natureid)
+        //     .input('modelid', sql.Int, modelid)
+        //     .input('PartNumber', sql.VarChar(50), cleanPart)
+        //     .input('r1', sql.Decimal(10, 2), r1)
+        //     .input('r2', sql.Decimal(10, 2), r2)
+        //     .input('l1', sql.Decimal(10, 2), l1)
+        //     .input('l2', sql.Decimal(10, 2), l2)
+        //     .input('MaxValueFlag', sql.Int, flag)
+        //     .input('parttype', sql.Int, parttype)
+        //     .query(query);
 
         const result = await pool.request()
-            .input('brandid', sql.Int, brandid)
-            .input('dealerid', sql.Int, dealerid)
-            .input('locationid', sql.Int, locationid)
-            .input('status', sql.Bit, status)
-            .input('seasonalid', sql.Int, seasonalid)
-            .input('natureid', sql.Int, natureid)
-            .input('modelid', sql.Int, modelid)
-            .input('PartNumber', sql.VarChar(50), partnumber)
-            .input('r1', sql.Decimal(10, 2), r1)
-            .input('r2', sql.Decimal(10, 2), r2)
-            .input('l1', sql.Decimal(10, 2), l1)
-            .input('l2', sql.Decimal(10, 2), l2)
-            .input('MaxValueFlag', sql.Int, flag)
-            .input('parttype', sql.Int, parttype)
-            .query(query);
+    .input('brandid', sql.Int, brandid)
+    .input('dealerid', sql.Int, dealerid)
+    .input('locationid', sql.Int, locationid ?? null)
+    .input('Status', sql.Bit, status ?? null)
+    .input('seasonalid', sql.Int, seasonalid ?? null)
+    .input('natureid', sql.Int, natureid ?? null)
+    .input('modelid', sql.Int, modelid ?? null)
+    .input('PartNumber', sql.VarChar(50), cleanPart ?? null)
+    .input('r1', sql.Decimal(10, 2), r1 ?? null)
+    .input('r2', sql.Decimal(10, 2), r2 ?? null)
+    .input('l1', sql.Decimal(10, 2), l1 ?? null)
+    .input('l2', sql.Decimal(10, 2), l2 ?? null)
+    .input('MaxValueFlag', sql.Int, flag ?? null)
+    .input('parttype', sql.Int, parttype ?? null)
+    .input('exportFlag',sql.Bit , exportFlag )
+    .execute('UAD_VON.dbo.sp_GetAdminView4');
 
         res.status(200).json({ Data: result.recordset });
     } catch (error) {
@@ -1398,11 +1444,11 @@ const maxpartmapping = async (partNumber, BrandId , DealerId, LocationId) => {
         select * from z_scope..stockable_nonstockable_td001_${DealerId} sn
         join data d on d.Locationid = sn.Locationid and d.Stockdate = sn.Stockdate
         JOIN @Part p on p.partnumber = sn.partnumber1
-        where d.Locationid = @locationid
-    `
+        where @locationid IS NULL OR d.locationid = @locationid`
 
     const result = await pool.request().input('brandid',sql.Int,BrandId).input('partnumber',sql.VarChar,partNumber).input('locationid',sql.Int,LocationId).query(query)
     // console.log(query);
+    // console.log("maxresult",result.recordset);
     
     if (result.recordset.length === 0) {
         return false
@@ -1428,7 +1474,7 @@ const partflagCheck = async (partnumber, dealerid, locationid, flag) => {
         result = await pool.request().query(queryflagzero)
         // console.log(2,result.recordset);
     }
-    // console.log(result);
+    console.log('flagCheck',result);
 
     if (result.recordset.length === 0) {
         return false

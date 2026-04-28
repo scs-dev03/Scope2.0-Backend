@@ -480,5 +480,16 @@ function invalidUserRemarks(cleanedData) {
   return invalidRemarks;
 }
 
+function cleanPartNumber(partNo) {
+    if (!partNo) return "";
 
-export { invalidUserRemarks, invalidRemarks, partBrandCheck, readExcel, insertData, insertAdminFeedback, findLocationPartidDuplicates, checkPendingFeedbackAndStatus, findLocationPartidDuplicatesAdmin, checkReviewedFeedbackByBrand, statusCheck }
+    // Remove non ASCII characters first
+    partNo = partNo.replace(/[^\x00-\x7F]/g, "");
+
+    // Remove all special characters (keep only alphanumeric)
+    partNo = partNo.replace(/[^a-zA-Z0-9]/g, "");
+  
+    return partNo.trim();
+}
+
+export { cleanPartNumber , invalidUserRemarks, invalidRemarks, partBrandCheck, readExcel, insertData, insertAdminFeedback, findLocationPartidDuplicates, checkPendingFeedbackAndStatus, findLocationPartidDuplicatesAdmin, checkReviewedFeedbackByBrand, statusCheck }

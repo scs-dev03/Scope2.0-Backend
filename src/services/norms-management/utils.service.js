@@ -14,6 +14,22 @@ const partfamilySaleservice = async (brandid,dealerid,locationid,partnumber) => 
 }
 
 
+ const MotherChildFamilySaleservice = async (brandid,dealerid,locationid,partnumber) => {
+    try {
+        // console.log(brandid,dealerid,locationid,partnumber);
+        
+        const pool = await getPool()
+        // const query = `use [z_scope] EXEC sp_MotherChildFamilySales_VB '${partnumber}',${brandid},${dealerid},${locationid}`
+        // Logic changed by Harish sir --3 March 2026
+        const query = `use [z_scope] EXEC sp_MotherChildFamilySales2_VB '${partnumber}',${brandid},${dealerid},${locationid}`
+        const result = await pool.request().query(query)
+        return result
+    } catch (error) {
+        throw new Error(`partfamilySaleservice failed: ${error.message}`);
+    }
+
+}
+
 // MAX and Stock of any Location (Family)
 const singlePartMaxByLocationService = async (brandid,dealerid,locationid,partnumber)=>{
 try {
@@ -250,4 +266,4 @@ try {
     throw new Error(`partBrandMapping failed: ${error.message}`);
 }
 }
-export {partfamilySaleservice,singlePartMaxByLocationService,partFamilyService,partBrandMapping}
+export {MotherChildFamilySaleservice , partfamilySaleservice,singlePartMaxByLocationService,partFamilyService,partBrandMapping}
