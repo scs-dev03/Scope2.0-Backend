@@ -1,7 +1,7 @@
 import { partBrandMapping, partfamilySaleservice, partFamilyService, singlePartMaxByLocationService } from "../../services/norms-management/utils.service.js";
 import { orderDetailsByPartnumberService, transformOrderData } from "../../services/orderDetails/orderDetailsService.js";
 import { partDetailsservice } from "../../services/salesview/salesviewservices.js";
-import { advisorwisePPNIValueService, groupStock, gainerListingService, jobCardByVehicleService, locationwisePPNIValueService, partInfo, partsByJobCardService, partSubstituteDetailService, partwisePPNIValueService, PPNIVALUE12MonthsService, reservedForVehicle, userroleService, vehicleSearchService, vehiclewisePPNIValueService, predictiveVehicleSearchService, vehicledealercheck, groupNorms, partfamilywiseStockColor, vehicleScore, vehicleSearchPagination, vehicleSearchlogsService, viewLogService, vehicleSearchConsentService } from "../../services/dealerMonitoring/dealerMonitoringService.js";
+import { advisorwisePPNIValueService, groupStock, gainerListingService, jobCardByVehicleService, locationwisePPNIValueService, partInfo, partsByJobCardService, partSubstituteDetailService, partwisePPNIValueService, PPNIVALUE12MonthsService, reservedForVehicle, userroleService, vehicleSearchService, vehiclewisePPNIValueService, predictiveVehicleSearchService, vehicledealercheck, groupNorms, partfamilywiseStockColor, vehicleScore, vehicleSearchPagination, vehicleSearchlogsService, viewLogService, vehicleSearchConsentService, versionDetailService, appSwitcherService } from "../../services/dealerMonitoring/dealerMonitoringService.js";
 import { performance } from 'node:perf_hooks';
 import { ApiError } from "../../utils/ApiError.js";
 import { ApiResponse } from "../../utils/ApiResponse.js";
@@ -608,8 +608,11 @@ const predictiveVehicleSearch = async (req, res) => {
 
 const vehicleSearchLogs = async (req, res) => {
     try {
-        const { moduleName, event, details, userid } = req.body
-        const result = await vehicleSearchlogsService(moduleName, event, details, userid)
+        const { moduleName, event, details, userid , locationid } = req.body
+        if(!moduleName || !details || !userid || !locationid){
+           return res.status(400).json({ message: `modulename , details , userid and locationid are required fields` })
+        }
+        const result = await vehicleSearchlogsService(moduleName, event, details, userid , locationid)
         res.status(200).send({ Data: result.recordset })
 
     } catch (error) {
@@ -645,4 +648,27 @@ const vehicleSearchConsent = async (req, res) => {
         res.status(500).json(new ApiError(500, `Unexpected error while recording consent`, []))
     }
 }
-export { vehicleSearchConsent, gainerListing, partSale, partDetails, singlePartMaxByLocation, orderDetailsByPartnumber, partStock, vehicleSearch, partSearch, substituteParts, userRole, locationwisePPNIValue, advisorwisePPNIValue, vehiclewisePPNIValue, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, vehicleSearchLogs, viewLog }
+
+const getCurrentVersion = async(req,res)=>{
+try {
+
+    const versionDetail = await versionDetailService()
+    res.status(200).json(new ApiResponse(200,versionDetail))
+} catch (error) {
+    res.status(500).json(new ApiError(500,error.message))
+}
+}
+
+const appSwitcher = async(req,res)=>{
+try {
+        const {userId} = req.body;
+        if(!userId){
+            res.status(400).json(new ApiError(400,`userId is required field`))
+        }
+        const data = await appSwitcherService(userId)
+        res.status(200).json(new ApiResponse(200,data))
+} catch (error) {
+    res.status(500).json(new ApiError(500,error.message))
+}
+}
+export { appSwitcher, getCurrentVersion, vehicleSearchConsent, gainerListing, partSale, partDetails, singlePartMaxByLocation, orderDetailsByPartnumber, partStock, vehicleSearch, partSearch, substituteParts, userRole, locationwisePPNIValue, advisorwisePPNIValue, vehiclewisePPNIValue, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, vehicleSearchLogs, viewLog }

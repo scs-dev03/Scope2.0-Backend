@@ -1,6 +1,6 @@
 import { Router } from "express";
 const router = Router()
-import { advisorwisePPNIValue, gainerListing, locationwisePPNIValue, orderDetailsByPartnumber, partDetails, partSale, partSearch, partStock, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, singlePartMaxByLocation, substituteParts, userRole, vehicleSearch, vehicleSearchConsent, vehicleSearchLogs, vehiclewisePPNIValue, viewLog } from "../controller/dealer-monitoring/user.dealermonitoring.js";
+import { advisorwisePPNIValue, appSwitcher, gainerListing, getCurrentVersion, locationwisePPNIValue, orderDetailsByPartnumber, partDetails, partSale, partSearch, partStock, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, singlePartMaxByLocation, substituteParts, userRole, vehicleSearch, vehicleSearchConsent, vehicleSearchLogs, vehiclewisePPNIValue, viewLog } from "../controller/dealer-monitoring/user.dealermonitoring.js";
 import { partremark, ppnipartremark, ppnivehicleremark, remarkMaster, vehicleremark } from "../controller/dealer-monitoring/remark.dealermonitoring.js";
 import { uploadImg } from "../middlewares/multer.middleware.js";
 
@@ -53,5 +53,8 @@ router.route('/log').post(vehicleSearchLogs)
 router.route('/view-log').post(viewLog)
 
 router.route('/vehicle-consent').post(vehicleSearchConsent)
+
+router.route('/version').get(getCurrentVersion)
+router.route('/app-switcher').post(appSwitcher)
 
 export default router

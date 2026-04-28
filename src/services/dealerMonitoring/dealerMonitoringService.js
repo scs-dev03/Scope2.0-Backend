@@ -1441,4 +1441,27 @@ const vehicleSearchConsentService = async (vehiclenumber, dealerid, locationid, 
     throw new ApiError(500, 'Unable to log the consent')
   }
 }
-export { vehicleSearchConsentService, vehicleSearchPagination, vehicleScore, partfamilywiseStockColor, groupNorms, vehicledealercheck, PPNIVALUE12MonthsService, userroleService, partInfo, reservedForVehicle, groupStock, jobCardByVehicleService, partsByJobCardService, partSubstituteDetailService, locationwisePPNIValueService, advisorwisePPNIValueService, vehiclewisePPNIValueService, partwisePPNIValueService, vehicleSearchService, gainerListingService, predictiveVehicleSearchService, vehicleSearchlogsService, viewLogService }
+
+const versionDetailService = async()=>{
+try {
+    const pool = await getPool()
+    const query =  `use z_scope select top 1 * from App_VersionControl order by VersionID desc`
+    const result = await pool.request().query(query)
+    return result.recordset
+} catch (error) {
+  throw new ApiError(500,error)
+}
+}
+
+const appSwitcherService = async(userId)=>{
+try {
+    const pool = await getPool()
+    const query = `use z_scope select IIF(SUM(CAST(OgsStatus AS INT))>0,1,0)IsSimsActive , IIF(SUM(CAST(SharingStatus AS INT))>0,1,0)IsGainerActive from locationinfo where dealerid  = (select top 1 DealerID from VW_SpmLocation where EmpID = @userId )`
+    const result = await pool.request().input('userId',sql.Int,userId).query(query)
+    return result.recordset
+} catch (error) {
+  throw new ApiError(500,error)
+}
+}
+
+export { appSwitcherService , versionDetailService, vehicleSearchConsentService, vehicleSearchPagination, vehicleScore, partfamilywiseStockColor, groupNorms, vehicledealercheck, PPNIVALUE12MonthsService, userroleService, partInfo, reservedForVehicle, groupStock, jobCardByVehicleService, partsByJobCardService, partSubstituteDetailService, locationwisePPNIValueService, advisorwisePPNIValueService, vehiclewisePPNIValueService, partwisePPNIValueService, vehicleSearchService, gainerListingService, predictiveVehicleSearchService, vehicleSearchlogsService, viewLogService }
