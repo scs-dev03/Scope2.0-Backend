@@ -810,7 +810,7 @@ const newDashboardView = async (req, res) => {
 //  '0,30 0-9 * * *'  for every 30 minutes interval between 12 midnight to 9 am 
 async function scheduleTask() {
   // cron.schedule('*/15 * * * *', async () => { 
-  console.log("Running scheduler every 15 minutes")
+  // console.log("Running scheduler every 15 minutes")
   try {
     const pool = await getPool()
     // Fetch tasks to be executed (status = 0 means pending)
@@ -822,7 +822,7 @@ async function scheduleTask() {
     const tasks = result.recordset
 
     if (!tasks.length) {
-      console.log(`No requests scheduled in the last 15 minutes.`)
+      throw new Error("No requests scheduled for next 12 hours.");
       return
     }
 
@@ -847,11 +847,11 @@ async function scheduleTask() {
           case 15: return refreshCID(task.dealerid, task.reqid)
           case 17: return refreshGainerMini(task.reqid)
           default:
-            console.error(`Invalid dashboardCode: ${task.dashboardcode} for reqid: ${task.reqid}`)
-            return null;
+            throw new Error(`Invalid dashboardCode: ${task.dashboardcode} for reqid: ${task.reqid}`)
+            // return null;
         }
       } catch (error) {
-        console.error(`Error processing dashboardCode ${task.dashboardcode} for reqid: ${task.reqid}:`, error.message)
+        throw new Error(`Error processing dashboardCode ${task.dashboardcode} for reqid: ${task.reqid}:, ${error.message}`)
       }
     })
 
@@ -860,7 +860,7 @@ async function scheduleTask() {
 
     console.log("All scheduled tasks processed asynchronously")
   } catch (error) {
-    console.error("Error processing scheduled tasks:", error.message)
+    throw new Error(`Error processing scheduled tasks: ${error.message}`)
   }
   // })
 }
@@ -986,11 +986,8 @@ async function siRefresh() {
 
     const task = (await pool.request().query(query)).recordset[0];
     // console.log(task);
-
-
     if (!task) {
-      console.log("No SI Dashboard scheduled in the last 15 minutes.");
-      return;
+      throw new Error("No SI Dashboard scheduled for next 12 hours.");
     }
 
     // Mark status as In-Progress
@@ -1005,7 +1002,7 @@ async function siRefresh() {
 
     console.log("✅ SI task processed successfully");
   } catch (error) {
-    console.error("❌ Error processing SI scheduled task:", error.message);
+    throw new Error(`❌ Error processing SI scheduled task:", ${error.message}`);
   }
   // });
 }

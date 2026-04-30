@@ -5,41 +5,12 @@ import cron from 'node-cron'
 import { scheduleTask, siRefresh } from './controller/dashboardSchedulerController.js'
 
 const PORT = process.env.PORT || 3000
-// connectDB()
-// // .then(()=>{
-// //     app.listen(PORT,()=>{
-// //         console.log(`Server is runnning at PORT: ${PORT}`)
-// //     })
-// // })
-// .catch((err)=>{
-//     console.log(" connection failed",err);
-// })
-// .finally(() => {
-//   app.listen(PORT, () => {
-//     console.log(`Server is running at PORT: ${PORT}`);
-//   });
-//   });
-// async function start() {
-//   try {
-//     await connectDB();         // waits for ALL pools (or throws on first error)
-//     app.listen(PORT, () => {
-//       console.log(`Server is running at PORT: ${PORT}`);
-//     });
-//   } catch (err) {
-//     console.error('DB connection failed—aborting start:', err);
-//     process.exit(1);
-//   }
-// }
-
-// start();
-
-
 
 async function start() {
   try {
     // 1) Connect your DB pools
     await connectDB();
-    console.log('DB connected, scheduling jobs…');
+    // console.log('DB connected, scheduling jobs…');
 
     // 2) Schedule your cron jobs:
 
