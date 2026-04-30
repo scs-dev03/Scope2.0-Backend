@@ -9,7 +9,7 @@ import appRoutes from './routes/index.js'
 import dm from './routes/dealermonitoringRoute.js'
 import aap from './routes/auto-approval/index.js'
 import automailers from './routes/automailers/automailer.js'
-
+import gainer from './routes/Gainer/helpsupport.js'
 const app = express()
 app.use(cors())
 app.use(express.json());
@@ -30,6 +30,6 @@ app.use("/api/v1/von", von)
 app.use("/api/v1/dm", dm)
 app.use("/api/v1", aap)
 app.use("/api/v1/automailer",automailers)
-
+app.use("/api/v1/gnr",gainer)
 
 export { app }
