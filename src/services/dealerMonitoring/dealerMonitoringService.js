@@ -42,16 +42,28 @@ const reservedForVehicle = async (dealerid, locationid, partnumber) => {
     // where Part_Number1 = '${partnumber}' and Final_Close = 'N'
     // group by Part_Number1`
 
-    const query = `
+    // const query = `
+    //     use z_scope
+    //     select 
+    //     CASE WHEN cs2.qty < SUM(co.qty)  then cs2.Qty else SUM(co.qty)  end as ReservedforVehicle 
+    //     from Create_Order_Request_TD001_${dealerid} co
+    //     join currentstock1 cs1 on cs1.locationid = co.LocationID
+    //     join CurrentStock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = co.Part_Number1
+    //     where Part_Number1 = '${partnumber}' and Dateadded >  DATEADD(day, -60 , GETDATE()) 
+    //     and cs2.Qty > 0 and Current_status <> 'Close' and co.LocationID = ${locationid}
+    //     group by co.Qty , cs2.Qty`
+        const query = `
         use z_scope
-        select 
+        select Vehiclenumber, CONCAT(amg.vcFirstName , '' , amg.vcLastName )Advisor , 
         CASE WHEN cs2.qty < SUM(co.qty)  then cs2.Qty else SUM(co.qty)  end as ReservedforVehicle 
         from Create_Order_Request_TD001_${dealerid} co
         join currentstock1 cs1 on cs1.locationid = co.LocationID
         join CurrentStock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = co.Part_Number1
-        where Part_Number1 = '${partnumber}' and Dateadded >  DATEADD(day, -60 , GETDATE()) 
+		    join AdminMaster_GEN amg on amg.bintId_Pk = co.AdvisorID
+        where Part_Number1 = '${partnumber}'   and 
+		    co.Dateadded >  DATEADD(day, -60 , GETDATE()) 
         and cs2.Qty > 0 and Current_status <> 'Close' and co.LocationID = ${locationid}
-        group by co.Qty , cs2.Qty
+        group by co.Qty , cs2.Qty , Vehiclenumber , amg.vcFirstName , amg.vcLastName
         `
     // console.log(query);
     const result = await pool.request().query(query)
@@ -1139,18 +1151,28 @@ order by value desc
 OFFSET @offset ROWS
 FETCH NEXT @pagesize ROWS ONLY;
 `
-    const result = await pool.request()
-      .input('vehicleno', vehicleno)
-      .input('LocationId',sql.Int,locationid)
-      .input('filter', filter)
-      .input('alltimenonstk', alltimenonstk)
-      .input('issued', issued)
-      .query(query);
+    // const result = await pool.request()
+    //   .input('vehicleno', vehicleno)
+    //   .input('LocationId',sql.Int,locationid)
+    //   .input('filter', filter)
+    //   .input('alltimenonstk', alltimenonstk)
+    //   .input('issued', issued)
+    //   .query(query);
+
+      const result = await pool.request()
+      .input('DealerId', sql.Int, dealerid)
+      .input('VehicleNo', sql.VarChar(50), vehicleno)
+      .input('LocationId', sql.Int, locationid)
+      .input('Filter', sql.VarChar(10), filter)
+      .input('AllTimeNonStk', sql.VarChar(10), alltimenonstk)
+      .input('Issued', sql.VarChar(1), issued)
+      .input('PageSize', sql.Int, pagesize || 1000)
+      .input('PageNo', sql.Int, pageno || 1)
+      .execute('dbo.sp_APP_VehicleSearch_VB');
 
     return result;
   } catch (error) {
     throw new Error(`vehiclesearchService failed: ${error.message}`);
-
   }
 }
 
