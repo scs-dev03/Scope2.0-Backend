@@ -98,7 +98,7 @@ const userView = async (req, res) => {
         if (!dealerid && !brandid) {
             return res.status(400).json({ Error: `Dealerid and Brandid is a required Parameter` })
         }
-        let cleanPart = "";
+        let cleanPart = null;
         if (partnumber) {
             cleanPart = cleanPartNumber(partnumber)
             const Check = await maxpartmapping(cleanPart,brandid, dealerid, locationid)
@@ -135,7 +135,6 @@ const userView = async (req, res) => {
         request.input('parttype', sql.Int, parttype ?? null);
 
         const result = await request.query(query);
-        // console.log(result.recordset);
 
         res.status(200).json({ Data: result.recordset })
     } catch (error) {
@@ -691,7 +690,7 @@ const adminPendingView = async (req, res) => {
     .input('parttype', sql.Int, parttype ?? null)
     .input('exportFlag',sql.Bit , exportFlag )
     .execute('UAD_VON.dbo.sp_GetAdminView4');
-
+        
         res.status(200).json({ Data: result.recordset });
     } catch (error) {
         res.status(500).json({ Error: error.message });
