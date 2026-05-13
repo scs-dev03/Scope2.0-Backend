@@ -226,7 +226,7 @@ const partStock = async (req, res) => {
 
 const vehicleSearch = async (req, res) => {
     try {
-        // const pool = await getPool()
+
         const { dealerid, locationid, vehicleno, alltimestk, filter, issued, pageno, pagesize, userId } = req.body
         const converted = filter === null
             ? null
@@ -671,4 +671,27 @@ try {
     res.status(500).json(new ApiError(500,error.message))
 }
 }
-export { appSwitcher, getCurrentVersion, vehicleSearchConsent, gainerListing, partSale, partDetails, singlePartMaxByLocation, orderDetailsByPartnumber, partStock, vehicleSearch, partSearch, substituteParts, userRole, locationwisePPNIValue, advisorwisePPNIValue, vehiclewisePPNIValue, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, vehicleSearchLogs, viewLog }
+
+const vehicleGroupStock = async(req,res)=>{
+try {
+        const {brandid , dealerid , locationid , partnumber} = req.body
+        if(!brandid || !dealerid || !locationid || !partnumber){
+            return res.status(400).json(new ApiError(400,`brandid , dealerid , locationid , partnumber are required`))
+        }
+        const result = await groupStock(brandid , dealerid , locationid , partnumber)
+        const colorMap = new Map(
+            result.recordsets[2].map(item => [item.locationid, item.PartStatus])
+            );
+
+        // Merge by matching LocationID
+        const merged = result.recordsets[0].map(item => ({
+            ...item,
+            Partstatus: colorMap.get(item.LocationID) || null
+        }));
+        res.status(200).json(new ApiResponse(200,merged))
+
+} catch (error) {
+    res.status(200).json(new ApiError(500,error.message))
+}
+}
+export { appSwitcher, getCurrentVersion, vehicleSearchConsent, gainerListing, partSale, partDetails, singlePartMaxByLocation, orderDetailsByPartnumber, partStock, vehicleSearch, partSearch, substituteParts, userRole, locationwisePPNIValue, advisorwisePPNIValue, vehiclewisePPNIValue, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, vehicleSearchLogs, viewLog ,vehicleGroupStock }

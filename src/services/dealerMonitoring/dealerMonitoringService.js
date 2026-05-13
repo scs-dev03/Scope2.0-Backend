@@ -55,7 +55,8 @@ const reservedForVehicle = async (dealerid, locationid, partnumber) => {
         const query = `
         use z_scope
         select Vehiclenumber, CONCAT(amg.vcFirstName , '' , amg.vcLastName )Advisor , 
-        CASE WHEN cs2.qty < SUM(co.qty)  then cs2.Qty else SUM(co.qty)  end as ReservedforVehicle 
+        CASE WHEN cs2.qty < SUM(co.qty)  then cs2.Qty else SUM(co.qty)  end as ReservedforVehicle ,
+        co.SCS_Submit_Date , co.final_close
         from Create_Order_Request_TD001_${dealerid} co
         join currentstock1 cs1 on cs1.locationid = co.LocationID
         join CurrentStock2 cs2 on cs2.StockCode = cs1.tCode and cs2.PartNumber = co.Part_Number1
@@ -63,7 +64,7 @@ const reservedForVehicle = async (dealerid, locationid, partnumber) => {
         where Part_Number1 = '${partnumber}'   and 
 		    co.Dateadded >  DATEADD(day, -60 , GETDATE()) 
         and cs2.Qty > 0 and Current_status <> 'Close' and co.LocationID = ${locationid}
-        group by co.Qty , cs2.Qty , Vehiclenumber , amg.vcFirstName , amg.vcLastName
+        group by co.Qty , cs2.Qty , Vehiclenumber , amg.vcFirstName , amg.vcLastName ,  co.SCS_Submit_Date , co.final_close
         `
     // console.log(query);
     const result = await pool.request().query(query)
@@ -87,7 +88,7 @@ const groupStock = async (brandid, dealerid, locationid, partnumber) => {
 		DECLARE @Part TABLE (partnumber varchar(30))
 	
         declare @latestpart varchar(20) 
-        select @latestpart = subpartnumber1 from Substitution_Master (nolock)
+        select @latestpart = subpartnumber1 from z_scope..Substitution_Master (nolock)
         where brandid = @InputBrandID and (partnumber1 = @InputPart or subpartnumber1 = @InputPart)
 
 		insert into @Part(partnumber)
@@ -147,13 +148,12 @@ const groupStock = async (brandid, dealerid, locationid, partnumber) => {
 		from @Part pf
 		join Dealer_Workshop_Master (nolock) dl on  dl.BrandID= @InputBrandID
 		join @RedFlag rf on rf.LocationId = dl.bigid
-		left join Substitution_Master sm (nolock) on  sm.brandid = @InputBrandID and pf.partnumber = sm.partnumber1
+		left join z_scope..Substitution_Master sm (nolock) on  sm.brandid = @InputBrandID and pf.partnumber = sm.partnumber1
 		outer apply(
 		           select top 1 a1.* from 
 		           Stockable_Nonstockable_TD001_${dealerid} a1 (nolock)
 		           inner join @StkblDate b1 on(a1.Locationid=b1.LocationID and a1.Stockdate =b1.MaxDate)
 		           where a1.Locationid = dl.bigid and a1.partnumber1 = pf.partnumber 
-		 
 		           )sn
 		left join Opening_Stock_Upload_TD001_${dealerid} os (nolock) on os.Locationid = dl.bigid and os.partnumber1 = pf.partnumber 
 		where dl.OgsStatus = 1 and dl.DealerID=@InputDealerid)l
