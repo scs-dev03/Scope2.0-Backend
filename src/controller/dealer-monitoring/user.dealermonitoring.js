@@ -168,13 +168,13 @@ const partStock = async (req, res) => {
         const times = [];
 
         const s1 = t(); const p1 = partInfo(brandid, partnumber).finally(() => times.push({ label: 'partInfo', ms: +(t() - s1).toFixed(2) }));
-        const s2 = t(); const p2 = reservedForVehicle(dealerid, locationid, partnumber).finally(() => times.push({ label: 'reservedForVehicle', ms: +(t() - s2).toFixed(2) }));
+        const s2 = t(); const p2 = reservedForVehicle(brandid,dealerid, locationid, partnumber).finally(() => times.push({ label: 'reservedForVehicle', ms: +(t() - s2).toFixed(2) }));
         const s3 = t(); const p3 = groupStock(brandid, dealerid, locationid, partnumber).finally(() => times.push({ label: 'groupStock', ms: +(t() - s3).toFixed(2) }));
         const s4 = t(); const p4 = singlePartMaxByLocationService(brandid, dealerid, locationid, partnumber).finally(() => times.push({ label: 'singlePartMaxByLocation', ms: +(t() - s4).toFixed(2) }));
 
         const [data, data2, data3, data4] = await Promise.all([p1, p2, p3, p4]);
 
-        times.sort((a, b) => b.ms - a.ms);
+        // times.sort((a, b) => b.ms - a.ms);
         // console.table(times);
         // console.log('Slowest:', times[0]);
         // const [data, data2, data3, data4] = await Promise.allSettled([
@@ -185,11 +185,11 @@ const partStock = async (req, res) => {
         // ]);
         // console.log(`1`,data);
         // console.log(`2`,data2);
-        // console.log(`3`,data3);
+        // console.log(`3`,data3.recordsets);
         // console.log(`4`,data4);
 
         const colorMap = new Map(
-            data3.recordsets[2].map(item => [item.locationid, item.PartStatus])
+            data3.recordsets[2].map(item => [item.LocationID, item.PartStatus])
         );
 
         // Merge by matching LocationID
@@ -239,7 +239,7 @@ const vehicleSearch = async (req, res) => {
                 message: `Invalid Vehicle Number`
             })
         }
-        const [data1, data2, data3] = await Promise.all([
+        const [data1, data2] = await Promise.all([
             vehicleSearchService(dealerid, locationid, vehicleno, alltimestk, converted, issued, pageno, pagesize),
             vehicleScore(dealerid, locationid, vehicleno),
             //  vehicleSearchPagination(pageno,pagesize,dealerid,vehicleno,alltimestk,issued,converted)
@@ -270,6 +270,8 @@ const vehicleSearch = async (req, res) => {
             // pageInfo:data3
         })
     } catch (error) {
+        console.log(error);
+        
         await ErrorLog("Vehicle Search",error.message,req.body.userId)
         res.status(500).json(error)
     }finally {
@@ -680,7 +682,7 @@ try {
         }
         const result = await groupStock(brandid , dealerid , locationid , partnumber)
         const colorMap = new Map(
-            result.recordsets[2].map(item => [item.locationid, item.PartStatus])
+            result.recordsets[2].map(item => [item.LocationID, item.PartStatus])
             );
 
         // Merge by matching LocationID
@@ -694,4 +696,18 @@ try {
     res.status(200).json(new ApiError(500,error.message))
 }
 }
-export { appSwitcher, getCurrentVersion, vehicleSearchConsent, gainerListing, partSale, partDetails, singlePartMaxByLocation, orderDetailsByPartnumber, partStock, vehicleSearch, partSearch, substituteParts, userRole, locationwisePPNIValue, advisorwisePPNIValue, vehiclewisePPNIValue, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, vehicleSearchLogs, viewLog ,vehicleGroupStock }
+const vehicleReserved = async(req,res)=>{
+    try {
+        const {brandid , dealerid , locationid , partnumber} = req.body
+        if(!brandid || !dealerid || !locationid || !partnumber){
+            return res.status(400).json(new ApiError(400,`brandid , dealerid , locationid , partnumber are required`))
+        }
+        const result = await reservedForVehicle(brandid , dealerid , locationid , partnumber)
+        
+        res.status(200).json(new ApiResponse(200,result.recordset,'Successful'))
+
+} catch (error) {
+    res.status(200).json(new ApiError(500,error.message))
+}
+}
+export { appSwitcher, getCurrentVersion, vehicleSearchConsent, gainerListing, partSale, partDetails, singlePartMaxByLocation, orderDetailsByPartnumber, partStock, vehicleSearch, partSearch, substituteParts, userRole, locationwisePPNIValue, advisorwisePPNIValue, vehiclewisePPNIValue, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, vehicleSearchLogs, viewLog ,vehicleGroupStock , vehicleReserved }

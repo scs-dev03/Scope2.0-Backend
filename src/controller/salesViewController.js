@@ -283,7 +283,7 @@
 // export {partDetails,getLedger}
 
 import { getPool } from '../db/db.js';
-import { readExcel } from '../utils/vonHelper.js';
+import { readExcel , cleanPartNumber } from '../utils/vonHelper.js';
 import fs from 'fs';
 
 /**
@@ -298,7 +298,8 @@ const partDetails = async (req, res) => {
     if (!Brandid || !excel) {
       return res.status(400).json({ error: 'Brandid and Excel flag are required' });
     }
-
+    // console.log('input',Partnumber);
+    
     let partnumberString = "";
 
     // Option 1: Read from Partnumber field in body
@@ -329,7 +330,7 @@ const partDetails = async (req, res) => {
 
 
       // Convert to SQL-safe string
-      partnumberString = partnumberArray.map(p => `'${p}'`).join(",");
+      partnumberString = partnumberArray.map(p => `'${cleanPartNumber(p)}'`).join(",");
       // console.log(partnumberString);
     }
 
@@ -338,11 +339,11 @@ const partDetails = async (req, res) => {
       if (req.file == undefined) {
         return res.status(400).json({ message: 'Must upload an Excel file' });
       }
-
+      
       const { path } = req.file;
       const {headers,data} = await readExcel(path);
       fs.unlinkSync(path); // Clean up file
-
+      
       const REQUIRED_HEADERS = [
         "PartNumber"
       ];
@@ -365,25 +366,29 @@ const partDetails = async (req, res) => {
       }
       data.forEach(row => {
         if (row.PartNumber != null) {
-          row.PartNumber = String(row.PartNumber)
-            .trim()
-            .toUpperCase();
+          row.PartNumber = cleanPartNumber(row.PartNumber)
         }
       });
       // console.log(data);
-
+      
       // Check if all parts are mapped to brand
       const unmatchedParts = await partBrandMappingCheck(Brandid, data);
+      // console.log(`unmatchedParts`,unmatchedParts);
+      
       if (unmatchedParts.length > 0) {
         return res.status(400).json({
           message: 'Some parts are not mapped with the selected brand.',
-          unmatchedParts: unmatchedParts.map(item => String(item.PartNumber).trim())
+          unmatchedParts: unmatchedParts.map(item => cleanPartNumber(item.PartNumber))
         });
       }
 
-      partnumberString = data.map(item => `'${item.PartNumber}'`).join(",");
+      partnumberString = data.map(item => item.PartNumber)
+      .filter(part => part != null && part !== "")
+      .map(part => `'${part}'`)
+      .join(",");
     }
-
+    // console.log(`output`,partnumberString);
+    
     // Build and run SQL query
     const query = `
       USE z_scope;
@@ -415,12 +420,13 @@ const partDetails = async (req, res) => {
  */
 const getLedger = async (req, res) => {
   const pool = await getPool();
-  const { Brandid, Dealerid, Locationid, PartNumber, from, to, excel } = req.body;
-  if(!Brandid || !Dealerid || !Locationid == null || !from || !to || !excel){
+  const { Brandid, Dealerid, Locationids, PartNumber, from, to, excel } = req.body;
+  if(!Brandid || !Dealerid || !Locationids == null || !from || !to || !excel){
     return res.status(400).json({message:`All Fields are required`})
   }
   let partnumbers = [];
-
+  // console.log('input',PartNumber);
+  
   try {
     // Option 1: Read from Excel file
     if (excel == 1) {
@@ -445,9 +451,7 @@ const getLedger = async (req, res) => {
       // Converting all partnumber to upper case
       data.forEach(row => {
         if (row.PartNumber != null) {
-          row.PartNumber = String(row.PartNumber)
-            .trim()
-            .toUpperCase();
+          row.PartNumber = cleanPartNumber(row.PartNumber)
         }
       });
 
@@ -455,11 +459,11 @@ const getLedger = async (req, res) => {
       if (unmatchedParts.length > 0) {
         return res.status(400).json({
           message: 'Some parts are not mapped with the selected brand.',
-          unmatchedParts: unmatchedParts.map(item => String(item.PartNumber).trim())
+          unmatchedParts: unmatchedParts.map(item => cleanPartNumber(item.PartNumber).trim())
         });
       }
 
-      partnumbers = data.map(item => item.PartNumber?.toString().trim()).filter(Boolean);
+      partnumbers = data.map(item => cleanPartNumber(item.PartNumber)).filter(Boolean);
       // console.log(partnumbers);
 
     }
@@ -515,7 +519,7 @@ const getLedger = async (req, res) => {
 
     // Map input part numbers to part IDs
     const matchedPartids = partnumbers
-      .map(pn => partNumberToPartidMap[pn])
+      .map(pn => partNumberToPartidMap[cleanPartNumber(pn)])
       .filter(pid => pid !== undefined);
 
     if (matchedPartids.length === 0) {
@@ -525,15 +529,24 @@ const getLedger = async (req, res) => {
 
     // const partidString = partnumbers.join(',');
     const partidString = matchedPartids.join(',');
+    // console.log(`output`,partidString);
+    
 
     ///****END */
 
 
     // console.log(`sp called`);
-    // console.log(partidString);
-    
+    // console.log(`LocationIds:`,Locationids);
+        const LocationIdsSQL =
+      Locationids === null || Locationids === undefined || Locationids === '' ||   Locationids === 'NULL'
+        ? 'NULL'
+        : `'${Locationids}'`;
+
     // Call stored procedure with mapped part IDs
-    const query = `exec [z_scope].dbo.SP_MonthwisemultiPartLedger ${Brandid} ,${Dealerid}, ${Locationid}, '${partidString}', ${from}, ${to}`;
+    
+    const query = `exec [z_scope].dbo.SP_MonthwisemultiPartLedgerL ${Brandid} ,${Dealerid}, ${LocationIdsSQL}, '${partidString}', ${from}, ${to}`;
+    // console.log(query);
+    
     const result = await pool.request().query(query);
 
     // console.log(`Data aagya`);

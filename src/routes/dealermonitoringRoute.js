@@ -1,6 +1,6 @@
 import { Router } from "express";
 const router = Router()
-import { advisorwisePPNIValue, appSwitcher, gainerListing, getCurrentVersion, locationwisePPNIValue, orderDetailsByPartnumber, partDetails, partSale, partSearch, partStock, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, singlePartMaxByLocation, substituteParts, userRole, vehicleSearch, vehicleSearchConsent, vehicleSearchLogs, vehiclewisePPNIValue, viewLog , vehicleGroupStock } from "../controller/dealer-monitoring/user.dealermonitoring.js";
+import { advisorwisePPNIValue, appSwitcher, gainerListing, getCurrentVersion, locationwisePPNIValue, orderDetailsByPartnumber, partDetails, partSale, partSearch, partStock, partwisePPNIValue, PPNIVALUE12Months, predictiveVehicleSearch, singlePartMaxByLocation, substituteParts, userRole, vehicleSearch, vehicleSearchConsent, vehicleSearchLogs, vehiclewisePPNIValue, viewLog , vehicleGroupStock, vehicleReserved } from "../controller/dealer-monitoring/user.dealermonitoring.js";
 import { partremark, ppnipartremark, ppnivehicleremark, remarkMaster, vehicleremark } from "../controller/dealer-monitoring/remark.dealermonitoring.js";
 import { uploadImg } from "../middlewares/multer.middleware.js";
 
@@ -22,6 +22,8 @@ router.route('/partstock').post(partStock)
 //Vehicle Search
 router.route('/vehicle').post(vehicleSearch)
 router.route('/grpstk').post(vehicleGroupStock)
+router.route('/reserved').post(vehicleReserved)
+
 router.route('/jobcard').post(partSearch)
 
 //Substitution Search

@@ -355,6 +355,7 @@ const getBDM = async (req, res) => {
 }
 const getRequests = async (req, res) => {
   try {
+
     const { userid } = req.body
     if (!userid) {
       return res.status(400).json({ message: `userid is required` })
@@ -580,18 +581,21 @@ const fetchRequests = async (userid) => {
       LEFT JOIN z_scope.dbo.AdminMaster_GEN amg2 ON sd.Editedby = amg2.bintId_Pk
       LEFT JOIN z_scope.dbo.AdminMaster_GEN amg3 ON sd.Deletedby = amg3.bintId_Pk
       LEFT JOIN z_scope.dbo.AdminMaster_GEN amg4 ON d.BDMCode = amg4.bintId_Pk
+      Where sd.Addedon > DATEADD(MONTH,-3,GETDATE()) 
     `;
 
     //  Filter for BDM (only show their own requests)
     if (usertype == '0') {
-      query += ` WHERE sd.Addedby = ${userid}`;
+      query += ` AND sd.Addedby = ${userid}`;
     }
 
     query += ` ORDER BY reqid DESC;`;
 
+    
     //  Step 3: Execute query and return result
     const result = await pool.request().query(query);
-
+    // console.log(result.recordset);
+    
     return result.recordset;
 
   } catch (error) {

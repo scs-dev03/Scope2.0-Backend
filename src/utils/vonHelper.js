@@ -482,7 +482,10 @@ function invalidUserRemarks(cleanedData) {
 
 function cleanPartNumber(partNo) {
     if (!partNo) return "";
-
+    
+    // Convert numbers or any other value to string
+    partNo = String(partNo);
+  
     // Remove non ASCII characters first
     partNo = partNo.replace(/[^\x00-\x7F]/g, "");
 

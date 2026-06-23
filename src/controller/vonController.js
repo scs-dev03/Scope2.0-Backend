@@ -94,29 +94,31 @@ const viewRemark = async (req, res) => {
 const userView = async (req, res) => {
     try {
         const pool = await getPool()
-        const { brandid, dealerid, r1, r2, l1, l2, partnumber, locationid, flag, seasonalid, modelid, natureid, parttype } = req.body
+        const { brandid, dealerid, r1, r2, l1, l2, partnumber, locationids, flag, seasonalid, modelid, natureid, parttype } = req.body
         if (!dealerid && !brandid) {
             return res.status(400).json({ Error: `Dealerid and Brandid is a required Parameter` })
         }
         let cleanPart = null;
         if (partnumber) {
             cleanPart = cleanPartNumber(partnumber)
-            const Check = await maxpartmapping(cleanPart,brandid, dealerid, locationid)
+            // Check for Check
+            const Check = await maxpartmapping(cleanPart,brandid, dealerid, locationids)
+
             if (Check == false) {
                 return res.status(400).json({ message: `No Sales in 12 Month for this part` })
             }
-            const flagCheck = await partflagCheck(cleanPart, dealerid, locationid, flag)
+            const flagCheck = await partflagCheck(cleanPart, dealerid, locationids, flag)
             // console.log(flagCheck);
             if (flagCheck == false) {
                 return res.status(400).json({ message: `Please choose correct filter` })
             }
 
         }
-        const query = `exec [z_scope].dbo.GetMAXData1 @brandid, @dealerid , @r1, @r2, @l1, @l2, @partnumber, @locationid, @maxvalueflag ,@seasonalid,@natureid,@modelid,@parttype;`
+        const query = `exec [z_scope].dbo.GetMAXData1 @brandid, @dealerid , @r1, @r2, @l1, @l2, @partnumber, @locationids, @maxvalueflag ,@seasonalid,@natureid,@modelid,@parttype;`
         
-        if (!cleanPart && !locationid) {
-            return res.status(400).json({ Error: `partnumber or locationid is required` })
-        }
+        // if (!cleanPart && !locationids) {
+        //     return res.status(400).json({ Error: `partnumber or locationid is required` })
+        // }
         const request = pool.request();
 
         // Handle potential NULL values correctly
@@ -130,7 +132,7 @@ const userView = async (req, res) => {
         request.input('natureid', sql.Int, natureid ?? null);
         request.input('modelid', sql.Int, modelid ?? null);
         request.input('partnumber', sql.VarChar, cleanPart ?? null);
-        request.input('locationid', sql.Int, locationid ?? null);
+        request.input('locationids', sql.VarChar, locationids ?? null);
         request.input('maxvalueflag', sql.Int, flag ?? null);
         request.input('parttype', sql.Int, parttype ?? null);
 
@@ -230,8 +232,8 @@ const viewLog = async (req, res) => {
         if (!brandid || !dealerid) {
             return res.status(400).json({ message: `Brandid and Dealerid are required Parameter` })
         }
-        if (!locationid && !partnumber) {
-            return res.status(400).json({ message: `Locationid or Partid anyone is required` })
+        if (!locationid ||  !partnumber) {  
+            return res.status(400).json({ message: `Locationid or partnumber anyone is required` })
         }
         const spmdynamicTable = `UAD_VON..UAD_VON_SPMFeedback_${brandid}`
         const admindynamicTable = `UAD_VON..UAD_VON_AdminFeedback_${brandid}`
@@ -312,7 +314,7 @@ const viewLog = async (req, res) => {
 const adminView = async (req, res) => {
     try {
         const pool = await getPool()
-        const { brandid, dealerid, r1, r2, l1, l2, partnumber, locationid, flag, seasonalid, modelid, natureid, status, parttype, pageno, pagesize } = req.body
+        const { brandid, dealerid, r1, r2, l1, l2, partnumber, locationids, flag, seasonalid, modelid, natureid, status, parttype, pageno, pagesize } = req.body
         // console.log(brandid, dealerid, r1, r2 ,l1,l2, partnumber , locationid , flag, seasonalid, modelid, natureid, status,parttype, pageno, pagesize);
         let cleanPart = null;
 
@@ -326,11 +328,11 @@ const adminView = async (req, res) => {
         //  cleanPart = cleanPartNumber(partnumber)
          cleanPart = partnumber ? cleanPartNumber(partnumber) : null;
 
-            const Check = await maxpartmapping(cleanPart,brandid, dealerid, locationid)
+            const Check = await maxpartmapping(cleanPart,brandid, dealerid, locationids)
             if (Check == false) {
                 return res.status(400).json({ message: `No Sales in 12 Month for this part` })
             }
-            const flagCheck = await partflagCheck(cleanPart, dealerid, locationid, flag)
+            const flagCheck = await partflagCheck(cleanPart, dealerid, locationids, flag)
             // console.log(flagCheck);
             if (flagCheck == false) {
                 return res.status(400).json({ message: `Please choose correct filter` })
@@ -366,7 +368,7 @@ const adminView = async (req, res) => {
         const result = await pool.request()
     .input('brandid', sql.Int, brandid)
     .input('dealerid', sql.Int, dealerid)
-    .input('locationid', sql.Int, locationid ?? null)
+    .input('locationids', sql.VarChar, locationids ?? null)
     .input('seasonalid', sql.Int, seasonalid ?? null)
     .input('natureid', sql.Int, natureid ?? null)
     .input('modelid', sql.Int, modelid ?? null)
@@ -379,7 +381,7 @@ const adminView = async (req, res) => {
     .input('parttype', sql.Bit, parttype ?? null)
     .input('pageno', sql.Int, pageno)
     .input('pagesize', sql.Int, pagesize)
-    .execute('z_scope.dbo.sp_MAXAdminView');
+    .execute('z_scope.dbo.sp_MAXAdminViewL');
         // const result = await request.query(query);
         // console.log(result.recordset);
 
@@ -584,7 +586,7 @@ const adminPendingView = async (req, res) => {
         let {
             brandid,
             dealerid,
-            locationid,
+            locationids,
             status,
             seasonalid,
             modelid,
@@ -601,7 +603,7 @@ const adminPendingView = async (req, res) => {
 
         brandid = Number(brandid);
         dealerid = dealerid !== null ? Number(dealerid) : null;
-        locationid = locationid !== null ? Number(locationid) : null;
+        locationids = locationids !== null ? locationids : null;
         status = status !== null ? Number(status) : null;
         seasonalid = seasonalid !== null ? Number(seasonalid) : null;
         modelid = modelid !== null ? Number(modelid) : null;
@@ -613,6 +615,10 @@ const adminPendingView = async (req, res) => {
         flag = flag !== null ? Number(flag) : null;
         parttype = parttype !== null ? Number(parttype) : null;
 
+        if (Number(exportFlag) === 1) {
+            status = null;
+        }
+
         if (!brandid) {
             return res.status(400).json({ message: `Brandid is required` });
         }
@@ -623,13 +629,13 @@ const adminPendingView = async (req, res) => {
             }
             // cleanPart = cleanPartNumber(partnumber)
             cleanPart = partnumber ? cleanPartNumber(partnumber) : null;
-            const Check = await maxpartmapping(cleanPart,brandid, dealerid, locationid)
+            const Check = await maxpartmapping(cleanPart,brandid, dealerid, locationids)
             // console.log(Check);
 
             if (Check == false) {
                 return res.status(400).json({ message: `No Sales in 12 Month for this part` })
             }
-            const flagCheck = await partflagCheck(cleanPart, dealerid, locationid, flag)
+            const flagCheck = await partflagCheck(cleanPart, dealerid, locationids, flag)
             // console.log(flagCheck);
             if (flagCheck == false) {
                 return res.status(400).json({ message: `Please choose correct MAX filter` })
@@ -676,7 +682,7 @@ const adminPendingView = async (req, res) => {
         const result = await pool.request()
     .input('brandid', sql.Int, brandid)
     .input('dealerid', sql.Int, dealerid)
-    .input('locationid', sql.Int, locationid ?? null)
+    .input('locationids', sql.VarChar, locationids ?? null)
     .input('Status', sql.Bit, status ?? null)
     .input('seasonalid', sql.Int, seasonalid ?? null)
     .input('natureid', sql.Int, natureid ?? null)
@@ -689,7 +695,7 @@ const adminPendingView = async (req, res) => {
     .input('MaxValueFlag', sql.Int, flag ?? null)
     .input('parttype', sql.Int, parttype ?? null)
     .input('exportFlag',sql.Bit , exportFlag )
-    .execute('UAD_VON.dbo.sp_GetAdminView4');
+    .execute('UAD_VON.dbo.sp_GetAdminView4L');
         
         res.status(200).json({ Data: result.recordset });
     } catch (error) {
@@ -1414,7 +1420,7 @@ const adminUpload = async (req, res) => {
 
 }
 
-const maxpartmapping = async (partNumber, BrandId , DealerId, LocationId) => {
+const maxpartmapping = async (partNumber, BrandId , DealerId, LocationIds) => {
     const pool = await getPool()
     // const query = `select * from z_scope..stockable_nonstockable_td001_${DealerId} where locationid = ${LocationId} and partnumber1 = '${partNumber}' and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${DealerId} where locationid = ${LocationId})`
     // const query = `with data as (
@@ -1436,16 +1442,23 @@ const maxpartmapping = async (partNumber, BrandId , DealerId, LocationId) => {
         select partnumber1  from substitution_master (nolock) where brandid = @brandid and subpartnumber1= @latestpart
         union 
         select ISNULL(@latestpart,@partnumber) 
-        ;with data as (
-                    select locationid , MAX(Stockdate)Stockdate from z_scope..stockable_nonstockable_td001_${DealerId} where Addedby !=7
-                    group by Locationid
-                    )
-        select * from z_scope..stockable_nonstockable_td001_${DealerId} sn
-        join data d on d.Locationid = sn.Locationid and d.Stockdate = sn.Stockdate
-        JOIN @Part p on p.partnumber = sn.partnumber1
-        where @locationid IS NULL OR d.locationid = @locationid`
+        drop table if exists #temp1
+		CREATE TABLE #temp1 (  
+		LocationID INT,  
+		MaxDate DATETIME  
+		); 
+ 
+		INSERT INTO #temp1   
+		SELECT locationid, MAX(stockdate) AS MaxDate  
+		FROM stockable_nonstockable_td001_${DealerId} (NOLOCK)  
+		WHERE  addedby != 7 and (             @LocationIDs IS NULL             OR LocationID IN (                 SELECT TRY_CAST(value AS int)                 FROM STRING_SPLIT(@LocationIDs,',')                 WHERE TRY_CAST(value AS int) IS NOT NULL        ))
+		GROUP BY LocationID;  
 
-    const result = await pool.request().input('brandid',sql.Int,BrandId).input('partnumber',sql.VarChar,partNumber).input('locationid',sql.Int,LocationId).query(query)
+        select * from z_scope..stockable_nonstockable_td001_${DealerId} sn
+        join #temp1 d on d.Locationid = sn.Locationid and d.MaxDate = sn.Stockdate
+        JOIN @Part p on p.partnumber = sn.partnumber1`
+
+    const result = await pool.request().input('brandid',sql.Int,BrandId).input('partnumber',sql.VarChar,partNumber).input('LocationIDs',sql.VarChar,LocationIds).query(query)
     // console.log(query);
     // console.log("maxresult",result.recordset);
     
@@ -1455,31 +1468,82 @@ const maxpartmapping = async (partNumber, BrandId , DealerId, LocationId) => {
     return true;
 }
 
-const partflagCheck = async (partnumber, dealerid, locationid, flag) => {
-    if(flag == null){
-        return true
-    }
-    const pool = await getPool()
-    const queryflagzero = `use z_scope select * from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and partnumber1 = '${partnumber}' and Addedby != 7 and Maxvalue = 0 and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and Addedby != 7)`
-    const queryflagone = `use z_scope select * from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and partnumber1 = '${partnumber}' and Addedby != 7 and Maxvalue > 0 and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and Addedby != 7)`
-    let result;
-    if (flag) {
+// const partflagCheck = async (partnumber, dealerid, locationids, flag) => {
+//     if(flag == null){
+//         return true
+//     }
+//     const pool = await getPool()
+//     const queryflagzero = `use z_scope select * from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and partnumber1 = '${partnumber}' and Addedby != 7 and Maxvalue = 0 and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and Addedby != 7)`
+//     const queryflagone = `use z_scope select * from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and partnumber1 = '${partnumber}' and Addedby != 7 and Maxvalue > 0 and stockdate = (select MAX(stockdate) from z_scope..stockable_nonstockable_td001_${dealerid} where locationid = ${locationid} and Addedby != 7)`
+//     let result;
+//     if (flag) {
 
-        result = await pool.request().query(queryflagone)
-        // console.log(`1`,result.recordset);
+//         result = await pool.request().query(queryflagone)
+//         // console.log(`1`,result.recordset);
         
-    }
-    else {
-        result = await pool.request().query(queryflagzero)
-        // console.log(2,result.recordset);
-    }
-    console.log('flagCheck',result);
+//     }
+//     else {
+//         result = await pool.request().query(queryflagzero)
+//         // console.log(2,result.recordset);
+//     }
+//     console.log('flagCheck',result);
 
-    if (result.recordset.length === 0) {
-        return false
+//     if (result.recordset.length === 0) {
+//         return false
+//     }
+//     return true;
+// }
+
+const partflagCheck = async (partnumber, dealerid, locationids, flag) => {
+    if (flag == null) {
+        return true;
     }
-    return true;
-}
+
+    const pool = await getPool();
+
+    const tableName = `[z_scope].dbo.[stockable_nonstockable_td001_${Number(dealerid)}]`;
+
+    const query = `
+        ;WITH data AS (
+            SELECT 
+                locationid, 
+                MAX(stockdate) AS MaxDate
+            FROM ${tableName} WITH (NOLOCK)
+            WHERE Addedby != 7
+              AND (
+                    @LocationIDs IS NULL
+                    OR LocationID IN (
+                        SELECT TRY_CAST(value AS INT)
+                        FROM STRING_SPLIT(@LocationIDs, ',')
+                        WHERE TRY_CAST(value AS INT) IS NOT NULL
+                    )
+                  )
+            GROUP BY LocationID
+        )
+        SELECT TOP 1 1 AS Found
+        FROM ${tableName} sn WITH (NOLOCK)
+        JOIN data d 
+            ON d.LocationID = sn.LocationID 
+           AND d.MaxDate = sn.StockDate
+        WHERE sn.PartNumber1 = @PartNumber
+          AND sn.Addedby != 7
+          AND (
+                (@Flag = 0 AND sn.Maxvalue = 0)
+                OR
+                (@Flag = 1 AND sn.Maxvalue > 0)
+              );
+    `;
+
+    const result = await pool.request()
+        .input('PartNumber', sql.VarChar(50), partnumber)
+        .input('LocationIDs', sql.VarChar(300), locationids || null)
+        .input('Flag', sql.Int, flag)
+        .query(query);
+
+    // console.log('flagCheck', result.recordset);
+
+    return result.recordset.length > 0;
+};
 
 async function getFeedbackId(brandid, usertype) {
     try {
