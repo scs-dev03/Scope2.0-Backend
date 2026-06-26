@@ -1,5 +1,5 @@
 import fs from 'fs';
-import mime from 'mime';
+import { lookup } from 'mime-types';
 import {
   S3Client,
   PutObjectCommand,
@@ -17,12 +17,22 @@ export const s3 = new S3Client({
   }
 });
 
+
+export const s3_another = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY3,
+    secretAccessKey: process.env.AWS_SECRET_KEY3
+  }
+});
 export async function uploadFileToS3(localFilePath, bucketName, s3Key) {
   // ✅ Delete if object already exists
+  // console.log(localFilePath, bucketName , s3Key);
+  
   try {
-    await s3.send(new HeadObjectCommand({ Bucket: bucketName, Key: s3Key }));
+    await s3_another.send(new HeadObjectCommand({ Bucket: bucketName, Key: s3Key }));
     // If above doesn't throw, object exists — delete it
-    await s3.send(new DeleteObjectCommand({ Bucket: bucketName, Key: s3Key }));
+    await s3_another.send(new DeleteObjectCommand({ Bucket: bucketName, Key: s3Key }));
     console.log(`Existing object "${s3Key}" deleted`);
   } catch (err) {
     if (err.name !== 'NotFound') {
@@ -34,7 +44,7 @@ export async function uploadFileToS3(localFilePath, bucketName, s3Key) {
 
   // ✅ Upload new file
   const fileStream = fs.createReadStream(localFilePath);
-  const contentType = mime.getType(localFilePath) || 'application/octet-stream';
+  const contentType = lookup(localFilePath) || 'application/octet-stream';
 
   const uploadCommand = new PutObjectCommand({
     Bucket: bucketName,
@@ -43,7 +53,7 @@ export async function uploadFileToS3(localFilePath, bucketName, s3Key) {
     ContentType: contentType
   });
 
-  await s3.send(uploadCommand);
+  await s3_another.send(uploadCommand);
 
   // ✅ Return signed URL (valid 7 days)
   const getCommand = new GetObjectCommand({ Bucket: bucketName, Key: s3Key });

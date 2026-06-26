@@ -14,9 +14,8 @@ const transporter = nodemailer.createTransport({
 
 const tatacvBrandPoolMail = (date,url) => ({
   from: `"Gainer AutoMailer" <${process.env.EMAILID}>`,
-  to: 'Chandan.Anand@tatamotors.com,vorsupport_pne@tatamotors.com,abhinaba.sahu@tatamotors.com,Anurag.Chatterjee@tatamotors.com,singh.arvind@tatamotors.com,Ashwani.Anand@tatamotors.com,chetan.garg@tatamotors.com,haribaskar.md@tatamotors.com,pritesh.mishra@tatamotors.com,rajesh.roshan@tatamotors.com,rishi.ranjan@tatamotors.com,sandeep.kapoor@tatamotors.com,santanu.das@tatamotors.com,s.bahuleyan@tatamotors.com,Shreshth.AGARWAL@tatamotors.com,tamal.saha@tatamotors.com,vikas.kothari@tatamotors.com,vikash.jha@tatamotors.com,GBB820982@tatamotors.com',
-  // to: 'vishu.bansal@sparecare.in',
-   cc: 'sandeep.avhad@tatamotors.com,hanish.khattar@sparecare.in,gainer.ho@sparecare.in',
+ to: 'Chandan.Anand@tatamotors.com,vorsupport_pne@tatamotors.com,abhinaba.sahu@tatamotors.com,Anurag.Chatterjee@tatamotors.com,singh.arvind@tatamotors.com,Ashwani.Anand@tatamotors.com,chetan.garg@tatamotors.com,haribaskar.md@tatamotors.com,pritesh.mishra@tatamotors.com,rajesh.roshan@tatamotors.com,rishi.ranjan@tatamotors.com,sandeep.kapoor@tatamotors.com,santanu.das@tatamotors.com,s.bahuleyan@tatamotors.com,Shreshth.AGARWAL@tatamotors.com,tamal.saha@tatamotors.com,vikas.kothari@tatamotors.com,vikash.jha@tatamotors.com,GBB820982@tatamotors.com',
+  cc: 'sandeep.avhad@tatamotors.com,hanish.khattar@sparecare.in,gainer.ho@sparecare.in,aryaman.phukan@tatamotors.com,shaaktee.narayan@tatamotors.com,ramakrishna.p@tatamotors.com,bpp11000436@tatamotors.com,piyush.lall@tatamotors.com,shrikant.varade@tatamotors.com,rupesh.jewrikar@tatamotors.com',
    bcc:'scope@sparecare.in,vishu.bansal@sparecare.in',
   subject: `Tata PCBU Brand Pool Stock for ${date}`,
   html: `
@@ -29,7 +28,7 @@ const Honda4WBrandPoolMail = (date,url) => ({
   from: `"Gainer AutoMailer" <${process.env.EMAILID}>`,
   to : ' ssgupta@honda.co.in,psohal@honda.co.in,scvijay@honda.co.in,ngoud@hondacarindia.com,djain@honda.co.in',
   cc : ' hanish.khattar@sparecare.in,manish.sharma@sparecare.in,gainer.exec8@sparecare.in,gainer.ho@sparecare.in',
-  // to: 'vishu.bansal@sparecare.in,manish.sharma@sparecare.in',
+  // to: 'vishu.bansal@sparecare.in',
   bcc:'scope@sparecare.in,vishu.bansal@sparecare.in',
   subject: `Honda 4W Brand Pool Stock for ${date}`,
   html: `
