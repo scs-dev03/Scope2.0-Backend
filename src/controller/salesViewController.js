@@ -503,32 +503,32 @@ const getLedger = async (req, res) => {
     ///*****PARTNUMBER ARE NOT TO BE CONVERTED TO PARTID BECAUSE OF OPTIMIZATION 
     // 26 August 2025************/
 
-    // Fetch mapping of PartNumber to Partid from DB
-    const mappingQuery = `SELECT Partid, PartNumber FROM z_scope..Dealer_Sale_Upload_Old_TD001_${Dealerid}`;
-    const mappingResult = await pool.request().query(mappingQuery);
-    const mappingData = mappingResult.recordset;
+    // // Fetch mapping of PartNumber to Partid from DB
+    // const mappingQuery = `SELECT Partid, PartNumber FROM z_scope..Dealer_Sale_Upload_Old_TD001_${Dealerid}`;
+    // const mappingResult = await pool.request().query(mappingQuery);
+    // const mappingData = mappingResult.recordset;
 
-    // console.log(mappingData);
+    // // console.log(mappingData);
     
-    const partNumberToPartidMap = {};
-    mappingData.forEach(item => {
-      if (item.PartNumber) {
-        partNumberToPartidMap[item.PartNumber.trim()] = item.Partid;
-      }
-    });
+    // const partNumberToPartidMap = {};
+    // mappingData.forEach(item => {
+    //   if (item.PartNumber) {
+    //     partNumberToPartidMap[item.PartNumber.trim()] = item.Partid;
+    //   }
+    // });
 
-    // Map input part numbers to part IDs
-    const matchedPartids = partnumbers
-      .map(pn => partNumberToPartidMap[cleanPartNumber(pn)])
-      .filter(pid => pid !== undefined);
+    // // Map input part numbers to part IDs
+    // const matchedPartids = partnumbers
+    //   .map(pn => partNumberToPartidMap[cleanPartNumber(pn)])
+    //   .filter(pid => pid !== undefined);
 
-    if (matchedPartids.length === 0) {
-      return res.status(400).json({ message: 'No sales for this Part'//'No matching Partids found for the provided part numbers.'
-       });
-    }
+    // if (matchedPartids.length === 0) {
+    //   return res.status(400).json({ message: 'No sales for this Part'//'No matching Partids found for the provided part numbers.'
+    //    });
+    // }
 
-    // const partidString = partnumbers.join(',');
-    const partidString = matchedPartids.join(',');
+
+    const partidString = partnumbers.join(',');
     // console.log(`output`,partidString);
     
 
