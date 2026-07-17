@@ -29,7 +29,7 @@ const Honda4WBrandPoolMail = (date,url) => ({
   to : ' ssgupta@honda.co.in,psohal@honda.co.in,scvijay@honda.co.in,ngoud@hondacarindia.com,djain@honda.co.in',
   cc : ' hanish.khattar@sparecare.in,manish.sharma@sparecare.in,gainer.exec8@sparecare.in,gainer.ho@sparecare.in',
   // to: 'vishu.bansal@sparecare.in',
-  bcc:'scope@sparecare.in,vishu.bansal@sparecare.in',
+  bcc: 'vishu.bansal@sparecare.in',
   subject: `Honda 4W Brand Pool Stock for ${date}`,
   html: `
     <p>Hi Team</p>
