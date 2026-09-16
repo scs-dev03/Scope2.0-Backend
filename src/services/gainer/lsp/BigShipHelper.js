@@ -21,7 +21,11 @@ export async function getLrNumber(token, apiUrl, masterCustomOrderId) {
         // console.log("apiResponse",apiResponse);
         
         if (apiResponse.status_code === 200 && apiResponse.status === true) {
-            return apiResponse.data.getOrderDetails.AwbNumber ?? null;
+            // return apiResponse.data.getOrderDetails.AwbNumber ?? null;
+            // console.log(apiResponse.data);
+            
+            return apiResponse.data.lr_number ?? null;
+
         } else {
             // console.log("API Error:", apiResponse.message);
             return null;

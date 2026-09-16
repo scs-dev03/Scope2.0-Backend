@@ -15,6 +15,7 @@ export default async function BigShipOrderStatusUpdate(req, res) {
         const pool = await getPool();
 
         const query = `
+            USE [Z_SCOPE]
             select A.Job_ID , B.LRnumber LRNumber, A.DispatchOrderNo,
             (Select APIURL from Lsp_Cred where APITYPE = 'LRTRACK'  and LspCode = 10 ) APIURL_Tracking , 
             (Select TokenNo from CompanyMaster where CompanyCode = 10 )TokenNo , 
@@ -167,6 +168,7 @@ export default async function BigShipOrderStatusUpdate(req, res) {
                             .input("FailedReason", sql.NVarChar, "Tracking history not found"
                             )
                             .query(`
+                                USE [Z_SCOPE]
                                 UPDATE SH_DispatchDetail SET FailedReason = @FailedReason
                                 WHERE DispatchOrderNo = @DispatchOrderNo AND CompanyCode = 10
                             `);
@@ -230,7 +232,7 @@ export default async function BigShipOrderStatusUpdate(req, res) {
 
 
                     let updateQuery = `
-
+                        USE [Z_SCOPE]
                         UPDATE SH_DispatchDetail
                         SET
                         LSPStatus  = @LSPStatus,
@@ -371,7 +373,7 @@ export default async function BigShipOrderStatusUpdate(req, res) {
                     .input("LRNumber",sql.NVarChar,lrNumber)
                     .input("FailedReason",sql.NVarChar,errorMessage)
                     .query(`
-
+                        USE [z_scope]
                         UPDATE SH_DispatchDetail
 
                         SET FailedReason =
@@ -411,10 +413,10 @@ export default async function BigShipOrderStatusUpdate(req, res) {
 
             successCount,
 
-            failedCount,
+            failedCount
 
-            orders:
-                processedOrders
+            // ,orders:
+            //     processedOrders
         });
 
     }

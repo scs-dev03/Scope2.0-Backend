@@ -7,6 +7,7 @@ export default async function BigShipLrUpdate(req, res) {
         const pool = await getPool();
 
         const query = `
+                USE [Z_SCOPE]
                 SELECT 
                 (SELECT TokenNo from CompanyMaster where CompanyCode = 10)TokenNo,
 				(SELECT TokenDate from CompanyMaster where CompanyCode = 10)TokenDate,
@@ -63,7 +64,7 @@ export default async function BigShipLrUpdate(req, res) {
                         dispatchOrderNo,
                         jobId,
                         success: false,
-                        message: "LABELPRINT API URL missing"
+                        message: "GETLR API URL missing"
                     });
 
                     continue;
@@ -77,6 +78,7 @@ export default async function BigShipLrUpdate(req, res) {
                         .input("LRNumber", sql.NVarChar, lrNumber)
                         .input("DispatchOrderNo", sql.NVarChar, dispatchOrderNo)
                         .query(`
+                        USE [Z_SCOPE]
                            IF EXISTS (
                                 SELECT 1
                                 FROM SH_BigShipLrCreation
@@ -130,7 +132,8 @@ export default async function BigShipLrUpdate(req, res) {
                     .request()
                     .input("DispatchOrderNo", sql.NVarChar, dispatchOrderNo)
                     .input("FailedReason", sql.NVarChar, 'Not Found')
-                    .query(`
+                    .query(` 
+                        USE [Z_SCOPE]
                             INSERT INTO SH_FAILEDLR
                             (OrderNo,FailedReason,Date )
                             VALUES (@DispatchOrderNo,@FailedReason,GETDATE())
@@ -188,7 +191,7 @@ export default async function BigShipLrUpdate(req, res) {
                     .request()
                     .input("DispatchOrderNo", sql.NVarChar, dispatchOrderNo)
                     .input("FailedReason", sql.NVarChar, errorMessage)
-                    .query(`
+                    .query(`USE [Z_SCOPE]
                             INSERT INTO SH_FAILEDLR
                             (OrderNo,FailedReason,Date)
                             VALUES (@DispatchOrderNo,@FailedReason,GETDATE())
@@ -209,8 +212,8 @@ export default async function BigShipLrUpdate(req, res) {
             message: "LR processing completed",
             totalOrders: rows.length,
             successCount,
-            failedCount,
-            orders: processedOrders
+            failedCount
+            // ,orders: processedOrders
         });
     }
     catch (error) {
