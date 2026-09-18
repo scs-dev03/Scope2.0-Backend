@@ -366,13 +366,13 @@ const userRole = async (req, res) => {
 
 const locationwisePPNIValue = async (req, res) => {
     try {
-        const { dealerid, nonstockable, jobcardstatus, month, userId , locationid} = req.body
+        const { dealerid, nonstockable, jobcardstatus, month, userId , locationid , rate} = req.body
         if (!dealerid || !nonstockable == null || !jobcardstatus == null || !month == null || !userId) {
             return res.status(400).json({
                 message: `dealerid , nonstockable , userId and partstatus is required`
             })
         }
-        const data = await locationwisePPNIValueService(dealerid, jobcardstatus, nonstockable, month)
+        const data = await locationwisePPNIValueService(dealerid, jobcardstatus, nonstockable, month , rate)
 
         res.status(200).json({
             Data: data.recordset
@@ -391,13 +391,13 @@ const locationwisePPNIValue = async (req, res) => {
 
 const advisorwisePPNIValue = async (req, res) => {
     try {
-        const { dealerid, locationid, nonstockable, jobcardstatus, month , userId } = req.body
+        const { dealerid, locationid, nonstockable, jobcardstatus, month , userId ,rate} = req.body
         if (!dealerid || !locationid || !nonstockable == null || !jobcardstatus == null || !month == null || !userId) {
             return res.status(400).json({
                 message: `dealerid , nonstockable and partstatus is required`
             })
         }
-        const data = await advisorwisePPNIValueService(dealerid, locationid, jobcardstatus, nonstockable, month)
+        const data = await advisorwisePPNIValueService(dealerid, locationid, jobcardstatus, nonstockable, month,rate)
         //    console.log(data);
 
         res.status(200).json({
@@ -417,13 +417,13 @@ const advisorwisePPNIValue = async (req, res) => {
 
 const vehiclewisePPNIValue = async (req, res) => {
     try {
-        const { dealerid, locationid, nonstockable, jobcardstatus, advisor, month, pageno, pagesize , userId } = req.body
+        const { dealerid, locationid, nonstockable, jobcardstatus, advisor, month, pageno, pagesize , userId ,rate } = req.body
         if (!dealerid || !locationid || !nonstockable == null || !jobcardstatus == null || !month == null || !userId) {
             return res.status(400).json({
                 message: `dealerid , nonstockable and partstatus is required`
             })
         }
-        const data = await vehiclewisePPNIValueService(dealerid, locationid, jobcardstatus, nonstockable, advisor, month, pageno, pagesize)
+        const data = await vehiclewisePPNIValueService(dealerid, locationid, jobcardstatus, nonstockable, advisor, month, pageno, pagesize ,rate)
         //    console.log(data);
 
         // Transform the flat data into grouped vehicle-wise structure
@@ -521,13 +521,13 @@ const vehiclewisePPNIValue = async (req, res) => {
 
 const partwisePPNIValue = async (req, res) => {
     try {
-        const { dealerid, locationid, nonstockable, jobcardstatus, advisor, vehicleno, month, userId } = req.body
+        const { dealerid, locationid, nonstockable, jobcardstatus, advisor, vehicleno, month, userId ,rate } = req.body
         if (!dealerid || !locationid || !nonstockable == null || !jobcardstatus == null || !vehicleno || !month == null || !userId) {
             return res.status(400).json({
                 message: `dealerid , locationid , userId and vehicleno is required`
             })
         }
-        const data = await partwisePPNIValueService(dealerid, locationid, jobcardstatus, nonstockable, advisor, vehicleno, month)
+        const data = await partwisePPNIValueService(dealerid, locationid, jobcardstatus, nonstockable, advisor, vehicleno, month ,rate)
        // 23 Feb 2026 
        // If data is empty return ""Parts Are Not In Stock""  
        // By Harish Sir on Mail
@@ -554,14 +554,14 @@ const partwisePPNIValue = async (req, res) => {
 
 const PPNIVALUE12Months = async (req, res) => {
     try {
-        const { dealerid, locationid, nonstockable, jobcardstatus, advisor } = req.body
+        const { dealerid, locationid, nonstockable, jobcardstatus, advisor ,rate } = req.body
         if (!dealerid || !locationid == null || !nonstockable == null || !jobcardstatus == null || !advisor == null) {
             return res.status(400).json({
                 message: `All fields are required`
             })
         }
 
-        const data = await PPNIVALUE12MonthsService(dealerid, locationid, nonstockable, jobcardstatus, advisor)
+        const data = await PPNIVALUE12MonthsService(dealerid, locationid, nonstockable, jobcardstatus, advisor ,rate)
         res.status(200).json({
             Data: data.recordset
         })
