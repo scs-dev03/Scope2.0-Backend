@@ -30,19 +30,19 @@ const getDealers = async (req, res) => {
 const getLocation = async (req, res) => {
   try {
     const pool = getPool();
-    const { dealerid , userId} = req.body;
+    const { dealerid, userId } = req.body;
     const adminLocationQuery = `use z_scope select locationid,location from locationinfo where dealerid = @dealerid and status = 1 and ogsStatus = 1 order by location`
     const spmLocationQuery = `use z_scope select sl.locationid , sl.location from VW_SpmLocation sl
                               JOIN LocationInfo li on li.LocationID = sl.LocationID
                               where EmpID = @userId and li.OgsStatus = 1 and li.Status = 1 order by sl.location`
     let result
-    if(userId){
-    // const usertypeQuery = `use z_scope select type from AdminMaster_GEN where bintId_Pk = @userId`
-    // const userType = await pool.request().input('userId', sql.Int, userId).query(usertypeQuery)
-       result = await pool.request().input('userId', sql.Int, userId).query(spmLocationQuery)
-   }else{
-     result = await pool.request().input('dealerid', sql.Int, dealerid).query(adminLocationQuery)
-   }
+    if (userId) {
+      // const usertypeQuery = `use z_scope select type from AdminMaster_GEN where bintId_Pk = @userId`
+      // const userType = await pool.request().input('userId', sql.Int, userId).query(usertypeQuery)
+      result = await pool.request().input('userId', sql.Int, userId).query(spmLocationQuery)
+    } else {
+      result = await pool.request().input('dealerid', sql.Int, dealerid).query(adminLocationQuery)
+    }
     res.status(200).json(result.recordset)
   } catch (error) {
     res.status(500).json(error)
@@ -703,4 +703,20 @@ const dealerByCluster = async (req, res) => {
     res.status(500).json(new ApiError(500, error.message))
   }
 }
-export { hsncode, jobtype, ordertype, spmhomepage, pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules, multiDealer, multiLocation, multiAdvisor, getUser, partQuality, tranferType ,clusterByBrand , dealerByCluster}
+
+const campaign = async (req, res) => {
+  try {
+    const pool = await getPool()
+    const { BrandId } = req.body
+    if(!BrandId){
+     return res.status(400).json(new ApiError(400,`BrandId is Required`))
+    }
+    const query = `select tCode , Description from campaignmaster where BrandId = @BrandId`
+    const result = await pool.request().input('BrandId', sql.Int, BrandId).query(query)
+    res.status(200).json(new ApiResponse(200, result.recordset))
+  }
+  catch (error) {
+    res.status(500).json(new ApiError(500, error.message))
+  }
+}
+export { campaign, hsncode, jobtype, ordertype, spmhomepage, pagination, homePageData, getBrands, getDealers, getLocation, getWorkspace, getDashboard, partNature, model, seasonal, partType, userInfo, latestDates, getUserModules, multiDealer, multiLocation, multiAdvisor, getUser, partQuality, tranferType, clusterByBrand, dealerByCluster } 
