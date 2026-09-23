@@ -622,7 +622,7 @@ const locationwisePPNIValueService = async (dealerid, jobcardstatus, nonstockabl
     		  FROM z_scope..Create_Order_Request_TD001_${dealerid} A
     		  LEFT JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
     		  LEFT  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
-          LEFT JOIN Part_Master pm on pm.brandid = A.BrandID and  pm.partnumber1 = A.Part_Number1
+          LEFT JOIN z_scope..Part_Master pm on pm.brandid = A.BrandID and  pm.partnumber1 = A.Part_Number1
     		  where Type='V' and A.current_status<>'Close' AND C.Qty>0 and pm.PartTypeID = 1 and (@rate IS NULL OR pm.landedcost >= @rate)
     		)
     Select A.LocationId , B.Location , B.Advisor , isnull(SUM(B.PPNI_Val),0) PPNI_Value 
@@ -716,7 +716,7 @@ const advisorwisePPNIValueService = async (dealerid, locationid, jobcardstatus, 
       		  FROM z_scope..Create_Order_Request_TD001_${dealerid} A
       		  LEFT JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
       		  LEFT  JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)
-            LEFT JOIN Part_Master pm on pm.brandid = A.BrandID and  pm.partnumber1 = A.Part_Number1	
+            LEFT JOIN z_scope..Part_Master pm on pm.brandid = A.BrandID and  pm.partnumber1 = A.Part_Number1	
       		  where Type='V' and A.locationid = ${locationid} and A.current_status<>'Close' AND C.Qty>0 AND pm.PartTypeID = 1 and (@rate IS NULL OR pm.landedcost >= @rate)
       		  )
       Select  B.Advisor , isnull(SUM(B.PPNI_Val),0) PPNI_Value
@@ -804,7 +804,7 @@ const vehiclewisePPNIValueService = async (dealerid, locationid, jobcardstatus, 
     LEFT JOIN z_scope..CurrentStock2 C
            ON C.Stockcode = B.tcode
           AND C.PartNumber = A.Part_Number
-          LEFT JOIN Part_Master pm on pm.brandid = A.BrandID and  pm.partnumber1 = A.Part_Number1
+          LEFT JOIN z_scope..Part_Master pm on pm.brandid = A.BrandID and  pm.partnumber1 = A.Part_Number1
       WHERE A.Locationid = ${locationid}
       AND A.Type = 'V'
       AND A.current_status <> 'Close'  and pm.PartTypeID = 1  AND C.Qty>0 and (@rate IS NULL OR pm.landedcost >= @rate)
@@ -875,7 +875,7 @@ const partwisePPNIValueService = async (dealerid, locationid, jobcardstatus, non
 		      SELECT A.Part_Number1,A.Vehiclenumber,C.Qty,A.Current_status,A.LocationID,A.Dealerid,A.BIGID ,A.JobLineCloseDate  FROM z_scope..Create_Order_Request_TD001_${dealerid} A
 		      LEFT JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
 		      LEFT JOIN z_scope..CurrentStock2  C	ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
-          LEFT JOIN Part_Master pm on pm.brandid = A.BrandID and  pm.partnumber1 = A.Part_Number1
+          LEFT JOIN z_scope..Part_Master pm on pm.brandid = A.BrandID and  pm.partnumber1 = A.Part_Number1
 		      where A.Locationid = ${locationid} and Vehiclenumber = '${vehicleno}'
 		      AND Type='V' and A.current_status<>'Close' AND C.Qty>0 AND pm.PartTypeID = 1 and (@rate IS NULL OR pm.landedcost >= @rate)
 		  )
@@ -947,7 +947,7 @@ Declare @locationid int = ${locationid},
 		  FROM z_scope..Create_Order_Request_TD001_${dealerid} A
 		  LEFT JOIN z_scope..CurrentStock1  B ON (A.LocationID = B.LocationID)
 		  LEFT  JOIN z_scope..CurrentStock2 C ON (C.Stockcode   = B.tcode AND C.PartNumber = A.Part_Number)	
-      LEFT JOIN Part_Master pm on pm.brandid = A.BrandID and  pm.partnumber1 = A.Part_Number1
+      LEFT JOIN z_scope..Part_Master pm on pm.brandid = A.BrandID and  pm.partnumber1 = A.Part_Number1
 		  where Type='V' and A.current_status<>'Close'  AND C.Qty>0 AND pm.PartTypeID = 1 and (@rate IS NULL OR pm.landedcost >= @rate)
 		  )
 	select CONCAT(MONTH(dateadded), '-', YEAR(dateadded)) AS [Date] ,
@@ -986,8 +986,112 @@ Declare @locationid int = ${locationid},
 const vehicleSearchService = async (dealerid, locationid, vehicleno, alltimenonstk, filter, issued, pageno, pagesize) => {
   try {
     const pool = await getPool()
+//     const query = `
+//             USE z_scope;
+// declare @pagesize int = ${pagesize}, @pageno int = ${pageno};
+// DECLARE @offset INT = (@pageno - 1) * @pagesize;
+// ;WITH data AS (
+//     SELECT latest, SUM(ISNULL(Qty, 0)) AS StockQty 
+//     FROM (
+//         SELECT 
+//             cs2.PartNumber, 
+//             CASE 
+//                 WHEN cs2.PartNumber = sm.partnumber1 THEN sm.subpartnumber1 
+//                 ELSE cs2.PartNumber 
+//             END AS latest,
+//             ISNULL(QTY, 0) AS QTY 
+//         FROM CurrentStock2 cs2
+//         JOIN CurrentStock1 cs1 ON cs1.tCode = cs2.StockCode
+//         JOIN LocationInfo li ON li.LocationID = cs1.LocationID
+//         LEFT JOIN substitution_master sm 
+//             ON sm.brandid = li.BrandID AND sm.partnumber1 = cs2.PartNumber
+//         WHERE cs1.LocationID = ${locationid}
+//     ) a
+//     GROUP BY latest
+// ),
+
+// data2 AS (
+//     SELECT DISTINCT
+//         co.bigid,
+//         co.DealerId,
+//         co.LocationId,
+//         co.Vehiclenumber,
+//         co.jobcard_number,
+//         co.part_number1,
+//         CASE 
+//             WHEN co.Part_Number1 = sm.partnumber1 THEN sm.subpartnumber1 
+//             ELSE co.Part_Number1 
+//         END AS Latest,
+//         pm.partdesc,
+//         pm.category,
+//         co.Price,
+//         co.qty AS Qty,
+//         CASE 
+//             WHEN co.Final_close = 'N' THEN 'Open' 
+//             ELSE 'Close' 
+//         END AS Final_close,
+//         co.Price * co.Qty AS Value,
+//         co.Dateadded AS OrderDate,
+//         pr.All_Time_NonStck,
+//         iif(isnull(pr.price,0)>0,pr.PPNI_Val / pr.price,0) AS PPNI_Qty,
+//         CASE  WHEN co.Current_status <> 'Close'  THEN 'Not Issued' ELSE 'Issued' END AS IssueStatus,
+//         co.BrandID
+//     FROM Create_Order_Request_TD001_${dealerid} co
+//     LEFT JOIN substitution_master sm 
+//         ON sm.Brandid = co.brandid AND co.Part_Number1 = sm.partnumber1
+//     JOIN LocationInfo li ON li.LocationID = co.LocationID
+//     left JOIN z_scope..Part_Master pm 
+//         ON li.brandid = pm.brandid AND pm.partnumber = co.Part_Number1  
+//     LEFT JOIN [UAD_BI_PPNI].dbo.ppni_report_${dealerid} pr
+//         --ON pr.Jobcard_Number = co.Jobcard_number AND pr.PartNumber = co.Part_Number1
+//         ON pr.Bigid = co.Bigid
+//     WHERE co.vehiclenumber = @vehicleno
+// 	 AND (@filter IS NULL OR co.final_close = @filter)
+//         AND (@alltimenonstk IS NULL OR pr.All_Time_NonStck = @alltimenonstk)
+//         AND (
+//           @issued IS NULL OR
+//           (@issued = '0' AND co.JobLineCloseDate IS NULL) OR
+//           (@issued = '1' AND co.JobLineCloseDate IS NOT NULL)
+//         )
+// ),
+// groupstock AS (
+//     SELECT 
+//         lp.Latest,
+//         SUM(ISNULL(cs2.Qty, 0)) AS GroupStock
+//     FROM (
+//         SELECT DISTINCT
+//             COALESCE(sm.subpartnumber1, d2.Latest) AS Latest,
+//             sm.partnumber1 AS EquivalentPart,
+//             d2.BrandID
+//         FROM data2 d2
+//         LEFT JOIN substitution_master sm 
+//             ON (d2.Latest = sm.subpartnumber1 OR d2.Latest = sm.partnumber1)
+//             AND d2.BrandID = sm.BrandID
+//         UNION 
+//         SELECT Latest, Latest AS EquivalentPart, BrandID
+//         FROM data2
+//     ) lp
+//     JOIN CurrentStock2 cs2 ON cs2.PartNumber = lp.EquivalentPart
+//     JOIN CurrentStock1 cs1 ON cs1.tCode = cs2.StockCode
+//     JOIN LocationInfo li ON li.LocationID = cs1.LocationID
+//     WHERE li.DealerID = ${dealerid}
+//     GROUP BY lp.Latest
+// )
+
+// SELECT count(part_number1)  OVER() as Count,
+//     d2.*,
+//     ISNULL(d.StockQty, 0) AS StockQty,
+//     ISNULL(gs.GroupStock, 0) AS GroupStock
+// FROM data2 d2
+// LEFT JOIN data d ON d.latest = d2.Latest
+// LEFT JOIN groupstock gs ON gs.Latest = d2.Latest
+// Where LocationID = @LocationId
+// order by value desc
+// OFFSET @offset ROWS
+// FETCH NEXT @pagesize ROWS ONLY;
+// `
     const query = `
-            USE z_scope;
+    USE z_scope;
 declare @pagesize int = ${pagesize}, @pageno int = ${pageno};
 DECLARE @offset INT = (@pageno - 1) * @pagesize;
 ;WITH data AS (
@@ -1077,20 +1181,58 @@ groupstock AS (
     JOIN LocationInfo li ON li.LocationID = cs1.LocationID
     WHERE li.DealerID = ${dealerid}
     GROUP BY lp.Latest
+),
+R AS
+(
+    SELECT
+        Latest,
+        SUM(ReservedQty) AS ReservedforVehicle
+    FROM
+    (
+        SELECT
+            COALESCE(sm.subpartnumber1, co.Part_Number1) AS Latest,
+            co.Vehiclenumber,
+            co.Part_Number1,
+            CASE 
+                WHEN cs2.Qty < SUM(co.Qty) 
+                THEN cs2.Qty 
+                ELSE SUM(co.Qty) 
+            END AS ReservedQty
+        FROM Create_Order_Request_TD001_${dealerid} co
+        JOIN CurrentStock1 cs1 WITH(NOLOCK)
+            ON cs1.LocationID = co.LocationID
+        JOIN CurrentStock2 cs2 WITH(NOLOCK)
+            ON cs2.StockCode = cs1.tCode
+           AND cs2.PartNumber = co.Part_Number1
+        LEFT JOIN substitution_master sm
+            ON sm.BrandID = co.BrandID
+           AND sm.partnumber1 = co.Part_Number1
+        WHERE co.Dateadded > DATEADD(DAY,-60,GETDATE())
+          AND co.Current_status <> 'Close'
+          AND co.Type = 'V'
+        GROUP BY
+            COALESCE(sm.subpartnumber1, co.Part_Number1),
+            co.Vehiclenumber,
+            co.Part_Number1,
+            cs2.Qty
+    ) x
+    GROUP BY Latest
 )
-
-SELECT count(part_number1)  OVER() as Count,
+SELECT count(d2.part_number1)  OVER() as Count,
     d2.*,
+    ISNULL(ReservedforVehicle,0)ReservedforVehicle,
     ISNULL(d.StockQty, 0) AS StockQty,
-    ISNULL(gs.GroupStock, 0) AS GroupStock
+    ISNULL(gs.GroupStock, 0) AS GroupStock,
+	  CASE WHEN  ISNULL(gs.GroupStock-ISNULL(R.ReservedforVehicle,0),0) < 0 then 0 ELSE ISNULL(gs.GroupStock-ISNULL(R.ReservedforVehicle,0),0) END as GroupFreeStock
 FROM data2 d2
 LEFT JOIN data d ON d.latest = d2.Latest
 LEFT JOIN groupstock gs ON gs.Latest = d2.Latest
-Where LocationID = @LocationId
+LEFT JOIN R on R.Latest = d.latest
+Where d2.LocationID = @LocationId
 order by value desc
 OFFSET @offset ROWS
-FETCH NEXT @pagesize ROWS ONLY;
-`
+FETCH NEXT @pagesize ROWS ONLY
+    `
     const result = await pool.request()
       .input('vehicleno', vehicleno)
       .input('LocationId', sql.Int, locationid)
